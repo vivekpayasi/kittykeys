@@ -368,6 +368,48 @@ import KeyboardCore
         #expect(s.controller.state.shift == .once)
     }
 
+    // MARK: Host notices (ruling R34)
+
+    @Test func hostNoticesKeepShiftTappedOffAtFieldStart() throws {
+        let k = try Harness(autoCap: .sentences)
+        #expect(k.controller.state.shift == .once)
+        try k.tap("⇧")
+        #expect(k.controller.state.shift == .off)
+        // iOS reports the field again with nothing changed: the user's choice stands.
+        k.controller.documentDidChange()
+        #expect(k.controller.state.shift == .off)
+        k.controller.fieldDidChange(FieldTraits(autoCap: .sentences))
+        #expect(k.controller.state.shift == .off)
+        try k.tap("h")
+        #expect(k.doc.text == "h")
+    }
+
+    @Test func hostNoticesKeepShiftTappedOffAfterSentence() throws {
+        let k = try Harness(autoCap: .sentences)
+        for label in ["h", "i", ".", "space"] { try k.tap(label) }
+        #expect(k.doc.text == "Hi. " && k.controller.state.shift == .once)
+        try k.tap("⇧")
+        #expect(k.controller.state.shift == .off)
+        // The late notice of the controller's own space brings nothing new.
+        k.controller.documentDidChange()
+        #expect(k.controller.state.shift == .off)
+        try k.tap("o")
+        #expect(k.doc.text == "Hi. o")
+    }
+
+    @Test func hostNoticeOfAMovedCursorChecksCapitals() throws {
+        let k = try Harness("Ok. bye", autoCap: .sentences)
+        #expect(k.controller.state.shift == .off)
+        // The user moves the cursor in the app to just after "Ok. ": a sentence start.
+        k.doc.moveCursor(by: -3)
+        k.controller.documentDidChange()
+        #expect(k.controller.state.shift == .once)
+        // And back to the end of "bye", reported with the same traits: the automatic capital goes.
+        k.doc.moveCursor(by: 3)
+        k.controller.fieldDidChange(FieldTraits(autoCap: .sentences))
+        #expect(k.controller.state.shift == .off)
+    }
+
     @Test func keyboardWillAppearStartsAfresh() throws {
         let k = try Harness()
         let text = FieldTraits(autoCap: .none)

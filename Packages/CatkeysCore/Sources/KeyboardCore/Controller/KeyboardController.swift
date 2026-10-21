@@ -69,6 +69,9 @@
     /// The latest space typed, while it is the latest key typed here: when, and the text before the cursor just after it.
     /// Any other key or edit here, or cursor mode, clears it. A change made elsewhere shows up as different text before the cursor.
     private var lastSpace: (time: Double, textBefore: String?)?
+    /// The text before the cursor when automatic capitals were last checked, which is after every edit made here.
+    /// A host notice that finds the same text brings nothing new, so it leaves shift alone (ruling R34).
+    private var lastSeenTextBefore: String?
     /// The time of the latest touch or `advance(to:)`.
     private var now = 0.0
     /// Counts `frames` rebuilds, so `notifying` can tell when they changed.
@@ -103,12 +106,17 @@
     }
 
     /// The host reports the field's traits, on focus and after every text change.
-    /// New traits pick the bottom row, the page and the return key; the same traits again leave the page alone,
-    /// so the user stays on the symbols page. Either way automatic capitals are checked again.
+    /// New traits pick the bottom row, the page and the return key, and automatic capitals are checked again.
+    /// The same traits again leave the page alone, so the user stays on the symbols page, and check capitals
+    /// only if the text before the cursor changed since the controller last saw it (as `documentDidChange()`).
     public func fieldDidChange(_ traits: FieldTraits) {
         notifying {
-            if traits != self.traits { adopt(traits) }
-            updateAutoShift()
+            if traits != self.traits {
+                adopt(traits)
+                updateAutoShift()
+            } else {
+                updateAutoShiftIfTextMoved()
+            }
         }
     }
 
@@ -125,9 +133,11 @@
         }
     }
 
-    /// The host reports that the text or the cursor changed, from any source: automatic capitals are checked again.
+    /// The host reports that the text or the cursor changed, from any source. Automatic capitals are checked again
+    /// only if the text before the cursor differs from what the controller last saw: iOS also reports the
+    /// controller's own edits, and checking again then would turn back on a shift the user just tapped off.
     public func documentDidChange() {
-        notifying { updateAutoShift() }
+        notifying { updateAutoShiftIfTextMoved() }
     }
 
     public func touchDown(_ id: TouchID, at p: Point, time: Double) {
@@ -370,10 +380,24 @@
         }
     }
 
-    /// Automatic capitals: shift turns on for one letter where the field asks for a capital, and an automatic one
-    /// turns off where it no longer does. A shift the user tapped, and caps lock, stay as they are.
+    /// Checks automatic capitals again only if the text before the cursor changed since they were last checked,
+    /// as when the user moved the cursor or another source changed the text.
+    private func updateAutoShiftIfTextMoved() {
+        let textBefore = document.textBefore
+        guard textBefore != lastSeenTextBefore else { return }
+        updateAutoShift(before: textBefore)
+    }
+
     private func updateAutoShift() {
-        let capitalize = TextRules.shouldCapitalize(before: document.textBefore, mode: (traits ?? FieldTraits()).autoCap)
+        updateAutoShift(before: document.textBefore)
+    }
+
+    /// Automatic capitals for `textBefore`, the text before the cursor now: shift turns on for one letter where the
+    /// field asks for a capital, and an automatic one turns off where it no longer does. A shift the user tapped,
+    /// and caps lock, stay as they are. Every edit here ends with this check, so `lastSeenTextBefore` follows them.
+    private func updateAutoShift(before textBefore: String?) {
+        lastSeenTextBefore = textBefore
+        let capitalize = TextRules.shouldCapitalize(before: textBefore, mode: (traits ?? FieldTraits()).autoCap)
         switch state.shift {
         case .off where capitalize:
             state.shift = .once
