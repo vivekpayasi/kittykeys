@@ -1,0 +1,10 @@
+// Copy this file to Config/Local.xcconfig (gitignored) and fill in your own values.
+// Base.xcconfig includes it, so these override the defaults there.
+
+// Your Apple team ID: Xcode > Settings > Accounts > your Apple ID > Team.
+DEVELOPMENT_TEAM = ABCDE12345
+
+// A reverse-DNS prefix you own, for example io.github.<handle>.
+// The app becomes <prefix>.catkeys, the keyboard <prefix>.catkeys.keyboard,
+// and the App Group group.<prefix>.catkeys.
+CATKEYS_BUNDLE_PREFIX = io.github.yourname
