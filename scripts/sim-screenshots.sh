@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Builds the app, opens the keyboard preview on the iPhone 17 simulator (iOS 26.4) in each scene below,
-# and saves a screenshot of each, light and dark, to build/screenshots/<name>-<light|dark>.png.
+# Builds the app, launches it on the iPhone 17 simulator (iOS 26.4) in each scene below (the keyboard
+# preview, then each app tab), and saves a screenshot of each, light and dark, to
+# build/screenshots/<name>-<light|dark>.png.
 # The simulator stays booted afterwards. Run from anywhere: ./scripts/sim-screenshots.sh
 set -euo pipefail
 
@@ -14,14 +15,17 @@ OUT="build/screenshots"
 # Seconds from launch to screenshot.
 SETTLE=2
 
-# Each scene: <name>|<launch arguments after -catkeysPreview>
+# Each scene: <name>|<launch arguments>
 SCENES=(
-  "letters|"
-  "symbols-1|-catkeysPreviewPage symbols-1"
-  "symbols-2|-catkeysPreviewPage symbols-2"
-  "hold-d|-catkeysPreviewHold d"
-  "hold-period|-catkeysPreviewHold ."
-  "cursor|-catkeysPreviewCursor"
+  "letters|-catkeysPreview"
+  "symbols-1|-catkeysPreview -catkeysPreviewPage symbols-1"
+  "symbols-2|-catkeysPreview -catkeysPreviewPage symbols-2"
+  "hold-d|-catkeysPreview -catkeysPreviewHold d"
+  "hold-period|-catkeysPreview -catkeysPreviewHold ."
+  "cursor|-catkeysPreview -catkeysPreviewCursor"
+  "app-setup|-catkeysTab setup"
+  "app-settings|-catkeysTab settings"
+  "app-tryit|-catkeysTab tryit"
 )
 
 xcodegen generate
@@ -54,7 +58,7 @@ for appearance in light dark; do
     xcrun simctl terminate "$UDID" "$BUNDLE_ID" >/dev/null 2>&1 || true
     # $arguments is split into separate launch arguments on purpose.
     # shellcheck disable=SC2086
-    xcrun simctl launch "$UDID" "$BUNDLE_ID" -catkeysPreview $arguments >/dev/null
+    xcrun simctl launch "$UDID" "$BUNDLE_ID" $arguments >/dev/null
     sleep "$SETTLE"
     # simctl chats on stderr even when it works; show what it said only when it fails.
     if ! output=$(xcrun simctl io "$UDID" screenshot "$OUT/$name-$appearance.png" 2>&1); then
