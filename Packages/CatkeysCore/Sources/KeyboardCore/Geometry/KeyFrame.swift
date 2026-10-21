@@ -27,9 +27,9 @@ public struct Rect: Equatable, Sendable {
     public var midX: Double { x + width / 2 }
     public var midY: Double { y + height / 2 }
 
-    /// Whether `p` is inside the rectangle. Points on an edge count as inside.
+    /// Whether `p` is inside the rectangle. Points on an edge count as inside; a rect with negative size contains nothing.
     public func contains(_ p: Point) -> Bool {
-        (minX...maxX).contains(p.x) && (minY...maxY).contains(p.y)
+        p.x >= minX && p.x <= maxX && p.y >= minY && p.y <= maxY
     }
 
     /// The straight-line distance from `p` to the nearest point of the rectangle: 0 inside or on an edge.

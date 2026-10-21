@@ -61,9 +61,31 @@ private func label(at p: Point, in frames: [KeyFrame]) -> String? {
     #expect(label(at: Point(x: 390, y: 163), in: f) == "l")
     // The gap between the q-p and a-l rows is y 132...142, midpoint 137; x 195 is g's middle.
     #expect(label(at: Point(x: 195, y: 138), in: f) == "g")
-    // The bottom padding (y 288...292) goes to the bottom key above it.
+    // The bottom padding (y 288...292) and everything below it go to the bottom row.
     #expect(label(at: Point(x: 200, y: 291), in: f) == "space")
     #expect(label(at: Point(x: 390, y: 291), in: f) == "return")
+    #expect(label(at: Point(x: 200, y: 400), in: f) == "space")
+}
+
+@Test func hitTestPicksTheRowFirst() throws {
+    let f = try qwertyFrames()
+    // The a-l row's band runs from just past y 137 to y 189 (halfway through the gap above z-m).
+    // Its left gutter (x < 22.5) is nearer to q or shift as rectangles, but the band keeps it on a.
+    #expect(label(at: Point(x: 5, y: 145), in: f) == "a")
+    #expect(label(at: Point(x: 5, y: 180), in: f) == "a")
+    #expect(label(at: Point(x: 5, y: 194), in: f) == "⇧")
+    #expect(label(at: Point(x: 385, y: 150), in: f) == "l")
+    // The midpoint of the gap belongs to the row above; anything past it to the row below.
+    #expect(label(at: Point(x: 20, y: 137), in: f) == "q")
+    #expect(label(at: Point(x: 20, y: 137.1), in: f) == "a")
+}
+
+@Test func tooNarrowForKeysGivesNoFrames() throws {
+    let page = try #require(try LayoutSet.bundled().page("latin-qwerty"))
+    // Below width 60 the unit is negative: an input view is often 0 wide on its first layout pass.
+    #expect(KeyboardGeometry.frames(page: page, bottom: page.bottomRow(.standard), width: 0, metrics: .standard).isEmpty)
+    #expect(KeyboardGeometry.frames(page: page, bottom: page.bottomRow(.standard), width: 50, metrics: .standard).isEmpty)
+    #expect(KeyboardGeometry.hitTest(Point(x: 200, y: 100), in: [], metrics: .standard) == nil)
 }
 
 @Test func suggestionRowIsNotAKey() throws {
@@ -81,4 +103,8 @@ private func label(at p: Point, in frames: [KeyFrame]) -> String? {
     #expect(r.contains(Point(x: 40, y: 60)) && r.distance(to: Point(x: 40, y: 60)) == 0)
     #expect(!r.contains(Point(x: 0, y: 40)) && r.distance(to: Point(x: 0, y: 40)) == 10)
     #expect(r.distance(to: Point(x: 43, y: 64)) == 5)
+}
+
+@Test func containsHandlesNegativeSize() {
+    #expect(!Rect(x: 10, y: 10, width: -5, height: 5).contains(Point(x: 8, y: 12)))
 }
