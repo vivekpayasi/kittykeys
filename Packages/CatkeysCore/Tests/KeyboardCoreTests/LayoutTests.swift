@@ -37,6 +37,11 @@ import KeyboardCore
     #expect(p.bottomRow(.url).map(\.output).contains("/") && p.bottomRow(.url).map(\.output).contains(".com"))
 }
 
+@Test func globeKeyComesFromTheIndex() throws {
+    let globe = try #require(try LayoutSet.bundled().globeKey)
+    #expect(globe.label == "🌐" && globe.action == .globe && globe.width == 1)
+}
+
 @Test func decodingDefaults() throws {
     let k = try JSONDecoder().decode(KeySpec.self, from: Data(#"{"label":"a","extra":1}"#.utf8))
     #expect(k.output == "a" && k.width == 1 && k.longPress.isEmpty && k.action == .character)

@@ -1,0 +1,354 @@
+/// The keyboard's brain, free of UIKit. It runs the host's raw touches through a `TouchProcessor`, applies the events
+/// to a `TextDocument`, and keeps the `state` and `frames` the keyboard view draws.
+///
+/// It applies the typing rules: shift and caps lock, automatic capitals, the double-space full stop,
+/// the field's bottom row and first page, and the globe key.
+///
+/// Times are the host's touch timestamps in seconds. The host calls `advance(to:)` before forwarding each touch,
+/// and whenever `nextDeadline` passes.
+@MainActor public final class KeyboardController {
+    /// Seconds within which a second shift tap turns on caps lock.
+    private static let shiftDoubleTapWindow = 0.3
+    /// Seconds within which a second space types the full stop.
+    private static let doubleSpaceWindow = 0.5
+    /// What a double space becomes, replacing the first space.
+    private static let doubleSpaceText = ". "
+    /// The page a number field opens on.
+    private static let numberPageID = "symbols-1"
+
+    public var settings: KeyboardSettings {
+        didSet {
+            processor.timing.longPress = settings.longPressDelay
+            notifying {
+                if !settings.keyPopup { state.previewKeyID = nil }
+            }
+        }
+    }
+
+    /// Whether the bottom row gets the layout set's globe key, just left of the emoji key.
+    /// The host sets it from `needsInputModeSwitchKey`.
+    public var needsGlobeKey = false {
+        didSet {
+            guard needsGlobeKey != oldValue else { return }
+            notifying { layOutKeys() }
+        }
+    }
+
+    /// Called when the globe key is typed: the host switches to the next keyboard.
+    public var onGlobe: (() -> Void)?
+    /// Called once after each call that changed `state` or `frames`, for the view to redraw.
+    public var onChange: (() -> Void)?
+    public private(set) var state: KeyboardState
+    /// The current page's keys, with its bottom row. Empty until `setWidth(_:)` gives a usable width.
+    public private(set) var frames: [KeyFrame] = []
+
+    /// The keyboard's height for the current page.
+    public var height: Double {
+        metrics.totalHeight(rowCount: (layouts.page(state.pageID)?.rows.count ?? 0) + 1)
+    }
+
+    /// When the next timer is due, for scheduling `advance(to:)`. nil when no timer is pending.
+    public var nextDeadline: Double? { processor.nextDeadline }
+
+    private let document: any TextDocument
+    private let layouts: LayoutSet
+    private let feedback: any FeedbackSink
+    private let metrics: KeyboardMetrics
+    private let processor: TouchProcessor
+    private var width = 0.0
+    private var bottomVariant = BottomVariant.standard
+    /// The traits of the latest `fieldDidChange(_:)`; nil before the first.
+    private var traits: FieldTraits?
+    /// How many fingers hold each key in `state.pressedKeyIDs`.
+    private var pressCounts: [Int: Int] = [:]
+    /// When the shift tap that set `.once` came. nil when automatic capitals set it, so a tap turns it off.
+    private var shiftTapTime: Double?
+    /// When space was typed, while it is the latest key typed. Any other key, edit or cursor move clears it.
+    private var lastSpaceTime: Double?
+    /// The time of the latest touch or `advance(to:)`.
+    private var now = 0.0
+    /// Counts `frames` rebuilds, so `notifying` can tell when they changed.
+    private var layoutCount = 0
+
+    public init(
+        document: any TextDocument, layouts: LayoutSet, settings: KeyboardSettings, feedback: any FeedbackSink,
+        metrics: KeyboardMetrics = .standard
+    ) {
+        self.document = document
+        self.layouts = layouts
+        self.settings = settings
+        self.feedback = feedback
+        self.metrics = metrics
+        var timing = TouchTiming()
+        timing.longPress = settings.longPressDelay
+        processor = TouchProcessor(timing: timing, metrics: metrics)
+        state = KeyboardState(
+            pageID: layouts.lettersPageID, shift: .off, returnKey: .standard, pressedKeyIDs: [], previewKeyID: nil,
+            alternates: nil, cursorMode: false)
+        updateAutoShift()
+    }
+
+    /// Lays the keys out for a new keyboard width. The same width again does nothing.
+    public func setWidth(_ width: Double) {
+        guard width != self.width else { return }
+        notifying {
+            self.width = width
+            processor.keyboardWidth = width
+            layOutKeys()
+        }
+    }
+
+    /// The host reports the field's traits, on focus and after every text change.
+    /// New traits pick the bottom row, the page and the return key; the same traits again leave the page alone,
+    /// so the user stays on the symbols page. Either way automatic capitals are checked again.
+    public func fieldDidChange(_ traits: FieldTraits) {
+        notifying {
+            if traits != self.traits {
+                self.traits = traits
+                state.returnKey = traits.returnKey
+                let variant: BottomVariant = switch traits.kind {
+                case .email: .email
+                case .url: .url
+                case .text, .number: .standard
+                }
+                show(page: traits.kind == .number ? Self.numberPageID : layouts.lettersPageID, bottom: variant)
+            }
+            updateAutoShift()
+        }
+    }
+
+    /// The host reports that the text or the cursor changed, from any source: automatic capitals are checked again.
+    public func documentDidChange() {
+        notifying { updateAutoShift() }
+    }
+
+    public func touchDown(_ id: TouchID, at p: Point, time: Double) {
+        now = time
+        notifying { apply(processor.touchDown(id, at: p, time: time)) }
+    }
+
+    public func touchMoved(_ id: TouchID, to p: Point, time: Double) {
+        now = time
+        notifying { apply(processor.touchMoved(id, to: p, time: time)) }
+    }
+
+    public func touchUp(_ id: TouchID, at p: Point, time: Double) {
+        now = time
+        notifying { apply(processor.touchUp(id, at: p, time: time)) }
+    }
+
+    public func touchCancelled(_ id: TouchID) {
+        notifying { apply(processor.touchCancelled(id)) }
+    }
+
+    /// Fires the touch timers due by `time`: long-press popups, cursor mode and backspace repeats.
+    public func advance(to time: Double) {
+        now = time
+        notifying { apply(processor.advance(to: time)) }
+    }
+
+    // MARK: Events
+
+    private func apply(_ events: [TouchEvent]) {
+        for event in events { apply(event) }
+    }
+
+    private func apply(_ event: TouchEvent) {
+        switch event {
+        case .keyDown(let frame):
+            press(frame)
+        case .keyUp(let frame):
+            release(frame)
+        case .activate(let frame, _):
+            activate(frame.key)
+        case let .alternatesShown(frame, options, selected, originX):
+            // Only for a key highlighted now, so the popup's id is a current key and its lift closes it.
+            guard isCurrent(frame), pressCounts[frame.id] != nil else { return }
+            state.alternates = AlternatesPopup(keyID: frame.id, options: options, selected: selected, originX: originX)
+        case let .alternateSelected(frame, selected):
+            guard state.alternates?.keyID == frame.id, isCurrent(frame) else { return }
+            state.alternates?.selected = selected
+        case .activateAlternate(_, let text):
+            state.alternates = nil
+            type(text)
+        case .deleteBackward(let word):
+            delete(word ? max(TextRules.previousWordLength(before: document.textBefore), 1) : 1)
+        case .deleteRestOfWord:
+            delete(TextRules.trailingRunLength(before: document.textBefore))
+        case .cursorModeBegan:
+            state.cursorMode = true
+            lastSpaceTime = nil
+        case .cursorModeEnded:
+            state.cursorMode = false
+            updateAutoShift()
+        case .cursorMoved(let characters):
+            moveCursor(by: characters, ticks: abs(characters))
+        case .cursorMovedLines(let lines):
+            let offset = CursorMath.verticalMove(before: document.textBefore, after: document.textAfter, lines: lines)
+            moveCursor(by: offset, ticks: lines == 0 ? 0 : 1)
+        }
+    }
+
+    private func activate(_ key: KeySpec) {
+        let previousSpaceTime = lastSpaceTime
+        lastSpaceTime = nil
+        switch key.action {
+        case .character:
+            type(state.shift == .off ? key.output : key.output.uppercased())
+        case .space:
+            typeSpace(key.output, previousSpaceTime: previousSpaceTime)
+        case .returnKey:
+            insert(key.output)
+        case .shift:
+            tapShift()
+        case .switchPage(let ref):
+            show(page: layouts.resolve(ref), bottom: bottomVariant)
+        case .globe:
+            onGlobe?()
+        case .backspace, .emoji:
+            // Backspace deletes through its own events; the emoji key does nothing in this milestone.
+            break
+        }
+    }
+
+    // MARK: Keys
+
+    /// Whether `frame` is the key at its id in the current frames. An event's frame can come from an earlier page or width.
+    private func isCurrent(_ frame: KeyFrame) -> Bool {
+        frames.indices.contains(frame.id) && frames[frame.id] == frame
+    }
+
+    private func press(_ frame: KeyFrame) {
+        feedback.keyDown()
+        guard isCurrent(frame) else { return }
+        pressCounts[frame.id, default: 0] += 1
+        state.pressedKeyIDs.insert(frame.id)
+        if settings.keyPopup && frame.key.action == .character { state.previewKeyID = frame.id }
+    }
+
+    /// A finger left the key. When it was the last one, the key's highlight, preview and popup go.
+    /// A key pressed before the frames were rebuilt has no count here and is ignored.
+    private func release(_ frame: KeyFrame) {
+        guard isCurrent(frame), let count = pressCounts[frame.id] else { return }
+        guard count == 1 else {
+            pressCounts[frame.id] = count - 1
+            return
+        }
+        pressCounts[frame.id] = nil
+        state.pressedKeyIDs.remove(frame.id)
+        if state.previewKeyID == frame.id { state.previewKeyID = nil }
+        if state.alternates?.keyID == frame.id { state.alternates = nil }
+    }
+
+    /// Shows page `id` with the `variant` bottom row. A page the layout set lacks is ignored.
+    private func show(page id: String, bottom variant: BottomVariant) {
+        guard layouts.page(id) != nil, id != state.pageID || variant != bottomVariant else { return }
+        state.pageID = id
+        bottomVariant = variant
+        layOutKeys()
+    }
+
+    /// Rebuilds `frames` for the current page, bottom row and width, and hands them to the touch processor.
+    /// Highlights, the preview and the popup go with the old frames, whose ids may now mean other keys.
+    private func layOutKeys() {
+        if let page = layouts.page(state.pageID) {
+            frames = KeyboardGeometry.frames(page: page, bottom: bottomRow(of: page), width: width, metrics: metrics)
+        } else {
+            frames = []
+        }
+        processor.frames = frames
+        layoutCount += 1
+        pressCounts.removeAll()
+        state.pressedKeyIDs.removeAll()
+        state.previewKeyID = nil
+        state.alternates = nil
+    }
+
+    /// The page's bottom row for the field, with the globe key just left of the emoji key when needed
+    /// (second in a row without one).
+    private func bottomRow(of page: LayoutPage) -> [KeySpec] {
+        var row = page.bottomRow(bottomVariant)
+        if needsGlobeKey, let globe = layouts.globeKey {
+            row.insert(globe, at: row.firstIndex { $0.action == .emoji } ?? min(1, row.count))
+        }
+        return row
+    }
+
+    // MARK: Text
+
+    /// Types a character key's output or a long-press option, using up a one-letter shift.
+    private func type(_ text: String) {
+        if state.shift == .once { state.shift = .off }
+        insert(text)
+    }
+
+    /// A second space soon after a first one, after a word, replaces the first with a full stop and a space.
+    private func typeSpace(_ space: String, previousSpaceTime: Double?) {
+        if settings.doubleSpacePeriod, let previousSpaceTime, now - previousSpaceTime <= Self.doubleSpaceWindow,
+            TextRules.isDoubleSpaceCandidate(before: document.textBefore) {
+            document.deleteBackward(count: 1)
+            insert(Self.doubleSpaceText)
+        } else {
+            insert(space)
+        }
+        lastSpaceTime = now
+    }
+
+    private func insert(_ text: String) {
+        document.insert(text)
+        lastSpaceTime = nil
+        updateAutoShift()
+    }
+
+    private func delete(_ count: Int) {
+        lastSpaceTime = nil
+        guard count > 0 else { return }
+        document.deleteBackward(count: count)
+        updateAutoShift()
+    }
+
+    private func moveCursor(by offset: Int, ticks: Int) {
+        if offset != 0 { document.moveCursor(by: offset) }
+        for _ in 0..<ticks { feedback.cursorTick() }
+    }
+
+    // MARK: Shift
+
+    /// Off → once; once → caps lock when this tap comes soon after the tap that set it, else off; caps lock → off.
+    private func tapShift() {
+        switch state.shift {
+        case .off:
+            state.shift = .once
+            shiftTapTime = now
+        case .once:
+            let isDoubleTap = shiftTapTime.map { now - $0 <= Self.shiftDoubleTapWindow } ?? false
+            state.shift = isDoubleTap ? .locked : .off
+        case .locked:
+            state.shift = .off
+        }
+    }
+
+    /// Automatic capitals: shift turns on for one letter where the field asks for a capital, and an automatic one
+    /// turns off where it no longer does. A shift the user tapped, and caps lock, stay as they are.
+    private func updateAutoShift() {
+        let capitalize = TextRules.shouldCapitalize(before: document.textBefore, mode: (traits ?? FieldTraits()).autoCap)
+        switch state.shift {
+        case .off where capitalize:
+            state.shift = .once
+            shiftTapTime = nil
+        case .once where !capitalize && shiftTapTime == nil:
+            state.shift = .off
+        default:
+            break
+        }
+    }
+
+    // MARK: Change notices
+
+    /// Runs `change`, then calls `onChange` once if it changed `state` or `frames`.
+    private func notifying(_ change: () -> Void) {
+        let oldState = state, oldLayoutCount = layoutCount
+        change()
+        if layoutCount != oldLayoutCount || state != oldState { onChange?() }
+    }
+}

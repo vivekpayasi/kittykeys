@@ -3,6 +3,9 @@ import Foundation
 /// The pages of one layout, loaded from the bundled `Layouts` folder.
 public struct LayoutSet: Sendable {
     public var lettersPageID: String
+    /// The key that switches to the next keyboard, for devices where iOS draws none (`needsInputModeSwitchKey`).
+    /// nil when the layout set has none.
+    public var globeKey: KeySpec?
     private var pages: [String: LayoutPage]
 
     public enum LoadError: Error {
@@ -12,6 +15,7 @@ public struct LayoutSet: Sendable {
     private struct Index: Decodable {
         var letters: String
         var pages: [String]
+        var globeKey: KeySpec?
     }
 
     /// Reads `Layouts/index.json` and every page it lists.
@@ -23,7 +27,7 @@ public struct LayoutSet: Sendable {
             let page = try decoder.decode(LayoutPage.self, from: try layoutFile(name))
             pages[page.id] = page
         }
-        return LayoutSet(lettersPageID: index.letters, pages: pages)
+        return LayoutSet(lettersPageID: index.letters, globeKey: index.globeKey, pages: pages)
     }
 
     private static func layoutFile(_ name: String) throws -> Data {
