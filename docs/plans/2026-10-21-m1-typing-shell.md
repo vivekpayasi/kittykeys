@@ -542,7 +542,8 @@ scripts/sim-screenshots.sh                    build + launch preview + capture P
   - `deleteRestOfWord`: deletes `TextRules.trailingRunLength(before:)`, and nothing if that is 0 (ruling R18).
   - Popups and frame ids:
     - `alternatesShown` renders `options` exactly as given, in display order.
-    - A `keyUp` closes the popup only when it belongs to that key.
+    - The popup is shown exactly while `TouchProcessor.isShowingAlternates` is true, checked after each batch of events (ruling R29).
+    - Replacing frames cancels pending long-presses of held character keys (ruling R30).
     - Never index the current `frames` by an event's `KeyFrame.id` after a page change: pressed-key highlighting matches by id only within the current page.
     - Two fingers on one key keep it highlighted until both lift.
   - `cursorMoved(n)`: calls `moveCursor(by: n)` and `feedback.cursorTick()` |n| times.
