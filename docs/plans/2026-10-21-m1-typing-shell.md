@@ -411,9 +411,13 @@ scripts/sim-screenshots.sh                    build + launch preview + capture P
   - **Act on touch-down:** shift and `switchPage` keys emit `[.keyDown, .activate]` on touch-down, and backspace's touch-down is handled in Task 6.
   - **Act on lift:** character, space, return, emoji and globe keys emit `.activate` on lift. The `landing` point is the touch-down point.
   - **Long-press options:** they show only for `.character` keys with a non-empty `longPress` list.
-    - The popup origin is `min(max(key.rect.minX, 0), keyboardWidth - options.count * alternateWidth)`.
-    - The selected option is `clamp(Int((x - originX) / alternateWidth), 0, count-1)`.
-  - **Fast typing (rollover):** a new touch-down while an earlier touch holds a character key or space that hasn't fired its long-press yet first emits `.activate` for the earlier key, then cancels its timers. That earlier touch is then spent, so its lift emits only `.keyUp`.
+    - **Layout (ruling R13):** options are emitted in display order, left to right.
+      - If they fit from `key.rect.minX`, they run left to right from there, with the default option leftmost and `selected = 0`.
+      - Otherwise they run right to left: the default option takes the cell ending at `key.rect.maxX`, `originX = max(key.rect.maxX - n*alternateWidth, 0)`, the options are reversed, and `selected = n-1`.
+    - **Selection:** the cell under the finger, `clamp(Int((x - originX) / alternateWidth), 0, n-1)`. If the cell width is ≤ 0 or the value isn't finite, the default option is used (ruling R17).
+    - **One popup at a time (ruling R16):** while any touch is choosing an option, new touches get no long-press.
+  - **Fast typing (rollover):** a new touch-down while an earlier touch holds a character key, space or return (ruling R14) that hasn't fired its long-press yet first emits `.activate` for the earlier key, then cancels its timers. That earlier touch is then spent, so its lift emits only `.keyUp`.
+  - **Reused touch id (ruling R15):** a touch-down that reuses a still-down id ends the stale touch as if it had lifted.
 
 - [ ] **Step 1: Write the failing tests.** Use frames from `KeyboardGeometry.frames` at width 390 and a helper `center(_ label: String) -> Point`.
   ```swift
