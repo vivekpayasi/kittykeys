@@ -133,7 +133,7 @@ scripts/sim-screenshots.sh                    build + launch preview + capture P
   - Keyboard `Info.plist`, under `NSExtension`:
     - `NSExtensionPointIdentifier = com.apple.keyboard-service`
     - `NSExtensionPrincipalClass = $(PRODUCT_MODULE_NAME).KeyboardViewController`
-    - `NSExtensionAttributes`: `IsASCIICapable = false`, `PrefersRightToLeft = false`, `PrimaryLanguage = en-IN`, `RequestsOpenAccess = true`
+    - `NSExtensionAttributes`: `IsASCIICapable = true` (ruling R7: catkeys types ASCII), `PrefersRightToLeft = false`, `PrimaryLanguage = en-IN`, `RequestsOpenAccess = true`
   - `KeyboardViewController`: a `UIInputViewController` subclass that shows a 292 pt tall empty view for now.
   - The app: a single `Text("catkeys")` view.
 - [ ] **Step 5: Generate and build for the simulator.**
