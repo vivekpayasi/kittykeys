@@ -1,0 +1,81 @@
+import Testing
+import KeyboardCore
+
+@Test func autoCap() {
+    #expect(TextRules.shouldCapitalize(before: "", mode: .sentences))
+    #expect(TextRules.shouldCapitalize(before: "ok. ", mode: .sentences))
+    #expect(TextRules.shouldCapitalize(before: "ok?\n", mode: .sentences))
+    #expect(!TextRules.shouldCapitalize(before: "ok ", mode: .sentences))
+    #expect(TextRules.shouldCapitalize(before: "ok ", mode: .words) && !TextRules.shouldCapitalize(before: "ok", mode: .words))
+    #expect(!TextRules.shouldCapitalize(before: "", mode: .none) && TextRules.shouldCapitalize(before: "a", mode: .all))
+}
+@Test func rulesTreatNilAsStartOfField() {
+    #expect(TextRules.shouldCapitalize(before: nil, mode: .sentences))
+    #expect(!TextRules.isDoubleSpaceCandidate(before: nil))
+    #expect(TextRules.previousWordLength(before: nil) == 0)
+    #expect(CursorMath.verticalMove(before: nil, after: nil, lines: -1) == 0)
+}
+@Test func doubleSpace() {
+    #expect(TextRules.isDoubleSpaceCandidate(before: "hi "))
+    #expect(TextRules.isDoubleSpaceCandidate(before: "route 66 "))
+    #expect(!TextRules.isDoubleSpaceCandidate(before: "hi. ") && !TextRules.isDoubleSpaceCandidate(before: "hi  "))
+}
+@Test func wordLength() {
+    #expect(TextRules.previousWordLength(before: "hello world") == 5)
+    #expect(TextRules.previousWordLength(before: "hello world  ") == 7)
+    #expect(TextRules.previousWordLength(before: "kya hua?!") == 2)
+    #expect(TextRules.previousWordLength(before: "hi 👍🏽") == 1)
+}
+@Test func verticalMoves() {
+    #expect(CursorMath.verticalMove(before: "abcdef\nxy", after: "z", lines: -1) == -7)   // to column 2 of "abcdef"
+    #expect(CursorMath.verticalMove(before: "ab\nwxyz", after: "", lines: -1) == -5)      // clamps to end of "ab"
+    #expect(CursorMath.verticalMove(before: "ab", after: "c\nlonger", lines: 1) == 4)     // over "c", "\n", then to column 2 of "longer"
+    #expect(CursorMath.verticalMove(before: "one long wrapped line", after: "", lines: -1) == 0)
+}
+@Test func utf16OffsetCountsWholeEmoji() {
+    #expect(TextOffsets.utf16Offset(graphemes: -1, before: "hi 👍🏽", after: nil) == -4)
+    #expect(TextOffsets.utf16Offset(graphemes: 2, before: nil, after: "🇮🇳a") == 5)
+}
+
+// Edge cases the rules above leave open; each pins the behaviour chosen.
+
+@Test func sentenceCapsAfterAnyWhitespaceRun() {
+    #expect(TextRules.shouldCapitalize(before: "ok!  ", mode: .sentences))
+    #expect(TextRules.shouldCapitalize(before: "  ", mode: .sentences))   // nothing typed yet but spaces
+    #expect(!TextRules.shouldCapitalize(before: "ok.", mode: .sentences))
+}
+
+@Test func verticalMovesSeveralLinesStopAtTheLastLineBreak() {
+    // "ab\nlonger\nxyz|": up 2 crosses "xyz", "\n", "longer", "\n", then column 3 clamps to the end of "ab".
+    #expect(CursorMath.verticalMove(before: "ab\nlonger\nxyz", after: "", lines: -2) == -11)
+    // Only one line break above, so up 5 goes up 1.
+    #expect(CursorMath.verticalMove(before: "abc\nxy", after: "", lines: -5) == -4)
+    // "x|y\nmid\nlast": down 2 crosses "y", "\n", "mid", "\n", then column 1 of "last".
+    #expect(CursorMath.verticalMove(before: "x", after: "y\nmid\nlast", lines: 2) == 7)
+    #expect(CursorMath.verticalMove(before: "ab\ncd", after: "ef\ngh", lines: 0) == 0)
+}
+
+@Test func utf16OffsetCountsUnknownTextAsOneUnitPerGrapheme() {
+    // The proxy may know less text than the move needs; graphemes past the known text count 1 unit each.
+    #expect(TextOffsets.utf16Offset(graphemes: -3, before: "👍🏽", after: nil) == -6)
+    #expect(TextOffsets.utf16Offset(graphemes: 2, before: nil, after: nil) == 2)
+}
+
+@Test func fakeDocumentEditsAtTheCursor() {
+    let doc = FakeTextDocument("hi 👍🏽", cursor: 2)
+    #expect(doc.textBefore == "hi" && doc.textAfter == " 👍🏽")
+    doc.insert("ya")
+    #expect(doc.text == "hiya 👍🏽" && doc.cursor == 4)
+    doc.moveCursor(by: 9)
+    #expect(doc.cursor == 6 && doc.textAfter == "")
+    doc.deleteBackward(count: 1)
+    #expect(doc.text == "hiya " && doc.cursor == 5)
+    doc.moveCursor(by: -9)
+    #expect(doc.cursor == 0 && doc.textBefore == "")
+    doc.deleteBackward(count: 3)
+    #expect(doc.text == "hiya " && doc.cursor == 0)
+    doc.moveCursor(by: 2)
+    doc.deleteBackward(count: 9)
+    #expect(doc.text == "ya " && doc.cursor == 0)
+    #expect(FakeTextDocument("abc").cursor == 3)
+}
