@@ -2,18 +2,25 @@ import Foundation
 import Testing
 import KeyboardCore
 
-/// Each test gets its own defaults suite, removed when the test ends.
+/// Each test gets its own defaults suite, named by an absolute path inside its own temporary folder, so
+/// nothing lands in ~/Library/Preferences. The suite and the folder are removed when the test ends.
 final class SettingsTests {
-    let suiteName = "catkeys-test-\(UUID())"
+    let suiteFolder: URL
+    let suiteName: String
     let defaults: UserDefaults
     let store: SettingsStore
 
     init() {
+        suiteFolder = FileManager.default.temporaryDirectory.appendingPathComponent("catkeys-tests-\(UUID())")
+        suiteName = suiteFolder.appendingPathComponent("settings").path
         defaults = UserDefaults(suiteName: suiteName)!
         store = SettingsStore(defaults: defaults)
     }
 
-    deinit { defaults.removePersistentDomain(forName: suiteName) }
+    deinit {
+        defaults.removePersistentDomain(forName: suiteName)
+        try? FileManager.default.removeItem(at: suiteFolder)
+    }
 
     func writeSettingsJSON(_ json: String) {
         defaults.set(Data(json.utf8), forKey: "catkeys.settings")
@@ -62,6 +69,34 @@ final class SettingsTests {
     @Test func longPressDelayIsClampedWhenDecoded() throws {
         let s = try JSONDecoder().decode(KeyboardSettings.self, from: Data(#"{"longPressDelay":0.1}"#.utf8))
         #expect(s.longPressDelay == 0.2)
+    }
+
+    @Test(arguments: [Double.nan, .infinity, -.infinity])
+    func nonFiniteDelayDecodesToDefault(_ delay: Double) throws {
+        // JSON can't carry NaN or infinity; a property list can.
+        let plist = try PropertyListSerialization.data(
+            fromPropertyList: ["longPressDelay": delay, "sound": true], format: .binary, options: 0)
+        let s = try PropertyListDecoder().decode(KeyboardSettings.self, from: plist)
+        #expect(s.longPressDelay == 0.3)
+        #expect(s.sound)
+    }
+
+    @Test(arguments: [Double.nan, .infinity])
+    func saveKeepsTheOtherFieldsWhenTheDelayIsNotFinite(_ delay: Double) {
+        var s = KeyboardSettings()
+        s.haptics = false
+        s.keyPopup = false
+        s.longPressDelay = delay
+        store.save(s)
+        s.longPressDelay = 0.3
+        #expect(store.load() == s)
+    }
+
+    @Test func oneBadFieldKeepsTheOthers() {
+        writeSettingsJSON(#"{"haptics":"yes","sound":true}"#)
+        var expected = KeyboardSettings()
+        expected.sound = true
+        #expect(store.load() == expected)
     }
 
     @Test func missingFieldsTakeDefaults() {

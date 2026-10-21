@@ -15,17 +15,22 @@ extension KeyboardSettings {
         case haptics, sound, keyPopup, doubleSpacePeriod, longPressDelay
     }
 
-    /// A missing field takes its default, so settings saved before a field existed still load.
-    /// `longPressDelay` is clamped to `longPressDelayRange`.
+    /// A missing or wrong-typed field takes its default, so settings saved before a field existed still load
+    /// and one bad field doesn't lose the others. `longPressDelay` goes through `validLongPressDelay(_:)`.
     public init(from decoder: any Decoder) throws {
         self.init()
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        haptics = try container.decodeIfPresent(Bool.self, forKey: .haptics) ?? haptics
-        sound = try container.decodeIfPresent(Bool.self, forKey: .sound) ?? sound
-        keyPopup = try container.decodeIfPresent(Bool.self, forKey: .keyPopup) ?? keyPopup
-        doubleSpacePeriod = try container.decodeIfPresent(Bool.self, forKey: .doubleSpacePeriod) ?? doubleSpacePeriod
-        let delay = try container.decodeIfPresent(Double.self, forKey: .longPressDelay) ?? longPressDelay
-        let range = Self.longPressDelayRange
-        longPressDelay = min(max(delay, range.lowerBound), range.upperBound)
+        haptics = (try? container.decodeIfPresent(Bool.self, forKey: .haptics)) ?? haptics
+        sound = (try? container.decodeIfPresent(Bool.self, forKey: .sound)) ?? sound
+        keyPopup = (try? container.decodeIfPresent(Bool.self, forKey: .keyPopup)) ?? keyPopup
+        doubleSpacePeriod = (try? container.decodeIfPresent(Bool.self, forKey: .doubleSpacePeriod)) ?? doubleSpacePeriod
+        let delay = (try? container.decodeIfPresent(Double.self, forKey: .longPressDelay)) ?? longPressDelay
+        longPressDelay = Self.validLongPressDelay(delay)
+    }
+
+    /// `delay` clamped to `longPressDelayRange`; NaN or infinity gives the default.
+    static func validLongPressDelay(_ delay: Double) -> Double {
+        guard delay.isFinite else { return KeyboardSettings().longPressDelay }
+        return min(max(delay, longPressDelayRange.lowerBound), longPressDelayRange.upperBound)
     }
 }

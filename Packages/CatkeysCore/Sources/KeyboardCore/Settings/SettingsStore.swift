@@ -13,9 +13,15 @@ public struct SettingsStore {
         self.defaults = defaults
     }
 
-    /// The store on the App Group's shared defaults; nil if `id` is nil or iOS refuses the suite.
+    /// The store on the App Group's shared defaults. nil if `id` is nil, if the app has no container for
+    /// that group (it lacks the App Group entitlement), or if `UserDefaults(suiteName:)` fails. Without the
+    /// entitlement iOS still hands back defaults for the suite, but they are private to the process and
+    /// share nothing, hence the container check. On macOS the container check always passes.
     public static func appGroup(id: String?) -> SettingsStore? {
-        guard let id, let defaults = UserDefaults(suiteName: id) else { return nil }
+        guard let id,
+              FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: id) != nil,
+              let defaults = UserDefaults(suiteName: id)
+        else { return nil }
         return SettingsStore(defaults: defaults)
     }
 
@@ -27,7 +33,11 @@ public struct SettingsStore {
         return settings
     }
 
+    /// Saves `settings` as JSON. A non-finite `longPressDelay`, which JSON can't hold, is saved as the default
+    /// so the other fields are still written.
     public func save(_ settings: KeyboardSettings) {
+        var settings = settings
+        settings.longPressDelay = KeyboardSettings.validLongPressDelay(settings.longPressDelay)
         guard let data = try? JSONEncoder().encode(settings) else { return }
         defaults.set(data, forKey: Self.settingsKey)
     }
