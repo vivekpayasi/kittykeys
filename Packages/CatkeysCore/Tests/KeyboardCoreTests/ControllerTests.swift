@@ -115,6 +115,21 @@ import KeyboardCore
         #expect(k.controller.state.shift == .off)
     }
 
+    @Test func keyBetweenShiftTapsIsNoDoubleTap() throws {
+        // Shift, o, shift all within 0.3 s: the o comes between, so the second tap is a first tap, not caps lock.
+        let k = try Harness()
+        let pShift = try k.down("⇧")
+        k.now = 0.03
+        k.up(at: pShift)
+        k.now = 0.06
+        let po = try k.down("o")
+        k.now = 0.1
+        k.up(at: po)
+        k.now = 0.2
+        try k.down("⇧")
+        #expect(k.doc.text == "O" && k.controller.state.shift == .once)
+    }
+
     @Test func slowSecondShiftTapTurnsShiftOff() throws {
         let k = try Harness()
         try k.tap("⇧")
@@ -253,6 +268,21 @@ import KeyboardCore
         #expect(k.controller.state.alternates?.options == ["₹", "$", "€"])
     }
 
+    @Test func popupStaysWhileItsFingerChooses() throws {
+        // A second finger taps d while the first chooses from d's popup: the popup stays with the first finger.
+        let k = try Harness()
+        let d = try k.key("d")
+        let p = try k.down("d", id: 1)
+        k.wait(0.3)
+        try k.tap("d", id: 2)
+        #expect(k.doc.text == "d" && k.controller.state.alternates?.keyID == d.id)
+        k.move(to: Point(x: 157, y: p.y), id: 1)
+        #expect(k.controller.state.alternates?.selected == 1)
+        k.now += 0.1
+        k.up(at: Point(x: 157, y: p.y), id: 1)
+        #expect(k.doc.text == "d$" && k.controller.state.alternates == nil && k.controller.state.pressedKeyIDs.isEmpty)
+    }
+
     @Test func popupClosesWhenItsKeyLifts() throws {
         // A second finger holds d too. The popup's finger is cancelled: the popup goes, the highlight stays.
         let k = try Harness()
@@ -266,6 +296,17 @@ import KeyboardCore
         k.now += 0.1
         k.up(at: p, id: 2)
         #expect(k.doc.text == "d" && k.controller.state.pressedKeyIDs.isEmpty)
+    }
+
+    @Test func widthChangeCancelsAComingLongPress() throws {
+        let k = try Harness()
+        let p = try k.down("d")
+        k.wait(0.1)
+        k.controller.setWidth(375)
+        k.wait(0.9)
+        #expect(k.controller.state.alternates == nil)
+        k.up(at: p)
+        #expect(k.doc.text == "d")
     }
 
     @Test func widthChangeDuringLongPressTypesTheKey() throws {

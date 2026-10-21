@@ -61,7 +61,8 @@
     private var traits: FieldTraits?
     /// How many fingers hold each key in `state.pressedKeyIDs`.
     private var pressCounts: [Int: Int] = [:]
-    /// When shift was last tapped, to spot a double-tap. nil until a tap, and again after the keyboard appears.
+    /// When shift was tapped, while it is the latest key: a second tap soon after locks caps.
+    /// Any other key, edit or cursor mode, or the keyboard appearing, clears it.
     private var lastShiftTapTime: Double?
     /// Whether automatic capitals, not a tap, set the current `.once`. Only such a shift turns off by itself.
     private var shiftIsAutomatic = false
@@ -116,8 +117,7 @@
     public func keyboardWillAppear(_ traits: FieldTraits) {
         notifying {
             adopt(traits)
-            lastShiftTapTime = nil
-            lastSpace = nil
+            forgetPreviousKey()
             state.shift = .off
             updateAutoShift()
         }
@@ -157,6 +157,9 @@
 
     private func apply(_ events: [TouchEvent]) {
         for event in events { apply(event) }
+        // The popup shows exactly while the processor has a finger choosing from it. A second finger on the same key
+        // lifting leaves it, and the chooser's lift or cancel ends it.
+        if state.alternates != nil && !processor.isShowingAlternates { state.alternates = nil }
     }
 
     private func apply(_ event: TouchEvent) {
@@ -168,14 +171,13 @@
         case .activate(let frame, _):
             activate(frame.key)
         case let .alternatesShown(frame, options, selected, originX):
-            // Only for a key highlighted now, so the popup's id is a current key and its lift closes it.
+            // Only for a key highlighted now, so the popup's id is a current key.
             guard isCurrent(frame), pressCounts[frame.id] != nil else { return }
             state.alternates = AlternatesPopup(keyID: frame.id, options: options, selected: selected, originX: originX)
         case let .alternateSelected(frame, selected):
             guard state.alternates?.keyID == frame.id, isCurrent(frame) else { return }
             state.alternates?.selected = selected
         case .activateAlternate(_, let text):
-            state.alternates = nil
             typeText(text)
         case .deleteBackward(let word):
             delete(word ? max(TextRules.previousWordLength(before: document.textBefore), 1) : 1)
@@ -183,7 +185,7 @@
             delete(TextRules.trailingRunLength(before: document.textBefore))
         case .cursorModeBegan:
             state.cursorMode = true
-            lastSpace = nil
+            forgetPreviousKey()
         case .cursorModeEnded:
             state.cursorMode = false
             updateAutoShift()
@@ -196,8 +198,8 @@
     }
 
     private func activate(_ key: KeySpec) {
-        let previousSpace = lastSpace
-        lastSpace = nil
+        let previousSpace = lastSpace, previousShiftTap = lastShiftTapTime
+        forgetPreviousKey()
         switch key.action {
         case .character:
             // Shift changes a single character; a longer output such as ".com" is typed as written.
@@ -207,7 +209,7 @@
         case .returnKey:
             insert(key.output)
         case .shift:
-            tapShift()
+            tapShift(after: previousShiftTap)
         case .switchPage(let ref):
             show(page: layouts.resolve(ref), bottom: bottomVariant)
         case .globe:
@@ -233,12 +235,10 @@
         if settings.keyPopup && frame.key.action == .character { state.previewKeyID = frame.id }
     }
 
-    /// A finger left the key: its popup goes at once, and its highlight and preview when it was the last finger.
+    /// A finger left the key. When it was the last one, the key's highlight and preview go.
     /// A key pressed before the frames were rebuilt has no count here and is ignored.
     private func release(_ frame: KeyFrame) {
         guard isCurrent(frame), let count = pressCounts[frame.id] else { return }
-        // Even with another finger still on the key: this may be the popup's own finger cancelled, which the processor has dropped.
-        if state.alternates?.keyID == frame.id { state.alternates = nil }
         guard count == 1 else {
             pressCounts[frame.id] = count - 1
             return
@@ -318,15 +318,21 @@
 
     private func insert(_ text: String) {
         document.insert(text)
-        lastSpace = nil
+        forgetPreviousKey()
         updateAutoShift()
     }
 
     private func delete(_ count: Int) {
-        lastSpace = nil
+        forgetPreviousKey()
         guard count > 0 else { return }
         document.deleteBackward(count: count)
         updateAutoShift()
+    }
+
+    /// Anything typed or deleted between two spaces or two shift taps stops them pairing up.
+    private func forgetPreviousKey() {
+        lastSpace = nil
+        lastShiftTapTime = nil
     }
 
     private func moveCursor(by offset: Int, ticks: Int) {
@@ -336,10 +342,11 @@
 
     // MARK: Shift
 
-    /// Caps lock → off. Otherwise a tap soon after the previous shift tap → caps lock, whatever shift was,
-    /// so a double-tap locks caps even where an automatic capital had shift on; else once → off and off → once.
-    private func tapShift() {
-        let isDoubleTap = lastShiftTapTime.map { now - $0 <= Self.shiftDoubleTapWindow } ?? false
+    /// Caps lock → off. Otherwise a tap soon after `previousTap`, a shift tap with no other key since, → caps lock,
+    /// whatever shift was, so a double-tap locks caps even where an automatic capital had shift on;
+    /// else once → off and off → once.
+    private func tapShift(after previousTap: Double?) {
+        let isDoubleTap = previousTap.map { now - $0 <= Self.shiftDoubleTapWindow } ?? false
         lastShiftTapTime = now
         switch state.shift {
         case .locked:

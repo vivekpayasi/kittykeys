@@ -2,16 +2,16 @@
 /// backspace repeat and swipe, and space-bar cursor mode.
 ///
 /// Time comes only from the `time` arguments and `advance(to:)`, never from a clock, so the same calls give the same events.
-/// Each finger keeps the key it landed on, so replacing `frames` never changes what a finger already down types;
-/// a finger choosing a long-press option goes back to typing its key, since its popup no longer matches the keys.
+/// Each finger keeps the key it landed on, so replacing `frames` never changes what a finger already down types.
+/// Replacing them ends long-presses, shown or still to come, since a popup would no longer match the keys on screen.
 /// A touch that lands on no key, such as one in the suggestion row, is ignored: the processor doesn't keep it,
 /// so its moves, lift and cancel return no events.
 public final class TouchProcessor {
     public var timing: TouchTiming
     /// The keys, in the order `KeyboardGeometry.frames` returns them. Replace them when the page or width changes.
-    /// A finger choosing a long-press option then loses its popup: it types its own key on lift.
+    /// Fingers on character keys then lose their long-press, shown or still to come, and type their own key on lift.
     public var frames: [KeyFrame] = [] {
-        didSet { dropAlternates() }
+        didSet { endLongPresses() }
     }
     /// The keyboard's width in points; long-press popups stay inside it. 0 until set.
     public var keyboardWidth = 0.0
@@ -137,6 +137,14 @@ public final class TouchProcessor {
         earliestTimer(dueBy: .infinity)?.deadline
     }
 
+    /// Whether some finger is choosing a long-press option, so its popup is on screen.
+    public var isShowingAlternates: Bool {
+        for id in downOrder {
+            if case .choosingAlternate? = touches[id]?.phase { return true }
+        }
+        return false
+    }
+
     /// Rollover: types each held character, space or return key still waiting for its lift, in touch-down order,
     /// and cancels its long-press or cursor hold.
     private func typeHeldKeys(into events: inout [TouchEvent]) {
@@ -148,14 +156,6 @@ public final class TouchProcessor {
         }
     }
 
-    /// Whether some finger is choosing a long-press option.
-    private var isShowingAlternates: Bool {
-        for id in downOrder {
-            if case .choosingAlternate? = touches[id]?.phase { return true }
-        }
-        return false
-    }
-
     /// Cursor mode takes over the keyboard: a held backspace deletes no more, by timer or swipe, and its lift only clears its highlight.
     private func stopBackspaceRepeats() {
         for id in downOrder {
@@ -165,13 +165,20 @@ public final class TouchProcessor {
         }
     }
 
-    /// New frames take away any long-press popup: each finger choosing an option goes back to pressed, with no timer,
-    /// so it types its own key on lift. Pressed fingers keep their timers.
-    private func dropAlternates() {
+    /// New frames end every long-press: a finger choosing an option goes back to pressed, and a held character key's
+    /// long-press timer is cancelled, so each types its own key on lift. Space keeps its hold for cursor mode.
+    private func endLongPresses() {
         for id in downOrder {
-            guard case .choosingAlternate? = touches[id]?.phase else { continue }
-            touches[id]?.phase = .pressed
-            touches[id]?.deadline = nil
+            guard let touch = touches[id] else { continue }
+            switch touch.phase {
+            case .choosingAlternate:
+                touches[id]?.phase = .pressed
+                touches[id]?.deadline = nil
+            case .pressed where touch.frame.key.action == .character:
+                touches[id]?.deadline = nil
+            case .pressed, .spent, .deleting, .movingCursor:
+                break
+            }
         }
     }
 

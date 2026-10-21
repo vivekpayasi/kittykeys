@@ -286,13 +286,21 @@ struct TouchTapTests {
         // The page changes under the held finger; another key now sits where a was.
         touches.frames = try Self.pageFrames("symbols-1")
         #expect(touches.touchUp(1, at: pa, time: 0.1) == [.activate(a, landing: pa), .keyUp(a)])
-        // A layout pass with no frames at all leaves a held key's long-press intact.
+        // Any layout pass, even one with no frames at all, cancels a held key's coming long-press:
+        // its popup would match no keys on screen, so the key types itself on lift.
         let d = try key("d"), pd = try center("d")
         touches.frames = frames
         #expect(touches.touchDown(2, at: pd, time: 1) == [.keyDown(d)])
         touches.frames = []
-        #expect(touches.advance(to: 1.5) == [.alternatesShown(d, options: ["₹", "$", "€"], selected: 0, originX: 100.5)])
-        #expect(touches.touchUp(2, at: pd, time: 1.6) == [.activateAlternate(d, text: "₹"), .keyUp(d)])
+        #expect(touches.nextDeadline == nil)
+        #expect(touches.advance(to: 1.5) == [])
+        #expect(touches.touchUp(2, at: pd, time: 1.6) == [.activate(d, landing: pd), .keyUp(d)])
+        // Holding space for cursor mode is not a long-press: it survives a layout pass.
+        let space = try key("space"), pspace = try center("space")
+        touches.frames = frames
+        #expect(touches.touchDown(3, at: pspace, time: 2) == [.keyDown(space)])
+        touches.frames = frames
+        #expect(touches.advance(to: 2.33) == [.cursorModeBegan])
     }
 
     @Test func framesReplacedWhileChoosingTypeTheKey() throws {
