@@ -107,6 +107,20 @@ struct TouchTapTests {
         #expect(touches.touchUp(2, at: Point(x: 157, y: 163), time: 1.7) == [.activateAlternate(d, text: "₹"), .keyUp(d)])
     }
 
+    @Test func unusableAlternateWidthLaysOutFromTheKey() throws {
+        let period = try key("."), pp = try center(".")
+        // A cell width that is not a positive number can't place the popup: it starts at the key's left edge
+        // in the key's own order, default first and selected, rather than at a NaN or clamped origin.
+        for (id, width) in [Double.nan, .infinity, -36].enumerated() {
+            touches.timing.alternateWidth = width
+            #expect(touches.touchDown(id, at: pp, time: Double(id)) == [.keyDown(period)])
+            #expect(touches.advance(to: Double(id) + 0.3)
+                == [.alternatesShown(period, options: [".", "?", "!", "…", ":", "/"], selected: 0, originX: 276)])
+            #expect(touches.touchMoved(id, to: Point(x: 200, y: 267), time: Double(id) + 0.4) == [])
+            #expect(touches.touchUp(id, at: pp, time: Double(id) + 0.5) == [.activateAlternate(period, text: "."), .keyUp(period)])
+        }
+    }
+
     @Test func onlyOnePopupAtATime() throws {
         let d = try key("d"), g = try key("g"), pd = try center("d"), pg = try center("g")
         #expect(touches.touchDown(1, at: pd, time: 0) == [.keyDown(d)])

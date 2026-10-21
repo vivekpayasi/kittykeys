@@ -10,8 +10,10 @@ public enum TouchEvent: Equatable, Sendable {
     /// Perform the key's action. `landing` is where the finger touched down.
     case activate(KeyFrame, landing: Point)
     /// Show the key's long-press options in cells starting at `originX`, with `selected` highlighted.
+    /// `options` are in display order, left to right: render them as given, never from `key.longPress`.
+    /// `selected`, here and in `alternateSelected`, is an index into `options`.
     case alternatesShown(KeyFrame, options: [String], selected: Int, originX: Double)
-    /// Highlight a different long-press option.
+    /// Highlight a different long-press option: `selected` indexes the `options` of that key's `alternatesShown`.
     case alternateSelected(KeyFrame, selected: Int)
     /// Type the chosen long-press option.
     case activateAlternate(KeyFrame, text: String)
