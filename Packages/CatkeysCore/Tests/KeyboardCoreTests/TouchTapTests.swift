@@ -295,6 +295,18 @@ struct TouchTapTests {
         #expect(touches.touchUp(2, at: pd, time: 1.6) == [.activateAlternate(d, text: "₹"), .keyUp(d)])
     }
 
+    @Test func framesReplacedWhileChoosingTypeTheKey() throws {
+        let d = try key("d"), pd = try center("d")
+        #expect(touches.touchDown(1, at: pd, time: 0) == [.keyDown(d)])
+        #expect(touches.advance(to: 0.3) == [.alternatesShown(d, options: ["₹", "$", "€"], selected: 0, originX: 100.5)])
+        // New frames take the popup away: the finger goes back to its own key, with no long-press to come.
+        touches.frames = try Self.pageFrames("symbols-1")
+        #expect(touches.nextDeadline == nil)
+        #expect(touches.touchMoved(1, to: Point(x: 157, y: 163), time: 0.4) == [])
+        #expect(touches.advance(to: 1) == [])
+        #expect(touches.touchUp(1, at: Point(x: 157, y: 163), time: 1.1) == [.activate(d, landing: pd), .keyUp(d)])
+    }
+
     @Test func reusedTouchIDEndsTheEarlierTouch() throws {
         let a = try key("a"), s = try key("s"), d = try key("d")
         let pa = try center("a"), ps = try center("s"), pd = try center("d")

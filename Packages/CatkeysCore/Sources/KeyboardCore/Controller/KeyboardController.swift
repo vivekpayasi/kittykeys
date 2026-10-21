@@ -57,14 +57,17 @@
     private let processor: TouchProcessor
     private var width = 0.0
     private var bottomVariant = BottomVariant.standard
-    /// The traits of the latest `fieldDidChange(_:)`; nil before the first.
+    /// The latest traits from `fieldDidChange(_:)` or `keyboardWillAppear(_:)`; nil before the first.
     private var traits: FieldTraits?
     /// How many fingers hold each key in `state.pressedKeyIDs`.
     private var pressCounts: [Int: Int] = [:]
-    /// When the shift tap that set `.once` came. nil when automatic capitals set it, so a tap turns it off.
-    private var shiftTapTime: Double?
-    /// When space was typed, while it is the latest key typed. Any other key, edit or cursor move clears it.
-    private var lastSpaceTime: Double?
+    /// When shift was last tapped, to spot a double-tap. nil until a tap, and again after the keyboard appears.
+    private var lastShiftTapTime: Double?
+    /// Whether automatic capitals, not a tap, set the current `.once`. Only such a shift turns off by itself.
+    private var shiftIsAutomatic = false
+    /// The latest space typed, while it is the latest key typed here: when, and the text before the cursor just after it.
+    /// Any other key or edit here, or cursor mode, clears it. A change made elsewhere shows up as different text before the cursor.
+    private var lastSpace: (time: Double, textBefore: String?)?
     /// The time of the latest touch or `advance(to:)`.
     private var now = 0.0
     /// Counts `frames` rebuilds, so `notifying` can tell when they changed.
@@ -103,16 +106,19 @@
     /// so the user stays on the symbols page. Either way automatic capitals are checked again.
     public func fieldDidChange(_ traits: FieldTraits) {
         notifying {
-            if traits != self.traits {
-                self.traits = traits
-                state.returnKey = traits.returnKey
-                let variant: BottomVariant = switch traits.kind {
-                case .email: .email
-                case .url: .url
-                case .text, .number: .standard
-                }
-                show(page: traits.kind == .number ? Self.numberPageID : layouts.lettersPageID, bottom: variant)
-            }
+            if traits != self.traits { adopt(traits) }
+            updateAutoShift()
+        }
+    }
+
+    /// The keyboard is about to show. It starts afresh: the field's first page and bottom row even for the same traits,
+    /// shift unlocked, and no earlier shift tap or space to pair with. Then automatic capitals are checked.
+    public func keyboardWillAppear(_ traits: FieldTraits) {
+        notifying {
+            adopt(traits)
+            lastShiftTapTime = nil
+            lastSpace = nil
+            state.shift = .off
             updateAutoShift()
         }
     }
@@ -170,14 +176,14 @@
             state.alternates?.selected = selected
         case .activateAlternate(_, let text):
             state.alternates = nil
-            type(text)
+            typeText(text)
         case .deleteBackward(let word):
             delete(word ? max(TextRules.previousWordLength(before: document.textBefore), 1) : 1)
         case .deleteRestOfWord:
             delete(TextRules.trailingRunLength(before: document.textBefore))
         case .cursorModeBegan:
             state.cursorMode = true
-            lastSpaceTime = nil
+            lastSpace = nil
         case .cursorModeEnded:
             state.cursorMode = false
             updateAutoShift()
@@ -190,13 +196,14 @@
     }
 
     private func activate(_ key: KeySpec) {
-        let previousSpaceTime = lastSpaceTime
-        lastSpaceTime = nil
+        let previousSpace = lastSpace
+        lastSpace = nil
         switch key.action {
         case .character:
-            type(state.shift == .off ? key.output : key.output.uppercased())
+            // Shift changes a single character; a longer output such as ".com" is typed as written.
+            typeText(state.shift == .off || key.output.count != 1 ? key.output : key.output.uppercased())
         case .space:
-            typeSpace(key.output, previousSpaceTime: previousSpaceTime)
+            typeSpace(key.output, after: previousSpace)
         case .returnKey:
             insert(key.output)
         case .shift:
@@ -226,10 +233,12 @@
         if settings.keyPopup && frame.key.action == .character { state.previewKeyID = frame.id }
     }
 
-    /// A finger left the key. When it was the last one, the key's highlight, preview and popup go.
+    /// A finger left the key: its popup goes at once, and its highlight and preview when it was the last finger.
     /// A key pressed before the frames were rebuilt has no count here and is ignored.
     private func release(_ frame: KeyFrame) {
         guard isCurrent(frame), let count = pressCounts[frame.id] else { return }
+        // Even with another finger still on the key: this may be the popup's own finger cancelled, which the processor has dropped.
+        if state.alternates?.keyID == frame.id { state.alternates = nil }
         guard count == 1 else {
             pressCounts[frame.id] = count - 1
             return
@@ -237,7 +246,18 @@
         pressCounts[frame.id] = nil
         state.pressedKeyIDs.remove(frame.id)
         if state.previewKeyID == frame.id { state.previewKeyID = nil }
-        if state.alternates?.keyID == frame.id { state.alternates = nil }
+    }
+
+    /// Takes `traits` as the field's: its return key, its bottom row, and its first page (symbols for a number field, else letters).
+    private func adopt(_ traits: FieldTraits) {
+        self.traits = traits
+        state.returnKey = traits.returnKey
+        let variant: BottomVariant = switch traits.kind {
+        case .email: .email
+        case .url: .url
+        case .text, .number: .standard
+        }
+        show(page: traits.kind == .number ? Self.numberPageID : layouts.lettersPageID, bottom: variant)
     }
 
     /// Shows page `id` with the `variant` bottom row. A page the layout set lacks is ignored.
@@ -277,31 +297,33 @@
     // MARK: Text
 
     /// Types a character key's output or a long-press option, using up a one-letter shift.
-    private func type(_ text: String) {
+    private func typeText(_ text: String) {
         if state.shift == .once { state.shift = .off }
         insert(text)
     }
 
-    /// A second space soon after a first one, after a word, replaces the first with a full stop and a space.
-    private func typeSpace(_ space: String, previousSpaceTime: Double?) {
-        if settings.doubleSpacePeriod, let previousSpaceTime, now - previousSpaceTime <= Self.doubleSpaceWindow,
-            TextRules.isDoubleSpaceCandidate(before: document.textBefore) {
+    /// A second space soon after a first one, after a word, replaces the first with a full stop and a space,
+    /// as long as the cursor is still where the first space left it.
+    private func typeSpace(_ space: String, after previousSpace: (time: Double, textBefore: String?)?) {
+        let textBefore = document.textBefore
+        if settings.doubleSpacePeriod, let previousSpace, now - previousSpace.time <= Self.doubleSpaceWindow,
+            textBefore == previousSpace.textBefore, TextRules.isDoubleSpaceCandidate(before: textBefore) {
             document.deleteBackward(count: 1)
             insert(Self.doubleSpaceText)
         } else {
             insert(space)
         }
-        lastSpaceTime = now
+        lastSpace = (now, document.textBefore)
     }
 
     private func insert(_ text: String) {
         document.insert(text)
-        lastSpaceTime = nil
+        lastSpace = nil
         updateAutoShift()
     }
 
     private func delete(_ count: Int) {
-        lastSpaceTime = nil
+        lastSpace = nil
         guard count > 0 else { return }
         document.deleteBackward(count: count)
         updateAutoShift()
@@ -314,17 +336,21 @@
 
     // MARK: Shift
 
-    /// Off → once; once → caps lock when this tap comes soon after the tap that set it, else off; caps lock → off.
+    /// Caps lock → off. Otherwise a tap soon after the previous shift tap → caps lock, whatever shift was,
+    /// so a double-tap locks caps even where an automatic capital had shift on; else once → off and off → once.
     private func tapShift() {
+        let isDoubleTap = lastShiftTapTime.map { now - $0 <= Self.shiftDoubleTapWindow } ?? false
+        lastShiftTapTime = now
         switch state.shift {
-        case .off:
-            state.shift = .once
-            shiftTapTime = now
-        case .once:
-            let isDoubleTap = shiftTapTime.map { now - $0 <= Self.shiftDoubleTapWindow } ?? false
-            state.shift = isDoubleTap ? .locked : .off
         case .locked:
             state.shift = .off
+        case _ where isDoubleTap:
+            state.shift = .locked
+        case .once:
+            state.shift = .off
+        case .off:
+            state.shift = .once
+            shiftIsAutomatic = false
         }
     }
 
@@ -335,8 +361,8 @@
         switch state.shift {
         case .off where capitalize:
             state.shift = .once
-            shiftTapTime = nil
-        case .once where !capitalize && shiftTapTime == nil:
+            shiftIsAutomatic = true
+        case .once where !capitalize && shiftIsAutomatic:
             state.shift = .off
         default:
             break

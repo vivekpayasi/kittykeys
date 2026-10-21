@@ -2,13 +2,17 @@
 /// backspace repeat and swipe, and space-bar cursor mode.
 ///
 /// Time comes only from the `time` arguments and `advance(to:)`, never from a clock, so the same calls give the same events.
-/// Each finger keeps the key it landed on, so replacing `frames` never changes what a finger already down types.
+/// Each finger keeps the key it landed on, so replacing `frames` never changes what a finger already down types;
+/// a finger choosing a long-press option goes back to typing its key, since its popup no longer matches the keys.
 /// A touch that lands on no key, such as one in the suggestion row, is ignored: the processor doesn't keep it,
 /// so its moves, lift and cancel return no events.
 public final class TouchProcessor {
     public var timing: TouchTiming
     /// The keys, in the order `KeyboardGeometry.frames` returns them. Replace them when the page or width changes.
-    public var frames: [KeyFrame] = []
+    /// A finger choosing a long-press option then loses its popup: it types its own key on lift.
+    public var frames: [KeyFrame] = [] {
+        didSet { dropAlternates() }
+    }
     /// The keyboard's width in points; long-press popups stay inside it. 0 until set.
     public var keyboardWidth = 0.0
 
@@ -157,6 +161,16 @@ public final class TouchProcessor {
         for id in downOrder {
             guard case .deleting? = touches[id]?.phase else { continue }
             touches[id]?.phase = .spent
+            touches[id]?.deadline = nil
+        }
+    }
+
+    /// New frames take away any long-press popup: each finger choosing an option goes back to pressed, with no timer,
+    /// so it types its own key on lift. Pressed fingers keep their timers.
+    private func dropAlternates() {
+        for id in downOrder {
+            guard case .choosingAlternate? = touches[id]?.phase else { continue }
+            touches[id]?.phase = .pressed
             touches[id]?.deadline = nil
         }
     }

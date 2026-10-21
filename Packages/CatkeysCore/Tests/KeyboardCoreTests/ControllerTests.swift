@@ -124,17 +124,31 @@ import KeyboardCore
         #expect(k.controller.state.shift == .off)
     }
 
-    @Test func capsLockIgnoresAutomaticCapitals() throws {
+    @Test func doubleTapGivesCapsLockAtSentenceStart() throws {
+        // Shift is on by itself at a sentence start. The first tap turns it off; the second, 0.2 s later, locks caps.
         let k = try Harness(autoCap: .sentences)
         #expect(k.controller.state.shift == .once)
-        // An automatic capital has no tap to double: one tap turns it off.
         try k.tap("⇧")
         #expect(k.controller.state.shift == .off)
         try k.tap("⇧")
+        #expect(k.controller.state.shift == .locked)
+        try k.tap("a")
+        try k.tap("b")
+        #expect(k.doc.text == "AB" && k.controller.state.shift == .locked)
+        // Automatic capitals leave caps lock alone.
+        for label in [".", "space", "c"] { try k.tap(label) }
+        #expect(k.doc.text == "AB. C" && k.controller.state.shift == .locked)
+    }
+
+    @Test func shiftLeavesLongerOutputsAsWritten() throws {
+        let k = try Harness()
+        k.controller.fieldDidChange(FieldTraits(kind: .url, autoCap: .none))
+        try k.tap("⇧")
         try k.tap("⇧")
         #expect(k.controller.state.shift == .locked)
-        for label in ["o", "k", ".", "space", "a"] { try k.tap(label) }
-        #expect(k.doc.text == "OK. A" && k.controller.state.shift == .locked)
+        try k.tap(".com")
+        try k.tap("a")
+        #expect(k.doc.text == ".comA" && k.controller.state.shift == .locked)
     }
 
     // MARK: Double-space full stop
@@ -176,6 +190,17 @@ import KeyboardCore
         try between.tap("⇧")
         try between.tap("space")
         #expect(between.doc.text == "hi  ")
+    }
+
+    @Test func doubleSpaceNeedsTheCursorWhereTheSpaceLeftIt() throws {
+        let k = try Harness("ok ")
+        for label in ["h", "i", "space"] { try k.tap(label) }
+        #expect(k.doc.text == "ok hi ")
+        // Something else moves the cursor back to just after "ok ": a quick space there is just a space.
+        k.doc.moveCursor(by: -3)
+        k.controller.documentDidChange()
+        try k.tap("space")
+        #expect(k.doc.text == "ok  hi ")
     }
 
     // MARK: Long-press popup
@@ -228,6 +253,33 @@ import KeyboardCore
         #expect(k.controller.state.alternates?.options == ["₹", "$", "€"])
     }
 
+    @Test func popupClosesWhenItsKeyLifts() throws {
+        // A second finger holds d too. The popup's finger is cancelled: the popup goes, the highlight stays.
+        let k = try Harness()
+        let d = try k.key("d")
+        let p = try k.down("d", id: 1)
+        k.wait(0.3)
+        try k.down("d", id: 2)
+        #expect(k.controller.state.alternates?.keyID == d.id)
+        k.controller.touchCancelled(1)
+        #expect(k.controller.state.alternates == nil && k.controller.state.pressedKeyIDs == [d.id])
+        k.now += 0.1
+        k.up(at: p, id: 2)
+        #expect(k.doc.text == "d" && k.controller.state.pressedKeyIDs.isEmpty)
+    }
+
+    @Test func widthChangeDuringLongPressTypesTheKey() throws {
+        let k = try Harness()
+        let p = try k.down("d")
+        k.wait(0.3)
+        #expect(k.controller.state.alternates != nil)
+        k.controller.setWidth(375)
+        #expect(k.controller.state.alternates == nil)
+        k.now += 0.1
+        k.up(at: p)
+        #expect(k.doc.text == "d")
+    }
+
     // MARK: Pages and fields
 
     @Test func pagesSwitch() throws {
@@ -273,6 +325,38 @@ import KeyboardCore
         s.doc.insert(" ")
         s.controller.fieldDidChange(FieldTraits(autoCap: .sentences))
         #expect(s.controller.state.shift == .once)
+    }
+
+    @Test func keyboardWillAppearStartsAfresh() throws {
+        let k = try Harness()
+        let text = FieldTraits(autoCap: .none)
+        try k.tap("123")
+        try k.tap("1/2")
+        #expect(k.controller.state.pageID == "symbols-2")
+        // The same traits as before, yet the keyboard opens on letters.
+        k.controller.keyboardWillAppear(text)
+        #expect(k.controller.state.pageID == "latin-qwerty")
+        // The traits count as reported: the same ones again leave the page alone.
+        try k.tap("123")
+        k.controller.fieldDidChange(text)
+        #expect(k.controller.state.pageID == "symbols-1")
+
+        // Caps lock goes, and the shift taps before it are forgotten: a tap 0.2 s after the last one is a first tap.
+        let shift = try Harness()
+        try shift.tap("⇧")
+        try shift.tap("⇧")
+        #expect(shift.controller.state.shift == .locked)
+        shift.controller.keyboardWillAppear(text)
+        #expect(shift.controller.state.shift == .off)
+        try shift.tap("⇧")
+        #expect(shift.controller.state.shift == .once)
+
+        // A space typed before doesn't pair with one typed after.
+        let space = try Harness("hi")
+        try space.tap("space")
+        space.controller.keyboardWillAppear(text)
+        try space.tap("space")
+        #expect(space.doc.text == "hi  ")
     }
 
     @Test func globeKeyAppearsWhenNeeded() throws {
@@ -441,10 +525,10 @@ import KeyboardCore
         #expect(k.controller.state.alternates != nil)
         try k.down("123", id: 2)
         #expect(k.controller.state.pageID == "symbols-1" && k.controller.state.alternates == nil)
-        // The finger still types the option it was on.
+        // With its popup gone, the finger types its own key.
         k.now += 0.1
         k.up(at: pd, id: 1)
-        #expect(k.doc.text == "₹" && k.controller.state.alternates == nil)
+        #expect(k.doc.text == "d" && k.controller.state.alternates == nil)
     }
 
     @Test func cancelledTouchesLeaveNothingBehind() throws {
