@@ -295,7 +295,7 @@ scripts/sim-screenshots.sh                    build + launch preview + capture P
 **Interfaces:**
 - Produces:
   ```swift
-  public protocol TextDocument: AnyObject {
+  @MainActor public protocol TextDocument: AnyObject {   // ruling R12
       var textBefore: String? { get }      // nil = unknown/start of field
       var textAfter: String? { get }
       func insert(_ text: String)
@@ -315,9 +315,9 @@ scripts/sim-screenshots.sh                    build + launch preview + capture P
       public static func utf16Offset(graphemes: Int, before: String?, after: String?) -> Int  // UTF-16 length of the graphemes crossed
   }
   ```
-- `FakeTextDocument` (test target only): `init(_ text: String, cursor: Int? = nil)`, with `text: String` and `cursor: Int` counted in graphemes. It implements the protocol over a `[Character]`.
+- `FakeTextDocument` (test target only): `init(_ text: String, cursor: Int? = nil)`, with `text: String` and `cursor: Int` counted in graphemes. It implements the protocol over a `[Character]`, is `@MainActor`, and returns nil for an empty side, as iOS does (ruling R10).
 - Rules:
-  - **Sentences:** capitalise when the text before is nil or empty, ends in a newline, or ends in `.`, `!` or `?` followed by whitespace.
+  - **Sentences:** capitalise when the text before is nil or empty, ends in a newline, or ends in a sentence terminal (Unicode `isSentenceTerminal`, ruling R11) followed by whitespace. Apostrophes between letters count as part of a word for word delete.
   - **Words:** capitalise when the text before is nil, empty or ends in whitespace.
   - **All:** always capitalise. **None:** never.
   - **Vertical moves:** the cursor keeps its column, meaning the number of graphemes since the last `\n`. When moving to a shorter line, it clamps to that line's end.
