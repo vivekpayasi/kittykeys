@@ -54,17 +54,51 @@ struct TouchHoldTests {
         #expect(touches.advance(to: 5) == [])
     }
 
-    @Test func backspaceSwipeDeletesOneWord() throws {
+    @Test func backspaceSwipeDeletesRestOfWord() throws {
         let b = try key("⌫"), pb = try center("⌫")
         #expect(touches.touchDown(1, at: pb, time: 0) == [.keyDown(b), .deleteBackward(word: false)])
         // 15 pt left, or any distance up or down, is not a swipe.
         #expect(touches.touchMoved(1, to: Point(x: 345.75, y: 190), time: 0.05) == [])
-        // 25 pt left of where it landed: one word goes and the repeats stop.
-        #expect(touches.touchMoved(1, to: Point(x: 335.75, y: 215), time: 0.1) == [.deleteBackward(word: true)])
+        // 25 pt left of where it landed: the rest of the word goes and the repeats stop.
+        #expect(touches.touchMoved(1, to: Point(x: 335.75, y: 215), time: 0.1) == [.deleteRestOfWord])
         #expect(touches.nextDeadline == nil)
         #expect(touches.touchMoved(1, to: Point(x: 300.75, y: 215), time: 0.2) == [])
         #expect(touches.advance(to: 2.0) == [])
         #expect(touches.touchUp(1, at: Point(x: 300.75, y: 215), time: 2.1) == [.keyUp(b)])
+    }
+
+    @Test func backspaceSwipeOfExactlyTwentyPoints() throws {
+        let b = try key("⌫"), pb = try center("⌫")
+        #expect(touches.touchDown(1, at: pb, time: 0) == [.keyDown(b), .deleteBackward(word: false)])
+        // 19.75 pt left is short of the swipe; exactly 20 pt is one.
+        #expect(touches.touchMoved(1, to: Point(x: 341, y: 215), time: 0.05) == [])
+        #expect(touches.touchMoved(1, to: Point(x: 340.75, y: 215), time: 0.1) == [.deleteRestOfWord])
+        #expect(touches.nextDeadline == nil)
+        #expect(touches.touchUp(1, at: Point(x: 340.75, y: 215), time: 0.2) == [.keyUp(b)])
+    }
+
+    @Test func backspaceSwipeWhileRepeatingCharacters() throws {
+        let b = try key("⌫"), pb = try center("⌫")
+        #expect(touches.touchDown(1, at: pb, time: 0) == [.keyDown(b), .deleteBackward(word: false)])
+        #expect(touches.advance(to: 0.6) == Array(repeating: .deleteBackward(word: false), count: 3))   // 0.4, 0.47, 0.54
+        #expect(touches.touchMoved(1, to: Point(x: 335.75, y: 215), time: 0.6) == [.deleteRestOfWord])
+        #expect(touches.nextDeadline == nil)
+        #expect(touches.touchMoved(1, to: Point(x: 300.75, y: 215), time: 0.7) == [])
+        #expect(touches.advance(to: 3) == [])
+        #expect(touches.touchUp(1, at: Point(x: 300.75, y: 215), time: 3.1) == [.keyUp(b)])
+    }
+
+    @Test func backspaceSwipeWhileRepeatingWords() throws {
+        let b = try key("⌫"), pb = try center("⌫")
+        #expect(touches.touchDown(1, at: pb, time: 0) == [.keyDown(b), .deleteBackward(word: false)])
+        // Sixteen character repeats (0.4 … 1.45), then the first word at 1.5.
+        #expect(touches.advance(to: 1.6)
+            == Array(repeating: .deleteBackward(word: false), count: 16) + [.deleteBackward(word: true)])
+        #expect(touches.touchMoved(1, to: Point(x: 335.75, y: 215), time: 1.6) == [.deleteRestOfWord])
+        #expect(touches.nextDeadline == nil)
+        #expect(touches.touchMoved(1, to: Point(x: 300.75, y: 215), time: 1.7) == [])
+        #expect(touches.advance(to: 3) == [])
+        #expect(touches.touchUp(1, at: Point(x: 300.75, y: 215), time: 3.1) == [.keyUp(b)])
     }
 
     @Test func backspaceTypesHeldKeyFirstAndKeepsRepeating() throws {
@@ -176,6 +210,22 @@ struct TouchHoldTests {
         #expect(touches.touchUp(1, at: Point(x: 213.75, y: 267), time: 2.4) == [.cursorModeEnded, .keyUp(try key("space"))])
         // Once it ends, keys work again.
         #expect(touches.touchDown(2, at: pa, time: 2.5) == [.keyDown(a)])
+    }
+
+    @Test func cursorModeStopsHeldBackspace() throws {
+        let b = try key("⌫"), space = try key("space"), pb = try center("⌫"), ps = try center("space")
+        #expect(touches.touchDown(1, at: pb, time: 0) == [.keyDown(b), .deleteBackward(word: false)])
+        // Space lands while backspace repeats; backspace never rolls over, so space starts its hold (due 0.43).
+        #expect(touches.touchDown(2, at: ps, time: 0.1) == [.keyDown(space)])
+        // Backspace repeats once at 0.4; at 0.43 cursor mode begins and backspace stops.
+        #expect(touches.advance(to: 0.43) == [.deleteBackward(word: false), .cursorModeBegan])
+        #expect(touches.nextDeadline == nil)
+        #expect(touches.advance(to: 3) == [])
+        // Backspace's finger can't swipe a word away either, and its lift only clears its highlight.
+        #expect(touches.touchMoved(1, to: Point(x: 300.75, y: 215), time: 3.1) == [])
+        #expect(touches.touchMoved(2, to: Point(x: 213.75, y: 267), time: 3.2) == [.cursorMoved(characters: 1)])
+        #expect(touches.touchUp(1, at: Point(x: 300.75, y: 215), time: 3.3) == [.keyUp(b)])
+        #expect(touches.touchUp(2, at: Point(x: 213.75, y: 267), time: 3.4) == [.cursorModeEnded, .keyUp(space)])
     }
 
     @Test func spaceRolloverBeforeHold() throws {

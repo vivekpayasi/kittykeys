@@ -8,7 +8,7 @@ public struct TouchTiming: Sendable {
     /// Cursor mode: travel per character, the speed in points per second above which each step
     /// moves `cursorFastMultiplier` characters, and travel per line.
     public var cursorStep = 9.0, cursorFastSpeed = 300.0, cursorFastMultiplier = 3, cursorLineStep = 30.0
-    /// The leftward swipe on backspace that deletes a word, and the width of one long-press option cell.
+    /// The leftward swipe on backspace that deletes the rest of the word, and the width of one long-press option cell.
     public var backspaceSwipe = 20.0, alternateWidth = 36.0
 
     public init() {}

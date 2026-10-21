@@ -66,7 +66,8 @@ public final class TouchProcessor {
     }
 
     /// A finger moved. A finger choosing a long-press option selects the option under it; backspace swiped
-    /// `backspaceSwipe` left of where it landed deletes a word and stops repeating; space in cursor mode moves the cursor.
+    /// `backspaceSwipe` left of where it landed deletes the rest of the word and stops repeating;
+    /// space in cursor mode moves the cursor.
     /// Other fingers keep the key they landed on.
     public func touchMoved(_ id: TouchID, to p: Point, time: Double) -> [TouchEvent] {
         guard var touch = touches[id] else { return [] }
@@ -82,7 +83,7 @@ public final class TouchProcessor {
         case .deleting where touch.landing.x - p.x >= timing.backspaceSwipe:
             touch.phase = .spent
             touch.deadline = nil
-            events.append(.deleteBackward(word: true))
+            events.append(.deleteRestOfWord)
         case .movingCursor(var trackpad):
             moveCursor(&trackpad, from: touch.position, to: p, time: time, into: &events)
             touch.phase = .movingCursor(trackpad)
@@ -118,6 +119,7 @@ public final class TouchProcessor {
     }
 
     /// Fires every timer due at or before `time`, earliest first, across all touches.
+    /// A timer due up to 1e-9 s after `time` counts as due, since sums like 0.4 + 0.07 round a hair past 0.47.
     public func advance(to time: Double) -> [TouchEvent] {
         var events: [TouchEvent] = []
         while let due = earliestTimer(dueBy: time + Self.timerTolerance) {
@@ -150,6 +152,15 @@ public final class TouchProcessor {
         return false
     }
 
+    /// Cursor mode takes over the keyboard: a held backspace deletes no more, by timer or swipe, and its lift only clears its highlight.
+    private func stopBackspaceRepeats() {
+        for id in downOrder {
+            guard case .deleting? = touches[id]?.phase else { continue }
+            touches[id]?.phase = .spent
+            touches[id]?.deadline = nil
+        }
+    }
+
     /// Whether space is in cursor mode.
     private var isMovingCursor: Bool {
         for id in downOrder {
@@ -159,7 +170,7 @@ public final class TouchProcessor {
     }
 
     /// Fires touch `id`'s timer, due at `deadline`: a character key's long-press shows its options,
-    /// space's hold starts cursor mode, and backspace deletes again and schedules its next repeat.
+    /// space's hold starts cursor mode (stopping any held backspace), and backspace deletes again and schedules its next repeat.
     private func fireTimer(_ id: TouchID, dueAt deadline: Double, into events: inout [TouchEvent]) {
         guard var touch = touches[id] else { return }
         touch.deadline = nil
@@ -171,6 +182,7 @@ public final class TouchProcessor {
         case (.pressed, .space):
             touch.phase = .movingCursor(KeyTouch.Trackpad(anchor: touch.position, lastMoveTime: deadline))
             events.append(.cursorModeBegan)
+            stopBackspaceRepeats()
         case (.deleting(var deleting), _):
             let word = nextDelete(after: deleting).word
             events.append(.deleteBackward(word: word))
@@ -278,7 +290,8 @@ private struct KeyTouch {
     enum Phase: Equatable {
         /// Waiting for its lift, its long-press or cursor hold, or another finger landing.
         case pressed
-        /// Its action already happened, on touch-down, by rollover or by a backspace swipe. Lift or cancel only clears the highlight.
+        /// Its action already happened: on touch-down, by rollover, or for backspace by a swipe or cursor mode starting.
+        /// Lift or cancel only clears the highlight.
         case spent
         /// Its long-press options are showing.
         case choosingAlternate(Popup)

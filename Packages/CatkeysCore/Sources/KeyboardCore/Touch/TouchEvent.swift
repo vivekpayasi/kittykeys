@@ -19,6 +19,9 @@ public enum TouchEvent: Equatable, Sendable {
     case activateAlternate(KeyFrame, text: String)
     /// Delete the character before the cursor, or the word before it.
     case deleteBackward(word: Bool)
+    /// The backspace swipe: delete the rest of the word the touch-down delete started on
+    /// (`TextRules.trailingRunLength`), and nothing when that delete finished the word.
+    case deleteRestOfWord
     /// Space-bar cursor mode started or ended.
     case cursorModeBegan, cursorModeEnded
     /// Move the cursor this many characters; negative is backward.

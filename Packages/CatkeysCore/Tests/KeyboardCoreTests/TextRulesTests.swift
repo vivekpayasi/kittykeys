@@ -56,6 +56,19 @@ import KeyboardCore
     #expect(TextRules.previousWordLength(before: "'quoted") == 6)   // the leading apostrophe is not inside a word
 }
 
+@Test func trailingRunStopsAtWhitespace() {
+    #expect(TextRules.trailingRunLength(before: "kya kr rha ") == 0)   // "h" already gone: "rha" is a different word
+    #expect(TextRules.trailingRunLength(before: "hell") == 4)
+    // The final apostrophe has no letter after it, so it isn't inside a word: the run is the punctuation "'" alone.
+    #expect(TextRules.trailingRunLength(before: "don'") == 1)
+    #expect(TextRules.trailingRunLength(before: "don't") == 5)
+    #expect(TextRules.trailingRunLength(before: "hi?!") == 2)
+    #expect(TextRules.trailingRunLength(before: nil) == 0)
+    #expect(TextRules.trailingRunLength(before: "") == 0)
+    #expect(TextRules.trailingRunLength(before: "I am ") == 0)
+    #expect(TextRules.trailingRunLength(before: "hi 👍🏽") == 1)
+}
+
 @Test func verticalMovesSeveralLinesStopAtTheLastLineBreak() {
     // "ab\nlonger\nxyz|": up 2 crosses "xyz", "\n", "longer", "\n", then column 3 clamps to the end of "ab".
     #expect(CursorMath.verticalMove(before: "ab\nlonger\nxyz", after: "", lines: -2) == -11)

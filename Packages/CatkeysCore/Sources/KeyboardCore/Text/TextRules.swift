@@ -39,9 +39,25 @@ public enum TextRules {
     public static func previousWordLength(before: String?) -> Int {
         guard let before else { return 0 }
         let characters = Array(before)
-        var start = characters.endIndex
-        while start > 0, characters[start - 1].isWhitespace { start -= 1 }
-        guard start > 0 else { return characters.count }
+        var end = characters.endIndex
+        while end > 0, characters[end - 1].isWhitespace { end -= 1 }
+        guard end > 0 else { return characters.count }
+        return characters.count - runStart(in: characters, end: end)
+    }
+
+    /// How many graphemes the backspace swipe removes: the run touching the cursor, taken as `previousWordLength`
+    /// takes it, but without skipping whitespace. 0 when the text is nil or empty or ends in whitespace,
+    /// since then the touch-down delete already finished the word and the one before is a different word.
+    public static func trailingRunLength(before: String?) -> Int {
+        guard let before, let last = before.last, !last.isWhitespace else { return 0 }
+        let characters = Array(before)
+        return characters.count - runStart(in: characters, end: characters.endIndex)
+    }
+
+    /// Where the run ending just before `end` starts: letters and digits (with apostrophes inside the word),
+    /// or else other non-space characters. `characters[end - 1]` must exist and not be whitespace.
+    private static func runStart(in characters: [Character], end: Int) -> Int {
+        var start = end
         if isWordCharacter(characters[start - 1]) {
             while start > 0, isWordCharacter(characters[start - 1]) || isApostropheInsideWord(characters, at: start - 1) {
                 start -= 1
@@ -49,7 +65,7 @@ public enum TextRules {
         } else {
             while start > 0, !characters[start - 1].isWhitespace, !isWordCharacter(characters[start - 1]) { start -= 1 }
         }
-        return characters.count - start
+        return start
     }
 
     private static let apostrophes: Set<Character> = ["'", "\u{2019}"]
