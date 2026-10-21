@@ -258,7 +258,10 @@ scripts/sim-screenshots.sh                    build + launch preview + capture P
   - Width-0 keys share whatever space is left in their row.
   - Every row is centred.
   - `id` is the key's index in the returned array, in row-major order.
-  - `hitTest` returns nil when `p.y < metrics.suggestionRowHeight`. Otherwise it returns the frame with the smallest `distance(to:)`, so gaps and edges go to the nearest key.
+  - `hitTest` returns nil when `p.y < metrics.suggestionRowHeight`. Otherwise it picks the row first, then the key, so gaps and edges go to the nearest key in that row (ruling R9). A pure nearest-rectangle rule would send edge-gutter taps to the row above.
+    - **Row:** each row owns its vertical band, from its top down to halfway through the gap below. The top row starts at `suggestionRowHeight`, and the bottom row extends down without limit.
+    - **Key:** within the row, the key with the smallest horizontal distance wins. Ties go to the earlier key.
+  - `frames` returns `[]` when the unit width is ≤ 0, and `Rect.contains` uses plain comparisons, never ranges.
 
 - [ ] **Step 1: Write the failing tests**
   ```swift
