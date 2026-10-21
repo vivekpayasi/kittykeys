@@ -30,7 +30,10 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: $(CATKEYS_BUNDLE_PREFIX).catkeys
         INFOPLIST_FILE: App/Info.plist
-        CODE_SIGN_ENTITLEMENTS: App/Catkeys.entitlements
+        # From the xcconfig files, so Local.xcconfig can build without the App Group.
+        CODE_SIGN_ENTITLEMENTS: $(CATKEYS_APP_ENTITLEMENTS)
+        # iPhone only, as the design says.
+        TARGETED_DEVICE_FAMILY: "1"
     dependencies:
       - target: CatkeysKeyboard
       - package: CatkeysCore
@@ -48,7 +51,8 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: $(CATKEYS_BUNDLE_PREFIX).catkeys.keyboard
         INFOPLIST_FILE: Keyboard/Info.plist
-        CODE_SIGN_ENTITLEMENTS: Keyboard/CatkeysKeyboard.entitlements
+        CODE_SIGN_ENTITLEMENTS: $(CATKEYS_KB_ENTITLEMENTS)
+        TARGETED_DEVICE_FAMILY: "1"
     dependencies:
       - package: CatkeysCore
         product: KeyboardCore
