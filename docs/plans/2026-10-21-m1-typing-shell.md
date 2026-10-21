@@ -690,9 +690,10 @@ Implement this before Task 7, or alongside it, because the controller takes `Key
   - **`viewDidAppear`:** turns off `delaysTouchesBegan` on every gesture recognizer in `view.window?.gestureRecognizers`. This is design §9's bottom-row workaround.
   - **`textDidChange`:** calls `fieldDidChange` and `documentDidChange`. The theme is dark when `proxy.keyboardAppearance == .dark` or the trait collection is dark.
   - **`didReceiveMemoryWarning`:** no-op for M1.
-- **Signposts:** `OSSignposter(subsystem: "catkeys", category: "perf")`.
+- **Signposts:** `OSSignposter(subsystem: "catkeys", category: "perf")`. `KeyboardView` doesn't import the extension: it reports through hooks (`onTouchDown`, `measure`, `onFirstKeysDrawn`) that the extension sets.
   - An interval `startup` from `viewDidLoad` to the first `render()` that has frames.
-  - An event `keyDown` on every touch-down, with the latency `systemUptime - touch.timestamp` in ms as metadata.
+  - An event `keyDown` on every touch-down, with the latency `systemUptime - touch.timestamp` in ms and `bottomRow` (1 if the touched key is on the bottom row, else 0) as metadata. Never the position or the key.
+  - An interval `touch` around each batch of touches `KeyboardView` hands to the controller (the touch processor and the controller's whole response), and an interval `render` around each `render()`.
   - An interval `insert` around every `TextDocument.insert` call in `ProxyTextDocument`.
 
 - [ ] **Step 1: Implement `ProxyTextDocument` and `DeviceFeedback`.**
@@ -735,14 +736,14 @@ Implement this before Task 7, or alongside it, because the controller takes `Key
   3. Turn on Developer Mode on the iPhone.
 
   Then Claude writes `Config/Local.xcconfig` with `DEVELOPMENT_TEAM` and `CATKEYS_BUNDLE_PREFIX`.
-- [ ] **Step 2: Build and install on the device.**
-  1. Run `xcodebuild -project Catkeys.xcodeproj -scheme Catkeys -destination 'platform=iOS,name=V’s iPhone' -derivedDataPath build/DerivedData -allowProvisioningUpdates build`.
-  2. Install with `xcrun devicectl device install app --device <id> build/DerivedData/Build/Products/Debug-iphoneos/Catkeys.app`.
+- [ ] **Step 2: Build and install on the device.** Use the Release configuration (ruling R35): Debug inflates time and memory and would mislead the speed and memory checks. Automatic development signing still applies. The simulator screenshot script stays on Debug.
+  1. Run `xcodebuild -project Catkeys.xcodeproj -scheme Catkeys -configuration Release -destination 'platform=iOS,name=V’s iPhone' -derivedDataPath build/DerivedData -allowProvisioningUpdates build`.
+  2. Install with `xcrun devicectl device install app --device <id> build/DerivedData/Build/Products/Release-iphoneos/Catkeys.app`.
 
   Expected: the app installs.
 - [ ] **Step 3: The user enables the keyboard and Full Access.** Then check the App Group: the app's Setup tab shows "Keyboard last opened: just now" after the keyboard opens. Record whether it works. If it doesn't, file a follow-up task for design §9's in-keyboard settings fallback.
-- [ ] **Step 4: Measure.** Use `xcrun xctrace record --device <id> --template 'Logging' --attach CatkeysKeyboard --output "/Volumes/Extreme SSD/catkeys-traces/m1-signposts.trace"` while the user types for 30 s.
-  - Read the `keyDown` latency, `insert` and `startup` from the trace.
+- [ ] **Step 4: Measure the Release build from Step 2.** Use `xcrun xctrace record --device <id> --template 'Logging' --attach CatkeysKeyboard --output "/Volumes/Extreme SSD/catkeys-traces/m1-signposts.trace"` while the user types for 30 s.
+  - Read the `keyDown` latency (split by its `bottomRow` metadata), `touch`, `render`, `insert` and `startup` from the trace.
   - Record a second trace with the `Allocations` template and read `phys_footprint`.
   - Compare against design §10: insert ≤ 2 ms, startup ≤ 50 ms, UI memory ≤ 22 MB. Also check whether bottom-row `keyDown` latency is higher than other rows.
 - [ ] **Step 5: The user's feel check.** Go through this list and record the user's verdicts:

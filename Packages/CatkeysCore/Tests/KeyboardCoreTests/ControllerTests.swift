@@ -699,6 +699,17 @@ import KeyboardCore
         #expect(doc.text == "a" && controller.state.pressedKeyIDs.isEmpty)
     }
 
+    @Test func keyAtFindsTheKeyATouchWouldLandOn() throws {
+        let k = try Harness()
+        let a = try k.key("a"), space = try k.key("space")
+        #expect(k.controller.key(at: Point(x: a.rect.midX, y: a.rect.midY)) == a)
+        // Below the bottom row is still the bottom row, the last row of frames.
+        let low = try #require(k.controller.key(at: Point(x: space.rect.midX, y: space.rect.maxY + 20)))
+        #expect(low == space && low.row == k.controller.frames.last?.row)
+        #expect(k.controller.key(at: Point(x: 200, y: 20)) == nil)
+        #expect(k.changes == 0)
+    }
+
     @Test func onChangeFiresOncePerChangingCall() throws {
         let k = try Harness()
         let p = try k.down("a")

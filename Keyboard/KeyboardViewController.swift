@@ -58,10 +58,17 @@ final class KeyboardViewController: UIInputViewController {
             feedback: feedback)
         controller.onGlobe = { [weak self] in self?.advanceToNextInputMode() }
         let keyboardView = KeyboardView(controller: controller)
-        // How long iOS took to deliver the touch: the bottom-row delay shows up here.
-        keyboardView.onTouchDown = { timestamp in
+        // How long iOS took to deliver the touch: the bottom-row delay shows up here, so the bottom row is marked
+        // (only a 0 or 1, never where the touch was or which key).
+        keyboardView.onTouchDown = { timestamp, isBottomRow in
             let latency = (ProcessInfo.processInfo.systemUptime - timestamp) * 1000
-            signposter.emitEvent("keyDown", "latencyMs=\(latency, format: .fixed(precision: 2))")
+            let bottomRow = isBottomRow ? 1 : 0
+            signposter.emitEvent(
+                "keyDown", "latencyMs=\(latency, format: .fixed(precision: 2)) bottomRow=\(bottomRow)")
+        }
+        // "touch": each batch of touches through the touch processor and the controller; "render": each redraw.
+        keyboardView.measure = { name, work in
+            signposter.withIntervalSignpost(name, around: work)
         }
         keyboardView.onFirstKeysDrawn = { [weak self] in self?.endStartupInterval() }
         // The view redraws from onChange; the height follows the page too.

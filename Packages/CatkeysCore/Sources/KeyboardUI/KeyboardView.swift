@@ -52,9 +52,13 @@ public enum ReturnKeyLabel {
         }
     }
 
-    /// Called at each touch-down with the touch's timestamp, before the controller sees the touch.
-    /// The keyboard extension measures touch delivery with it.
-    public var onTouchDown: ((_ timestamp: TimeInterval) -> Void)?
+    /// Called at each touch-down with the touch's timestamp and whether it landed on the bottom row,
+    /// before the controller sees the touch. The keyboard extension measures touch delivery with it.
+    public var onTouchDown: ((_ timestamp: TimeInterval, _ isBottomRow: Bool) -> Void)?
+    /// Runs a stretch of the view's work, for timing: "touch" for each batch of touches handed to the controller
+    /// (the touch processor and the controller's whole response), and "render" for each `render()`.
+    /// The keyboard extension wraps `work` in a signpost interval. Without it the work just runs.
+    public var measure: ((_ name: StaticString, _ work: () -> Void) -> Void)?
     /// Called once, after the first render that drew keys. The keyboard extension ends its startup measurement with it.
     public var onFirstKeysDrawn: (() -> Void)?
 
@@ -138,6 +142,10 @@ public enum ReturnKeyLabel {
     /// Rebuilds the key layers only when the frames changed; otherwise updates only the keys, preview and popup
     /// whose state changed.
     public func render() {
+        measuring("render") { renderNow() }
+    }
+
+    private func renderNow() {
         let state = controller.state
         CATransaction.begin()
         CATransaction.setDisableActions(true)
@@ -282,25 +290,37 @@ public enum ReturnKeyLabel {
 
     public override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
         if let onTouchDown {
-            for touch in touches { onTouchDown(touch.timestamp) }
+            let bottomRow = controller.frames.last?.row
+            for touch in touches {
+                let row = controller.key(at: point(of: touch))?.row
+                onTouchDown(touch.timestamp, row != nil && row == bottomRow)
+            }
         }
-        if let stillDown = event?.allTouches { cancelLostTouches(stillDown: stillDown) }
-        forward(touches) { controller.touchDown($0, at: $1, time: $2) }
-        for touch in touches { liveTouchIDs.insert(Self.id(of: touch)) }
+        measuring("touch") {
+            if let stillDown = event?.allTouches { cancelLostTouches(stillDown: stillDown) }
+            forward(touches) { controller.touchDown($0, at: $1, time: $2) }
+            for touch in touches { liveTouchIDs.insert(Self.id(of: touch)) }
+        }
     }
 
     public override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
-        forward(touches) { controller.touchMoved($0, to: $1, time: $2) }
+        measuring("touch") {
+            forward(touches) { controller.touchMoved($0, to: $1, time: $2) }
+        }
     }
 
     public override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
-        forward(touches) { controller.touchUp($0, at: $1, time: $2) }
-        for touch in touches { liveTouchIDs.remove(Self.id(of: touch)) }
+        measuring("touch") {
+            forward(touches) { controller.touchUp($0, at: $1, time: $2) }
+            for touch in touches { liveTouchIDs.remove(Self.id(of: touch)) }
+        }
     }
 
     public override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
-        forward(touches) { id, _, _ in controller.touchCancelled(id) }
-        for touch in touches { liveTouchIDs.remove(Self.id(of: touch)) }
+        measuring("touch") {
+            forward(touches) { id, _, _ in controller.touchCancelled(id) }
+            for touch in touches { liveTouchIDs.remove(Self.id(of: touch)) }
+        }
     }
 
     /// Hands each touch to the controller in time order. Timers due by a touch's time fire first,
@@ -332,6 +352,15 @@ public enum ReturnKeyLabel {
     private func point(of touch: UITouch) -> KeyboardCore.Point {
         let location = touch.location(in: self)
         return KeyboardCore.Point(x: Double(location.x), y: Double(location.y))
+    }
+
+    /// Runs `work` through `measure` when the host set one.
+    private func measuring(_ name: StaticString, _ work: () -> Void) {
+        if let measure {
+            measure(name, work)
+        } else {
+            work()
+        }
     }
 
     // MARK: Timers

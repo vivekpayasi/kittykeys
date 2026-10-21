@@ -50,6 +50,12 @@
     /// When the next timer is due, for scheduling `advance(to:)`. nil when no timer is pending.
     public var nextDeadline: Double? { processor.nextDeadline }
 
+    /// The current key a touch at `p` would land on, by the same hit-test touches use; nil in the suggestion row
+    /// or before there are keys. For measurements: it changes nothing.
+    public func key(at p: Point) -> KeyFrame? {
+        KeyboardGeometry.hitTest(p, in: frames, metrics: metrics)
+    }
+
     private let document: any TextDocument
     private let layouts: LayoutSet
     private let feedback: any FeedbackSink
