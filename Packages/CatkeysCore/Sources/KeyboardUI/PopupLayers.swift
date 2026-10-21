@@ -39,8 +39,12 @@ final class KeyPreviewLayer: CAShapeLayer {
         fatalError("init(coder:) is not supported")
     }
 
-    /// Shows `label` in a balloon over `key`, with the head kept inside `bounds`.
+    /// Shows `label` in a balloon over `key`, with the head kept inside `bounds`. A key with no area shows nothing.
     func show(_ label: String, over key: CGRect, within bounds: CGRect, theme: KeyboardTheme, scale: CGFloat) {
+        guard hasArea(key.size) else {
+            hide()
+            return
+        }
         let headWidth = key.width + 2 * Self.headOverhang
         let head = CGRect(
             x: min(max(key.midX - headWidth / 2, bounds.minX), bounds.maxX - headWidth),
@@ -64,27 +68,30 @@ final class KeyPreviewLayer: CAShapeLayer {
     }
 
     /// The head's outline, joined by S-curves to the key's sides, then down around the key's rounded bottom corners.
+    /// Each corner's radius fits its rectangle, however narrow.
     private static func balloonPath(head: CGRect, key: CGRect) -> CGPath {
         let neckBottom = head.maxY + neckHeight
         let neckMiddle = head.maxY + neckHeight / 2
+        let headRadius = fittedCornerRadius(headCornerRadius, for: head.size)
+        let keyRadius = fittedCornerRadius(KeyLayer.cornerRadius, for: key.size)
         let path = CGMutablePath()
-        path.move(to: CGPoint(x: head.minX, y: head.minY + headCornerRadius))
+        path.move(to: CGPoint(x: head.minX, y: head.minY + headRadius))
         path.addArc(
             tangent1End: CGPoint(x: head.minX, y: head.minY), tangent2End: CGPoint(x: head.maxX, y: head.minY),
-            radius: headCornerRadius)
+            radius: headRadius)
         path.addArc(
             tangent1End: CGPoint(x: head.maxX, y: head.minY), tangent2End: CGPoint(x: head.maxX, y: head.maxY),
-            radius: headCornerRadius)
+            radius: headRadius)
         path.addLine(to: CGPoint(x: head.maxX, y: head.maxY))
         path.addCurve(
             to: CGPoint(x: key.maxX, y: neckBottom), control1: CGPoint(x: head.maxX, y: neckMiddle),
             control2: CGPoint(x: key.maxX, y: neckMiddle))
         path.addArc(
             tangent1End: CGPoint(x: key.maxX, y: key.maxY), tangent2End: CGPoint(x: key.minX, y: key.maxY),
-            radius: KeyLayer.cornerRadius)
+            radius: keyRadius)
         path.addArc(
             tangent1End: CGPoint(x: key.minX, y: key.maxY), tangent2End: CGPoint(x: key.minX, y: neckBottom),
-            radius: KeyLayer.cornerRadius)
+            radius: keyRadius)
         path.addLine(to: CGPoint(x: key.minX, y: neckBottom))
         path.addCurve(
             to: CGPoint(x: head.minX, y: head.maxY), control1: CGPoint(x: key.minX, y: neckMiddle),
@@ -110,18 +117,17 @@ final class AlternatesLayer: CALayer {
 
     private let selectionLayer = CALayer()
     private var cells: [CATextLayer] = []
+    private var cellWidth: CGFloat = 0
     private var selected: Int?
     private var theme = KeyboardTheme.light
 
     override init() {
         super.init()
         isHidden = true
-        cornerRadius = Self.popupCornerRadius
         shadowColor = UIColor.black.cgColor
         shadowOpacity = 0.25
         shadowOffset = CGSize(width: 0, height: 3)
         shadowRadius = 6
-        selectionLayer.cornerRadius = Self.selectionCornerRadius
         addSublayer(selectionLayer)
     }
 
@@ -136,25 +142,32 @@ final class AlternatesLayer: CALayer {
     }
 
     /// Shows `options` in display order, in `cellWidth` cells from `originX`, above `key`, with nothing selected yet.
-    /// The popup's background stays inside `bounds`; the cells never move.
+    /// The popup's background stays inside `bounds`; the cells never move. A popup with no room inside `bounds`
+    /// shows nothing.
     func show(
         _ options: [String], originX: CGFloat, cellWidth: CGFloat, above key: CGRect, within bounds: CGRect,
         theme: KeyboardTheme, scale: CGFloat
     ) {
         self.theme = theme
-        let height = Self.cellHeight + 2 * Self.padding
-        let minX = max(originX - Self.padding, bounds.minX)
-        let maxX = min(originX + CGFloat(options.count) * cellWidth + Self.padding, bounds.maxX)
-        frame = CGRect(x: minX, y: max(key.minY - Self.gapAboveKey - height, bounds.minY), width: maxX - minX, height: height)
-        backgroundColor = theme.popup.cgColor
-        shadowPath = CGPath(
-            roundedRect: self.bounds, cornerWidth: Self.popupCornerRadius, cornerHeight: Self.popupCornerRadius,
-            transform: nil)
-        selectionLayer.backgroundColor = theme.selection.cgColor
+        self.cellWidth = cellWidth
+        cells.forEach { $0.removeFromSuperlayer() }
+        cells = []
         selectionLayer.isHidden = true
         selected = nil
+        let minX = max(originX - Self.padding, bounds.minX)
+        let maxX = min(originX + CGFloat(options.count) * cellWidth + Self.padding, bounds.maxX)
+        let size = CGSize(width: maxX - minX, height: Self.cellHeight + 2 * Self.padding)
+        guard hasArea(size) else {
+            hide()
+            return
+        }
+        frame = CGRect(origin: CGPoint(x: minX, y: max(key.minY - Self.gapAboveKey - size.height, bounds.minY)), size: size)
+        backgroundColor = theme.popup.cgColor
+        let radius = fittedCornerRadius(Self.popupCornerRadius, for: size)
+        cornerRadius = radius
+        shadowPath = CGPath(roundedRect: self.bounds, cornerWidth: radius, cornerHeight: radius, transform: nil)
+        selectionLayer.backgroundColor = theme.selection.cgColor
 
-        cells.forEach { $0.removeFromSuperlayer() }
         let font = UIFont.systemFont(ofSize: Self.fontSize)
         let lineHeight = ceil(font.lineHeight)
         cells = options.enumerated().map { index, option in
@@ -174,16 +187,21 @@ final class AlternatesLayer: CALayer {
         isHidden = false
     }
 
-    /// Highlights the cell at `index`, an index into the options shown.
+    /// Highlights the cell at `index`, an index into the options shown. A cell too narrow for the highlight
+    /// gets only the highlighted label colour.
     func select(_ index: Int) {
         guard index != selected, cells.indices.contains(index) else { return }
         if let selected, cells.indices.contains(selected) { cells[selected].foregroundColor = theme.label.cgColor }
         selected = index
         let cell = cells[index]
         cell.foregroundColor = theme.selectedLabel.cgColor
-        selectionLayer.frame = CGRect(
-            x: cell.frame.minX + Self.selectionInset, y: Self.padding,
-            width: cell.frame.width - 2 * Self.selectionInset, height: Self.cellHeight)
+        let size = CGSize(width: cellWidth - 2 * Self.selectionInset, height: Self.cellHeight)
+        guard hasArea(size) else {
+            selectionLayer.isHidden = true
+            return
+        }
+        selectionLayer.frame = CGRect(origin: CGPoint(x: cell.frame.minX + Self.selectionInset, y: Self.padding), size: size)
+        selectionLayer.cornerRadius = fittedCornerRadius(Self.selectionCornerRadius, for: size)
         selectionLayer.isHidden = false
     }
 

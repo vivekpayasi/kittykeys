@@ -12,6 +12,18 @@ struct KeyStyle {
     var fontSize: CGFloat
 }
 
+/// A corner radius that fits a rounded rectangle of `size`: at most half of either side, and never negative.
+/// `CGPath(roundedRect:cornerWidth:cornerHeight:transform:)` asserts on a larger one, and a crash kills the keyboard.
+/// `size` is used as given; `CGRect.width` and `height` would hide a negative size.
+func fittedCornerRadius(_ radius: CGFloat, for size: CGSize) -> CGFloat {
+    max(0, min(radius, size.width / 2, size.height / 2))
+}
+
+/// Whether `size` has room to draw a rounded rectangle in: both sides above 0.
+func hasArea(_ size: CGSize) -> Bool {
+    size.width > 0 && size.height > 0
+}
+
 /// One key: a rounded rectangle with a centred label and, on letter rows, a symbol in its top-right corner.
 ///
 /// Each setter changes Core Animation properties only when its value changes. The caller wraps changes
@@ -39,13 +51,18 @@ final class KeyLayer: CALayer {
         self.theme = theme
         super.init()
         frame = rect
-        cornerRadius = Self.cornerRadius
+        let radius = fittedCornerRadius(Self.cornerRadius, for: rect.size)
+        cornerRadius = radius
         shadowColor = UIColor.black.cgColor
         shadowOpacity = 0.3
         shadowOffset = CGSize(width: 0, height: 1)
         shadowRadius = 0
-        shadowPath = CGPath(
-            roundedRect: bounds, cornerWidth: Self.cornerRadius, cornerHeight: Self.cornerRadius, transform: nil)
+        // A key squeezed to nothing, as on a very narrow layout, draws nothing rather than an impossible shape.
+        if hasArea(rect.size) {
+            shadowPath = CGPath(roundedRect: bounds, cornerWidth: radius, cornerHeight: radius, transform: nil)
+        } else {
+            isHidden = true
+        }
         updateFill()
 
         labelLayer.contentsScale = scale
