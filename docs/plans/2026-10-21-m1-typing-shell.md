@@ -517,6 +517,7 @@ scripts/sim-screenshots.sh                    build + launch preview + capture P
       public func setWidth(_ width: Double)
       public func fieldDidChange(_ traits: FieldTraits)       // picks variant/page/return key, re-evaluates auto-shift
       public func documentDidChange()                          // re-evaluates auto-shift
+      public func keyboardWillAppear(_ traits: FieldTraits)    // ruling R28: reset page/variant from traits, clear shift history, re-evaluate auto-shift
       public func touchDown(_ id: TouchID, at: Point, time: Double)
       public func touchMoved(_ id: TouchID, to: Point, time: Double)
       public func touchUp(_ id: TouchID, at: Point, time: Double)
@@ -527,11 +528,12 @@ scripts/sim-screenshots.sh                    build + launch preview + capture P
   ```
 - **What each event does:**
   - `keyDown`: calls `feedback.keyDown()` and adds the key to `pressedKeyIDs`.
-  - `activate(.character)`: inserts the output, uppercased when shift is `once` or `locked`. A `once` shift is then used up.
-  - `activate(.space)`: if `settings.doubleSpacePeriod` is on, the previous key was also space within `0.5` s, and `isDoubleSpaceCandidate(before:)` holds, it deletes 1 and inserts `". "`. Otherwise it inserts `" "`.
+  - `activate(.character)`: inserts the output, uppercased when shift is `once` or `locked` and the output is a single grapheme (ruling R25). A `once` shift is then used up.
+  - `activate(.space)`: if `settings.doubleSpacePeriod` is on, the previous key was also space within `0.5` s, the text before the cursor is unchanged since that space (ruling R26), and `isDoubleSpaceCandidate(before:)` holds, it deletes 1 and inserts `". "`. Otherwise it inserts `" "`.
   - `activate(.returnKey)`: inserts `"\n"`.
   - `activate(.shift)`:
     - From off, it goes to once.
+    - Ruling R24 overrides the next two rules: every shift tap records its time, and a tap within `0.3` s of the previous shift tap goes to locked from any state except locked.
     - From once, it goes to locked if the press came within `0.3` s of the shift tap that set it, and otherwise to off.
     - From locked, it goes to off.
   - `activate(.switchPage)`: changes `pageID` and recomputes the frames.
@@ -683,7 +685,7 @@ Implement this before Task 7, or alongside it, because the controller takes `Key
   - The input view adopts `UIInputViewAudioFeedback` with `enableInputClicksWhenVisible = true`.
 - **`KeyboardViewController`:**
   - **`viewDidLoad`:** loads `LayoutSet.bundled()` and settings from `SettingsStore.appGroup(id: Bundle.main.object(forInfoDictionaryKey: "CatkeysAppGroup") as? String)`, falling back to `KeyboardSettings()`. It builds the controller and the `KeyboardView`, sets a height constraint from `controller.height`, wires `onGlobe` to `advanceToNextInputMode()`, and sets `needsGlobeKey = needsInputModeSwitchKey`.
-  - **`viewWillAppear`:** reloads settings, writes the `lastKeyboardOpen = Date()` heartbeat, and calls `fieldDidChange`.
+  - **`viewWillAppear`:** reloads settings, writes the `lastKeyboardOpen = Date()` heartbeat, and calls `controller.keyboardWillAppear(traits)` (ruling R28).
   - **`viewDidAppear`:** turns off `delaysTouchesBegan` on every gesture recognizer in `view.window?.gestureRecognizers`. This is design §9's bottom-row workaround.
   - **`textDidChange`:** calls `fieldDidChange` and `documentDidChange`. The theme is dark when `proxy.keyboardAppearance == .dark` or the trait collection is dark.
   - **`didReceiveMemoryWarning`:** no-op for M1.
