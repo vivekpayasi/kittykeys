@@ -591,7 +591,7 @@ Implement this before Task 7, or alongside it, because the controller takes `Key
   }
   public struct SettingsStore {
       public init(defaults: UserDefaults)
-      public static func appGroup(id: String?) -> SettingsStore?   // nil if id is nil or UserDefaults(suiteName:) fails
+      public static func appGroup(id: String?) -> SettingsStore?   // nil if id is nil, the App Group container is unavailable (ruling R22), or UserDefaults(suiteName:) fails
       public func load() -> KeyboardSettings                        // missing or corrupt data → defaults
       public func save(_ s: KeyboardSettings)
       public var lastKeyboardOpen: Date? { get nonmutating set }    // heartbeat written by the keyboard, read by the app
