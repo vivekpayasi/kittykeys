@@ -815,7 +815,7 @@ Decisions made while building, one line each. The ledger behind them is local an
 - R3: `KeySpec.cornerHint` is `longPress.first` for character keys; the view draws hints only on rows between the number row and the bottom row.
 - R4: Backspace switches to word deletes at exactly 1.5 s after touch-down, then every 0.2 s; character repeats stop before 1.5 s.
 - R5: The preview host uses a no-op `FeedbackSink`.
-- R6: Every subagent runs on the "opus" model, as the maintainer's standing instructions require.
+- R6: Process only (how the build was run); no effect on the product.
 - R7: The keyboard's Info.plist sets `IsASCIICapable = true`.
 - R8: The globe key's spec lives in `Layouts/index.json` as `globeKey`; the controller inserts it.
 - R9: Hit-testing picks the row first (bands split at the gap midpoints), then the horizontally nearest key in it.
