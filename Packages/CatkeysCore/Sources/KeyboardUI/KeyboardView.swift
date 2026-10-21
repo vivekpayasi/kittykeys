@@ -27,8 +27,9 @@ public enum ReturnKeyLabel {
 /// - Keys are layers, built once per change of the controller's frames. Other changes touch only the layers
 ///   they affect, with implicit animations off. There are no buttons, gesture recognizers or Auto Layout
 ///   inside the key grid.
-/// - The view lays the keys out for its own width, redraws from `controller.onChange` (which `init` sets),
-///   and runs the controller's timers with a display link while one is pending.
+/// - The view lays the keys out for its own width, redraws from `controller.onChange` (which `init` sets; a host
+///   that wants change notices too wraps it rather than replacing it), and runs the controller's timers with a
+///   display link while one is pending.
 /// - The suggestion row is an empty band at the top in milestone 1.
 @MainActor public final class KeyboardView: UIView {
     /// The width of a long-press option's cell, the touch processor's own.
@@ -46,6 +47,12 @@ public enum ReturnKeyLabel {
             rebuild()
         }
     }
+
+    /// Called at each touch-down with the touch's timestamp, before the controller sees the touch.
+    /// The keyboard extension measures touch delivery with it.
+    public var onTouchDown: ((_ timestamp: TimeInterval) -> Void)?
+    /// Called once, after the first render that drew keys. The keyboard extension ends its startup measurement with it.
+    public var onFirstKeysDrawn: (() -> Void)?
 
     private let controller: KeyboardController
     private let keysLayer = CALayer()
@@ -98,6 +105,9 @@ public enum ReturnKeyLabel {
     public override func layoutSubviews() {
         super.layoutSubviews()
         controller.setWidth(Double(bounds.width))
+        // setWidth redraws through onChange only when the width changed. Frames the controller already had,
+        // such as before this view existed, still need drawing.
+        if controller.frames != builtFrames { render() }
     }
 
     public override func didMoveToWindow() {
@@ -126,6 +136,10 @@ public enum ReturnKeyLabel {
         CATransaction.commit()
         renderedState = state
         updateTimer()
+        if !keyLayers.isEmpty, let onFirstKeysDrawn {
+            self.onFirstKeysDrawn = nil
+            onFirstKeysDrawn()
+        }
     }
 
     /// Throws away every key layer and draws again, for a new theme or screen scale.
@@ -255,6 +269,9 @@ public enum ReturnKeyLabel {
     // MARK: Touches
 
     public override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+        if let onTouchDown {
+            for touch in touches { onTouchDown(touch.timestamp) }
+        }
         forward(touches) { controller.touchDown($0, at: $1, time: $2) }
     }
 
