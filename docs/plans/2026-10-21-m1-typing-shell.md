@@ -383,7 +383,8 @@ scripts/sim-screenshots.sh                    build + launch preview + capture P
       case alternatesShown(KeyFrame, options: [String], selected: Int, originX: Double)
       case alternateSelected(KeyFrame, selected: Int)
       case activateAlternate(KeyFrame, text: String)
-      case deleteBackward(word: Bool)                          // Task 6
+      case deleteBackward(word: Bool)                          // Task 6: held backspace
+      case deleteRestOfWord                                    // Task 6: backspace swipe (ruling R18)
       case cursorModeBegan, cursorModeEnded                    // Task 6
       case cursorMoved(characters: Int)                        // Task 6
       case cursorMovedLines(Int)                               // Task 6
@@ -451,7 +452,8 @@ scripts/sim-screenshots.sh                    build + launch preview + capture P
   - Touch-down emits `[.keyDown, .deleteBackward(word: false)]`.
   - Repeats start at `0.4` s and come every `0.07` s.
   - From `1.5` s after touch-down, each repeat is `.deleteBackward(word: true)`, every `0.2` s.
-  - The first horizontal move of ≥ `20` pt to the left emits one `.deleteBackward(word: true)` and stops the repeats. Nothing more happens until lift.
+  - The first horizontal move of ≥ `20` pt to the left emits one `.deleteRestOfWord` (ruling R18) and stops the repeats. Nothing more happens until lift.
+  - When cursor mode begins, a deleting backspace stops (ruling R19).
 - **Space:**
   - Holding for `0.33` s with no rollover emits `.cursorModeBegan`.
   - In cursor mode, the horizontal movement since the last emitted step is turned into `.cursorMoved(characters: n)`, where n is `Int(dx / 9)` (rounding towards zero). If the speed over the last move is above `300` pt/s, n is multiplied by `3`.
@@ -506,7 +508,7 @@ scripts/sim-screenshots.sh                    build + launch preview + capture P
   @MainActor public final class KeyboardController {
       public init(document: any TextDocument, layouts: LayoutSet, settings: KeyboardSettings, feedback: any FeedbackSink, metrics: KeyboardMetrics = .standard)
       public var settings: KeyboardSettings                    // didSet updates processor timing
-      public var needsGlobeKey: Bool                           // didSet inserts/removes a 🌐 (action .globe) key before 😊
+      public var needsGlobeKey: Bool                           // didSet inserts/removes the globe key spec from Layouts/index.json "globeKey" (ruling R8) before 😊
       public var onGlobe: (() -> Void)?                        // called on globe activate
       public var onChange: (() -> Void)?                       // called after any state/frames change
       public private(set) var state: KeyboardState
@@ -535,6 +537,12 @@ scripts/sim-screenshots.sh                    build + launch preview + capture P
   - `activate(.switchPage)`: changes `pageID` and recomputes the frames.
   - `activateAlternate`: inserts the text unchanged and uses up a `once` shift.
   - `deleteBackward(word: false)`: deletes 1 character. `deleteBackward(word: true)` deletes `previousWordLength`, or 1 if that is 0.
+  - `deleteRestOfWord`: deletes `TextRules.trailingRunLength(before:)`, and nothing if that is 0 (ruling R18).
+  - Popups and frame ids:
+    - `alternatesShown` renders `options` exactly as given, in display order.
+    - A `keyUp` closes the popup only when it belongs to that key.
+    - Never index the current `frames` by an event's `KeyFrame.id` after a page change: pressed-key highlighting matches by id only within the current page.
+    - Two fingers on one key keep it highlighted until both lift.
   - `cursorMoved(n)`: calls `moveCursor(by: n)` and `feedback.cursorTick()` |n| times.
   - `cursorMovedLines(n)`: moves by `CursorMath.verticalMove` and calls `cursorTick()` once.
   - `.emoji`: does nothing in M1.
@@ -625,6 +633,7 @@ Implement this before Task 7, or alongside it, because the controller takes `Key
 - `KeyboardView` behaviour:
   - **Touches:** `isMultipleTouchEnabled = true`. It forwards `touchesBegan`, `Moved`, `Ended` and `Cancelled` to the controller using `ObjectIdentifier(touch).hashValue`, `touch.location(in: self)` and `touch.timestamp`.
   - **Timers:** while `controller.nextDeadline != nil`, a `CADisplayLink` calls `controller.advance(to: ProcessInfo.processInfo.systemUptime)`. It's invalidated when there's no deadline.
+  - **Order:** before forwarding any touch event at time t, call `controller.advance(to: t)`, so a lift just after a deadline sees that deadline fired first.
   - **Layers:** one `KeyLayer` (a `CALayer` with label and corner-hint `CATextLayer`s) per frame. Implicit animations are disabled with `CATransaction.setDisableActions(true)`.
   - **Re-rendering:** `render()` rebuilds layers only when the frames change. Otherwise it updates only the pressed and preview states, which keeps per-key work small.
   - **Key preview:** a magnified balloon above the key, clamped inside the view's bounds. The number row's balloon covers the suggestion row.
