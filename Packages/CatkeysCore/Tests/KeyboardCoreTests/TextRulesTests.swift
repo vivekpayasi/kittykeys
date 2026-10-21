@@ -54,13 +54,15 @@ import KeyboardCore
     #expect(TextRules.previousWordLength(before: "it’s ") == 5)
     #expect(TextRules.previousWordLength(before: "kya hua?!") == 2)
     #expect(TextRules.previousWordLength(before: "'quoted") == 6)   // the leading apostrophe is not inside a word
+    #expect(TextRules.previousWordLength(before: "dogs'") == 5)     // a trailing apostrophe stays with its word
+    #expect(TextRules.previousWordLength(before: "''") == 2)        // apostrophes with no word before them are punctuation
 }
 
 @Test func trailingRunStopsAtWhitespace() {
     #expect(TextRules.trailingRunLength(before: "kya kr rha ") == 0)   // "h" already gone: "rha" is a different word
     #expect(TextRules.trailingRunLength(before: "hell") == 4)
-    // The final apostrophe has no letter after it, so it isn't inside a word: the run is the punctuation "'" alone.
-    #expect(TextRules.trailingRunLength(before: "don'") == 1)
+    // An apostrophe right after a letter stays with its word, even with nothing after it yet (R20).
+    #expect(TextRules.trailingRunLength(before: "don'") == 4)
     #expect(TextRules.trailingRunLength(before: "don't") == 5)
     #expect(TextRules.trailingRunLength(before: "hi?!") == 2)
     #expect(TextRules.trailingRunLength(before: nil) == 0)

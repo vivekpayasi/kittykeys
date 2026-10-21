@@ -35,7 +35,7 @@ public enum TextRules {
 
     /// How many graphemes a word delete removes: the trailing whitespace, then one run of letters and digits
     /// or one run of other non-space characters (punctuation, emoji).
-    /// An apostrophe (`'` or `’`) between two letters or digits stays inside the word, so "don't" goes in one delete.
+    /// An apostrophe (`'` or `’`) right after a letter or digit stays with its word, so "don't" and "dogs'" each go in one delete.
     public static func previousWordLength(before: String?) -> Int {
         guard let before else { return 0 }
         let characters = Array(before)
@@ -54,12 +54,12 @@ public enum TextRules {
         return characters.count - runStart(in: characters, end: characters.endIndex)
     }
 
-    /// Where the run ending just before `end` starts: letters and digits (with apostrophes inside the word),
+    /// Where the run ending just before `end` starts: letters and digits (with each apostrophe that follows one),
     /// or else other non-space characters. `characters[end - 1]` must exist and not be whitespace.
     private static func runStart(in characters: [Character], end: Int) -> Int {
         var start = end
-        if isWordCharacter(characters[start - 1]) {
-            while start > 0, isWordCharacter(characters[start - 1]) || isApostropheInsideWord(characters, at: start - 1) {
+        if isWordCharacter(characters[start - 1]) || isApostropheAfterWordCharacter(characters, at: start - 1) {
+            while start > 0, isWordCharacter(characters[start - 1]) || isApostropheAfterWordCharacter(characters, at: start - 1) {
                 start -= 1
             }
         } else {
@@ -74,9 +74,9 @@ public enum TextRules {
         character.isLetter || character.isNumber
     }
 
-    /// Whether `characters[index]` is an apostrophe with a letter or digit just before it. Called only while
-    /// scanning a word backwards, so the character after it is already part of the word.
-    private static func isApostropheInsideWord(_ characters: [Character], at index: Int) -> Bool {
+    /// Whether `characters[index]` is an apostrophe with a letter or digit just before it, which keeps it in that word
+    /// whatever follows: "don't", "dogs'", or "don'" while it's being typed.
+    private static func isApostropheAfterWordCharacter(_ characters: [Character], at index: Int) -> Bool {
         index > 0 && apostrophes.contains(characters[index]) && isWordCharacter(characters[index - 1])
     }
 }
