@@ -7,8 +7,9 @@ import KeyboardCore
 // a-l row starts at x 22.5: a 22.5...55.5, s 61.5...94.5, d 100.5...133.5, f 139.5...172.5, g 178.5...211.5.
 // z-m row: ⇧ 3...55.5. Bottom row: 123 3...55.5, 😊 61.5...94.5, "," 100.5...133.5, space 139.5...270,
 // "." 276...309, return 315...387.
-// Long-press cells are 36 wide. d's three options fit from its left edge, x 100.5.
-// "."'s six options are 216 wide and would pass x 390 from x 276, so they start at 390 - 216 = 174.
+// Long-press cells are 36 wide. d's three options fit rightward from its left edge, x 100.5.
+// "."'s six options are 216 wide and would pass x 390 from x 276, so they run leftward from its right edge:
+// they start at 309 - 216 = 93, and "." (the default) is the rightmost cell, x 273...309.
 
 struct TouchTapTests {
     let frames: [KeyFrame]
@@ -72,16 +73,50 @@ struct TouchTapTests {
 
     @Test func alternatesStayOnTheKeyboard() throws {
         let period = try key("."), pp = try center(".")
-        #expect(pp == Point(x: 292.5, y: 267))
+        #expect(period.rect.minX == 276 && period.rect.maxX == 309 && pp == Point(x: 292.5, y: 267))
         #expect(touches.touchDown(1, at: pp, time: 0) == [.keyDown(period)])
+        // The options run leftward in display order, so the default "." is selected under the finger.
         #expect(touches.advance(to: 0.3)
-            == [.alternatesShown(period, options: [".", "?", "!", "…", ":", "/"], selected: 0, originX: 174)])
+            == [.alternatesShown(period, options: ["/", ":", "…", "!", "?", "."], selected: 5, originX: 93)])
+        // A 5 pt jitter either way stays in the "." cell: (297.5 - 93) / 36 = 5.68, (287.5 - 93) / 36 = 5.40.
+        #expect(touches.touchMoved(1, to: Point(x: 297.5, y: 267), time: 0.35) == [])
+        #expect(touches.touchMoved(1, to: Point(x: 287.5, y: 267), time: 0.4) == [])
+        // 36 pt left of the landing point is x 256.5: (256.5 - 93) / 36 = 4.54, the "?" cell.
+        #expect(touches.touchMoved(1, to: Point(x: 256.5, y: 267), time: 0.5) == [.alternateSelected(period, selected: 4)])
         // Past either end of the popup, the end option is selected.
-        #expect(touches.touchMoved(1, to: Point(x: 390, y: 267), time: 0.4) == [.alternateSelected(period, selected: 5)])
-        #expect(touches.touchMoved(1, to: Point(x: 0, y: 267), time: 0.5) == [.alternateSelected(period, selected: 0)])
-        // x 211 is the second cell: (211 - 174) / 36 = 1.03.
-        #expect(touches.touchMoved(1, to: Point(x: 211, y: 267), time: 0.6) == [.alternateSelected(period, selected: 1)])
-        #expect(touches.touchUp(1, at: Point(x: 211, y: 267), time: 0.7) == [.activateAlternate(period, text: "?"), .keyUp(period)])
+        #expect(touches.touchMoved(1, to: Point(x: 0, y: 267), time: 0.6) == [.alternateSelected(period, selected: 0)])
+        #expect(touches.touchMoved(1, to: Point(x: 390, y: 267), time: 0.7) == [.alternateSelected(period, selected: 5)])
+        #expect(touches.touchMoved(1, to: Point(x: 256.5, y: 267), time: 0.8) == [.alternateSelected(period, selected: 4)])
+        #expect(touches.touchUp(1, at: Point(x: 256.5, y: 267), time: 0.9) == [.activateAlternate(period, text: "?"), .keyUp(period)])
+    }
+
+    @Test func unusableAlternateWidthKeepsTheDefault() throws {
+        let d = try key("d"), pd = try center("d")
+        // A finger at a non-finite x selects the default option rather than trapping.
+        #expect(touches.touchDown(1, at: pd, time: 0) == [.keyDown(d)])
+        #expect(touches.advance(to: 0.3) == [.alternatesShown(d, options: ["₹", "$", "€"], selected: 0, originX: 100.5)])
+        #expect(touches.touchMoved(1, to: Point(x: 157, y: 163), time: 0.4) == [.alternateSelected(d, selected: 1)])
+        #expect(touches.touchMoved(1, to: Point(x: .nan, y: 163), time: 0.45) == [.alternateSelected(d, selected: 0)])
+        #expect(touches.touchUp(1, at: pd, time: 0.5) == [.activateAlternate(d, text: "₹"), .keyUp(d)])
+        // Cells 0 wide: no move leaves the default option.
+        touches.timing.alternateWidth = 0
+        #expect(touches.touchDown(2, at: pd, time: 1) == [.keyDown(d)])
+        #expect(touches.advance(to: 1.5) == [.alternatesShown(d, options: ["₹", "$", "€"], selected: 0, originX: 100.5)])
+        #expect(touches.touchMoved(2, to: Point(x: 157, y: 163), time: 1.6) == [])
+        #expect(touches.touchMoved(2, to: Point(x: 100.5, y: 163), time: 1.65) == [])
+        #expect(touches.touchUp(2, at: Point(x: 157, y: 163), time: 1.7) == [.activateAlternate(d, text: "₹"), .keyUp(d)])
+    }
+
+    @Test func onlyOnePopupAtATime() throws {
+        let d = try key("d"), g = try key("g"), pd = try center("d"), pg = try center("g")
+        #expect(touches.touchDown(1, at: pd, time: 0) == [.keyDown(d)])
+        #expect(touches.advance(to: 0.3) == [.alternatesShown(d, options: ["₹", "$", "€"], selected: 0, originX: 100.5)])
+        // g lands while d's options show: it gets no long-press, so it types on lift however long it's held.
+        #expect(touches.touchDown(2, at: pg, time: 0.4) == [.keyDown(g)])
+        #expect(touches.nextDeadline == nil)
+        #expect(touches.advance(to: 1.0) == [])
+        #expect(touches.touchUp(2, at: pg, time: 1.1) == [.activate(g, landing: pg), .keyUp(g)])
+        #expect(touches.touchUp(1, at: pd, time: 1.2) == [.activateAlternate(d, text: "₹"), .keyUp(d)])
     }
 
     @Test func holdWithoutOptionsTypesKey() throws {
@@ -132,6 +167,15 @@ struct TouchTapTests {
             == [.activate(a, landing: pa), .keyDown(shift), .activate(shift, landing: pShift)])
         #expect(touches.touchUp(1, at: pa, time: 0.1) == [.keyUp(a)])
         #expect(touches.touchUp(2, at: pShift, time: 0.15) == [.keyUp(shift)])
+    }
+
+    @Test func heldReturnTypesBeforeTheNextKey() throws {
+        let ret = try key("return"), a = try key("a"), pRet = try center("return"), pa = try center("a")
+        #expect(touches.touchDown(1, at: pRet, time: 0) == [.keyDown(ret)])
+        // a lands while return is still down: the new line is typed first, even though a lifts first.
+        #expect(touches.touchDown(2, at: pa, time: 0.05) == [.activate(ret, landing: pRet), .keyDown(a)])
+        #expect(touches.touchUp(2, at: pa, time: 0.1) == [.activate(a, landing: pa), .keyUp(a)])
+        #expect(touches.touchUp(1, at: pRet, time: 0.15) == [.keyUp(ret)])
     }
 
     @Test func returnAndEmojiActOnLift() throws {
@@ -238,12 +282,18 @@ struct TouchTapTests {
     }
 
     @Test func reusedTouchIDEndsTheEarlierTouch() throws {
-        let a = try key("a"), s = try key("s"), pa = try center("a"), ps = try center("s")
+        let a = try key("a"), s = try key("s"), d = try key("d")
+        let pa = try center("a"), ps = try center("s"), pd = try center("d")
         #expect(touches.touchDown(1, at: pa, time: 0) == [.keyDown(a)])
-        // Id 1 lands again without having lifted: the stale touch is cleared, not typed.
-        #expect(touches.touchDown(1, at: ps, time: 0.1) == [.keyUp(a), .keyDown(s)])
+        // Id 1 lands again without having lifted. Its lift was lost, so a is typed as if it had lifted.
+        #expect(touches.touchDown(1, at: ps, time: 0.1) == [.activate(a, landing: pa), .keyUp(a), .keyDown(s)])
         #expect(touches.nextDeadline == 0.1 + 0.3)
         #expect(touches.touchUp(1, at: ps, time: 0.2) == [.activate(s, landing: ps), .keyUp(s)])
+        // A stale touch choosing a long-press option types its selected option.
+        #expect(touches.touchDown(2, at: pd, time: 1) == [.keyDown(d)])
+        #expect(touches.advance(to: 1.5) == [.alternatesShown(d, options: ["₹", "$", "€"], selected: 0, originX: 100.5)])
+        #expect(touches.touchDown(2, at: ps, time: 1.6) == [.activateAlternate(d, text: "₹"), .keyUp(d), .keyDown(s)])
+        #expect(touches.touchUp(2, at: ps, time: 1.7) == [.activate(s, landing: ps), .keyUp(s)])
         #expect(touches.nextDeadline == nil)
     }
 }
