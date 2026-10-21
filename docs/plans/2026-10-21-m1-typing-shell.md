@@ -713,7 +713,7 @@ Implement this before Task 7, or alongside it, because the controller takes `Key
 - **Setup:**
   - Numbered steps: Settings → General → Keyboard → Keyboards → Add New Keyboard → catkeys; then tap catkeys → Allow Full Access.
   - The Full Access paragraph reads, exactly: "Full Access lets catkeys use haptics and read the settings you choose here. catkeys never connects to the internet: nothing you type leaves your phone."
-  - A status line, "Keyboard last opened: <relative time>", from `lastKeyboardOpen`. It shows "Settings can't be shared on this install: the App Group isn't available" when `SettingsStore.appGroup` returns nil, and "Not opened yet" when there's no heartbeat.
+  - A status line, "Keyboard last opened: <relative time>", from `lastKeyboardOpen`. It shows "Settings can't be shared on this install: the App Group isn't available" when `SettingsStore.appGroup` returns nil, and "Not opened yet, or Full Access is off" when there's no heartbeat (ruling R38: without Full Access the keyboard can't write it).
 - **Settings:**
   - Toggles: Haptics, Key click sound, Key popup, Double-space full stop.
   - A long-press delay slider from 0.2 to 0.6 s in 0.05 steps, showing its value in seconds.

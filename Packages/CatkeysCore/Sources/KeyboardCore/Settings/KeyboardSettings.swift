@@ -1,6 +1,7 @@
 /// The settings the user picks in the container app. The keyboard reads them through `SettingsStore`.
 public struct KeyboardSettings: Codable, Equatable, Sendable {
-    /// The seconds `longPressDelay` may take; a decoded value outside it is clamped into it.
+    /// The seconds `longPressDelay` may take. A finite value outside it is clamped into it on save and on decode;
+    /// NaN or infinity becomes the default.
     public static let longPressDelayRange: ClosedRange<Double> = 0.2...0.6
 
     public var haptics = true, sound = false, keyPopup = true, doubleSpacePeriod = true

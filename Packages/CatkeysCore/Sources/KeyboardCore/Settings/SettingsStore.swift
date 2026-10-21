@@ -33,8 +33,8 @@ public struct SettingsStore {
         return settings
     }
 
-    /// Saves `settings` as JSON. A non-finite `longPressDelay`, which JSON can't hold, is saved as the default
-    /// so the other fields are still written.
+    /// Saves `settings` as JSON. A finite `longPressDelay` outside `longPressDelayRange` is clamped into it,
+    /// and a non-finite one, which JSON can't hold, is saved as the default so the other fields are still written.
     public func save(_ settings: KeyboardSettings) {
         var settings = settings
         settings.longPressDelay = KeyboardSettings.validLongPressDelay(settings.longPressDelay)

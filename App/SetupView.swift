@@ -37,7 +37,8 @@ struct SetupView: View {
 
     private static func status(of store: SettingsStore?, now: Date) -> String {
         guard let store else { return appGroupUnavailableMessage }
-        guard let opened = store.lastKeyboardOpen else { return "Not opened yet" }
+        // Without Full Access the keyboard can't write its heartbeat, so no heartbeat can mean either.
+        guard let opened = store.lastKeyboardOpen else { return "Not opened yet, or Full Access is off" }
         return "Keyboard last opened: \(relativeTime(of: opened, now: now))"
     }
 
