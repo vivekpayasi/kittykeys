@@ -1,6 +1,7 @@
 /// The text field the keyboard edits. The keyboard extension wraps `UITextDocumentProxy`; tests use a fake.
 /// Positions and counts are in grapheme clusters (`Character`s), never UTF-16 units.
-public protocol TextDocument: AnyObject {
+/// Main-actor isolated, like `UITextDocumentProxy` and the keyboard controller.
+@MainActor public protocol TextDocument: AnyObject {
     /// The text before the cursor. nil = unknown/start of field.
     var textBefore: String? { get }
     /// The text after the cursor. nil = unknown/end of field.

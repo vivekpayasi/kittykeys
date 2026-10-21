@@ -45,6 +45,17 @@ import KeyboardCore
     #expect(!TextRules.shouldCapitalize(before: "ok.", mode: .sentences))
 }
 
+@Test func sentenceEndersComeFromUnicode() {
+    #expect(TextRules.shouldCapitalize(before: "ठीक है। ", mode: .sentences) == true)
+}
+
+@Test func wordDeleteKeepsContractionsWhole() {
+    #expect(TextRules.previousWordLength(before: "don't") == 5)
+    #expect(TextRules.previousWordLength(before: "it’s ") == 5)
+    #expect(TextRules.previousWordLength(before: "kya hua?!") == 2)
+    #expect(TextRules.previousWordLength(before: "'quoted") == 6)   // the leading apostrophe is not inside a word
+}
+
 @Test func verticalMovesSeveralLinesStopAtTheLastLineBreak() {
     // "ab\nlonger\nxyz|": up 2 crosses "xyz", "\n", "longer", "\n", then column 3 clamps to the end of "ab".
     #expect(CursorMath.verticalMove(before: "ab\nlonger\nxyz", after: "", lines: -2) == -11)
@@ -61,21 +72,23 @@ import KeyboardCore
     #expect(TextOffsets.utf16Offset(graphemes: 2, before: nil, after: nil) == 2)
 }
 
-@Test func fakeDocumentEditsAtTheCursor() {
+@Test @MainActor func fakeDocumentEditsAtTheCursor() {
     let doc = FakeTextDocument("hi 👍🏽", cursor: 2)
     #expect(doc.textBefore == "hi" && doc.textAfter == " 👍🏽")
     doc.insert("ya")
     #expect(doc.text == "hiya 👍🏽" && doc.cursor == 4)
     doc.moveCursor(by: 9)
-    #expect(doc.cursor == 6 && doc.textAfter == "")
+    #expect(doc.cursor == 6 && doc.textAfter == nil)   // nil like iOS when nothing is on that side
     doc.deleteBackward(count: 1)
     #expect(doc.text == "hiya " && doc.cursor == 5)
     doc.moveCursor(by: -9)
-    #expect(doc.cursor == 0 && doc.textBefore == "")
+    #expect(doc.cursor == 0 && doc.textBefore == nil)
     doc.deleteBackward(count: 3)
     #expect(doc.text == "hiya " && doc.cursor == 0)
     doc.moveCursor(by: 2)
     doc.deleteBackward(count: 9)
     #expect(doc.text == "ya " && doc.cursor == 0)
     #expect(FakeTextDocument("abc").cursor == 3)
+    let empty = FakeTextDocument("")
+    #expect(empty.textBefore == nil && empty.textAfter == nil)
 }

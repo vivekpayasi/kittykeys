@@ -1,7 +1,8 @@
 import KeyboardCore
 
 /// An in-memory `TextDocument` for tests: the text is a `[Character]` with a cursor counted in graphemes.
-final class FakeTextDocument: TextDocument {
+/// Like iOS, it reports nil for a side of the cursor with no text.
+@MainActor final class FakeTextDocument: TextDocument {
     private var characters: [Character]
     private(set) var cursor: Int
 
@@ -14,9 +15,9 @@ final class FakeTextDocument: TextDocument {
 
     var text: String { String(characters) }
 
-    var textBefore: String? { String(characters[..<cursor]) }
+    var textBefore: String? { cursor == 0 ? nil : String(characters[..<cursor]) }
 
-    var textAfter: String? { String(characters[cursor...]) }
+    var textAfter: String? { cursor == characters.count ? nil : String(characters[cursor...]) }
 
     func insert(_ text: String) {
         characters.insert(contentsOf: text, at: cursor)
