@@ -588,6 +588,48 @@ import KeyboardCore
         #expect(!k.controller.state.cursorMode && k.controller.state.pressedKeyIDs.isEmpty && k.doc.text == "ab")
     }
 
+    // MARK: Stale touches (ruling R33)
+
+    @Test func keyboardWillAppearEndsAStuckCursorMode() throws {
+        // Space's lift never came, so cursor mode would stay on and every later touch would be ignored.
+        let k = try Harness()
+        try k.down("space")
+        k.wait(0.33)
+        #expect(k.controller.state.cursorMode)
+        k.controller.keyboardWillAppear(FieldTraits(autoCap: .none))
+        #expect(!k.controller.state.cursorMode && k.controller.state.pressedKeyIDs.isEmpty)
+        #expect(k.controller.nextDeadline == nil)
+        try k.tap("a", id: 2)
+        #expect(k.doc.text == "a")
+    }
+
+    @Test func cancelAllTouchesStopsHeldBackspaceWithOneNotice() throws {
+        let k = try Harness("hi there")
+        try k.down("⌫")
+        k.wait(0.4)
+        #expect(k.doc.text == "hi the")
+        let changes = k.changes
+        k.controller.cancelAllTouches()
+        #expect(k.changes == changes + 1)
+        #expect(k.controller.state.pressedKeyIDs.isEmpty && k.controller.nextDeadline == nil)
+        // A minute on, as when the view comes back to a window: nothing more is deleted.
+        k.wait(60)
+        #expect(k.doc.text == "hi the")
+        // With nothing held, there is nothing to tell the view.
+        k.controller.cancelAllTouches()
+        #expect(k.changes == changes + 1)
+    }
+
+    @Test func cancelAllTouchesClosesThePopupAndPreview() throws {
+        let k = try Harness()
+        try k.down("d")
+        k.wait(0.3)
+        #expect(k.controller.state.alternates != nil && k.controller.state.pressedKeyIDs.count == 1)
+        k.controller.cancelAllTouches()
+        #expect(k.controller.state.alternates == nil && k.controller.state.previewKeyID == nil)
+        #expect(k.controller.state.pressedKeyIDs.isEmpty && k.doc.text == "")
+    }
+
     // MARK: Width, height and change notices
 
     @Test func framesFollowTheWidth() throws {

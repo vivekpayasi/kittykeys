@@ -122,6 +122,21 @@ public final class TouchProcessor {
         return [.keyUp(touch.frame)]
     }
 
+    /// Every touch ends at once and nothing is typed, as when the keyboard leaves the screen or a lift never came.
+    /// Returns `.cursorModeEnded` first if space was moving the cursor, then `.keyUp` for every touch in
+    /// touch-down order, spent ones included. No touch or timer is left, so `nextDeadline` is nil afterwards.
+    public func cancelAll() -> [TouchEvent] {
+        var events: [TouchEvent] = []
+        events.reserveCapacity(downOrder.count + 1)
+        if isMovingCursor { events.append(.cursorModeEnded) }
+        for id in downOrder {
+            if let touch = touches[id] { events.append(.keyUp(touch.frame)) }
+        }
+        touches.removeAll(keepingCapacity: true)
+        downOrder.removeAll(keepingCapacity: true)
+        return events
+    }
+
     /// Fires every timer due at or before `time`, earliest first, across all touches.
     /// A timer due up to 1e-9 s after `time` counts as due, since sums like 0.4 + 0.07 round a hair past 0.47.
     public func advance(to time: Double) -> [TouchEvent] {

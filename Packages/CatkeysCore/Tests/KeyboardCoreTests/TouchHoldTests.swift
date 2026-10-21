@@ -270,4 +270,46 @@ struct TouchHoldTests {
         #expect(touches.touchDown(1, at: pa, time: 1) == [.cursorModeEnded, .keyUp(space), .keyDown(a)])
         #expect(touches.touchUp(1, at: pa, time: 1.1) == [.activate(a, landing: pa), .keyUp(a)])
     }
+
+    // MARK: Cancelling every touch (ruling R33)
+
+    @Test func cancelAllEndsCursorMode() throws {
+        let space = try key("space"), a = try key("a"), pa = try center("a")
+        try enterCursorMode()
+        #expect(touches.cancelAll() == [.cursorModeEnded, .keyUp(space)])
+        #expect(touches.nextDeadline == nil)
+        // Space's lift, if it comes after all, does nothing; and keys work again.
+        #expect(touches.touchUp(1, at: try center("space"), time: 1) == [])
+        #expect(touches.touchDown(2, at: pa, time: 1.1) == [.keyDown(a)])
+        #expect(touches.touchUp(2, at: pa, time: 1.2) == [.activate(a, landing: pa), .keyUp(a)])
+    }
+
+    @Test func cancelAllStopsHeldBackspace() throws {
+        let b = try key("⌫"), pb = try center("⌫")
+        #expect(touches.touchDown(1, at: pb, time: 0) == [.keyDown(b), .deleteBackward(word: false)])
+        #expect(touches.advance(to: 0.4) == [.deleteBackward(word: false)])
+        #expect(touches.cancelAll() == [.keyUp(b)])
+        #expect(touches.nextDeadline == nil)
+        // A minute later, as when the keyboard comes back on screen: no delete is replayed.
+        #expect(touches.advance(to: 60) == [])
+        #expect(touches.touchUp(1, at: pb, time: 60.1) == [])
+    }
+
+    @Test func cancelAllEndsEveryTouchInOrderAndTypesNothing() throws {
+        let a = try key("a"), s = try key("s"), d = try key("d"), b = try key("⌫")
+        let pa = try center("a"), ps = try center("s"), pd = try center("d"), pb = try center("⌫")
+        #expect(touches.touchDown(1, at: pa, time: 0) == [.keyDown(a)])
+        // s types the held a (rollover), so a is spent; d waits for its long-press; backspace repeats.
+        #expect(touches.touchDown(2, at: ps, time: 0.05) == [.activate(a, landing: pa), .keyDown(s)])
+        #expect(touches.touchDown(3, at: pb, time: 0.1) == [.activate(s, landing: ps), .keyDown(b), .deleteBackward(word: false)])
+        #expect(touches.touchDown(4, at: pd, time: 0.15) == [.keyDown(d)])
+        #expect(touches.advance(to: 0.45) == [.alternatesShown(d, options: ["₹", "$", "€"], selected: 0, originX: 100.5)])
+        #expect(touches.isShowingAlternates)
+        #expect(touches.cancelAll() == [.keyUp(a), .keyUp(s), .keyUp(b), .keyUp(d)])
+        #expect(touches.nextDeadline == nil && !touches.isShowingAlternates)
+        #expect(touches.advance(to: 10) == [])
+        #expect(touches.touchUp(4, at: pd, time: 10.1) == [])
+        // With nothing down, it has nothing to say.
+        #expect(touches.cancelAll() == [])
+    }
 }

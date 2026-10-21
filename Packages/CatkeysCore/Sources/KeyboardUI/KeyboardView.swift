@@ -30,6 +30,8 @@ public enum ReturnKeyLabel {
 /// - The view lays the keys out for its own width, redraws from `controller.onChange` (which `init` sets; a host
 ///   that wants change notices too wraps it rather than replacing it), and runs the controller's timers with a
 ///   display link while one is pending.
+/// - A touch whose lift never arrives is ended for it (ruling R33): when the view leaves or rejoins a window,
+///   and when a new touch begins while UIKit no longer reports it.
 /// - The suggestion row is an empty band at the top in milestone 1.
 @MainActor public final class KeyboardView: UIView {
     /// The width of a long-press option's cell, the touch processor's own.
@@ -38,6 +40,8 @@ public enum ReturnKeyLabel {
     private static let capsLockLabel = "⇪"
     /// Label sizes: number row, single-character labels, longer labels such as "123" or "return".
     private static let numberFontSize: CGFloat = 19, characterFontSize: CGFloat = 21, wordFontSize: CGFloat = 15
+    /// More fingers than a screen reports at once, so tracking touches never grows its set.
+    private static let touchCapacity = 20
 
     /// Set by the host from the trait collection or the field's `keyboardAppearance`. Changing it redraws every key.
     public var theme: KeyboardTheme = .light {
@@ -70,6 +74,8 @@ public enum ReturnKeyLabel {
     private var shownAlternates: AlternatesPopup?
     /// Calls `advance(to:)` every frame while the controller has a timer pending; paused otherwise.
     private var displayLink: CADisplayLink?
+    /// The touches handed to the controller that haven't ended or been cancelled yet.
+    private var liveTouchIDs: Set<TouchID> = []
 
     /// A key preview on screen: the key and the label it shows.
     private struct Preview: Equatable {
@@ -81,6 +87,7 @@ public enum ReturnKeyLabel {
         self.controller = controller
         super.init(frame: .zero)
         isMultipleTouchEnabled = true
+        liveTouchIDs.reserveCapacity(Self.touchCapacity)
         backgroundColor = theme.background
         layer.addSublayer(keysLayer)
         layer.addSublayer(previewLayer)
@@ -112,6 +119,11 @@ public enum ReturnKeyLabel {
 
     public override func didMoveToWindow() {
         super.didMoveToWindow()
+        // A touch whose lift was lost on the way out would otherwise leave cursor mode on (every touch ignored)
+        // or a backspace repeat due, which would replay every missed delete once the timer runs again.
+        // So every touch ends here, before the timer can restart.
+        liveTouchIDs.removeAll(keepingCapacity: true)
+        controller.cancelAllTouches()
         if window == nil {
             displayLink?.invalidate()
             displayLink = nil
@@ -272,7 +284,9 @@ public enum ReturnKeyLabel {
         if let onTouchDown {
             for touch in touches { onTouchDown(touch.timestamp) }
         }
+        if let stillDown = event?.allTouches { cancelLostTouches(stillDown: stillDown) }
         forward(touches) { controller.touchDown($0, at: $1, time: $2) }
+        for touch in touches { liveTouchIDs.insert(Self.id(of: touch)) }
     }
 
     public override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
@@ -281,23 +295,43 @@ public enum ReturnKeyLabel {
 
     public override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
         forward(touches) { controller.touchUp($0, at: $1, time: $2) }
+        for touch in touches { liveTouchIDs.remove(Self.id(of: touch)) }
     }
 
     public override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
         forward(touches) { id, _, _ in controller.touchCancelled(id) }
+        for touch in touches { liveTouchIDs.remove(Self.id(of: touch)) }
     }
 
     /// Hands each touch to the controller in time order. Timers due by a touch's time fire first,
     /// so a lift just after a deadline sees the deadline's effect.
     private func forward(_ touches: Set<UITouch>, to send: (TouchID, KeyboardCore.Point, Double) -> Void) {
         for touch in touches.sorted(by: { $0.timestamp < $1.timestamp }) {
-            let location = touch.location(in: self)
             controller.advance(to: touch.timestamp)
-            send(
-                ObjectIdentifier(touch).hashValue, KeyboardCore.Point(x: Double(location.x), y: Double(location.y)),
-                touch.timestamp)
+            send(Self.id(of: touch), point(of: touch), touch.timestamp)
         }
         updateTimer()
+    }
+
+    /// Cancels each touch handed to the controller that `stillDown`, every touch of the event now beginning,
+    /// no longer includes: UIKit lost its lift. A touch that is still down is always in its event's touches.
+    private func cancelLostTouches(stillDown: Set<UITouch>) {
+        func isLost(_ id: TouchID) -> Bool { !stillDown.contains { Self.id(of: $0) == id } }
+        // The usual case, nothing lost, only compares ids.
+        guard liveTouchIDs.contains(where: isLost) else { return }
+        for id in liveTouchIDs.filter(isLost) {
+            liveTouchIDs.remove(id)
+            controller.touchCancelled(id)
+        }
+    }
+
+    private static func id(of touch: UITouch) -> TouchID {
+        ObjectIdentifier(touch).hashValue
+    }
+
+    private func point(of touch: UITouch) -> KeyboardCore.Point {
+        let location = touch.location(in: self)
+        return KeyboardCore.Point(x: Double(location.x), y: Double(location.y))
     }
 
     // MARK: Timers

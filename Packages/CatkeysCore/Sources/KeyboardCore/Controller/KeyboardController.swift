@@ -112,10 +112,12 @@
         }
     }
 
-    /// The keyboard is about to show. It starts afresh: the field's first page and bottom row even for the same traits,
-    /// shift unlocked, and no earlier shift tap or space to pair with. Then automatic capitals are checked.
+    /// The keyboard is about to show. It starts afresh: no touch left from before (as `cancelAllTouches()`),
+    /// the field's first page and bottom row even for the same traits, shift unlocked, and no earlier shift tap
+    /// or space to pair with. Then automatic capitals are checked.
     public func keyboardWillAppear(_ traits: FieldTraits) {
         notifying {
+            apply(processor.cancelAll())
             adopt(traits)
             forgetPreviousKey()
             state.shift = .off
@@ -145,6 +147,13 @@
 
     public func touchCancelled(_ id: TouchID) {
         notifying { apply(processor.touchCancelled(id)) }
+    }
+
+    /// Ends every touch at once and types nothing, as when the keyboard leaves the screen or a lift never came:
+    /// highlights, the preview, the popup and cursor mode go, and no timer is left to fire.
+    /// The host calls it when the view leaves or rejoins a window.
+    public func cancelAllTouches() {
+        notifying { apply(processor.cancelAll()) }
     }
 
     /// Fires the touch timers due by `time`: long-press popups, cursor mode and backspace repeats.
