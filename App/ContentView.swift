@@ -6,7 +6,7 @@ let appGroupUnavailableMessage = "Settings can't be shared on this install: the 
 
 /// The app's tabs. The simulator screenshot script opens one with `-catkeysTab <raw value>`.
 enum AppTab: String {
-    case setup, settings, tryIt = "tryit"
+    case setup, settings, tryIt = "tryit", typingTest = "typingtest"
 }
 
 struct ContentView: View {
@@ -29,6 +29,9 @@ struct ContentView: View {
                 }
                 Tab("Try it", systemImage: "keyboard", value: AppTab.tryIt) {
                     TryItView()
+                }
+                Tab("Typing test", systemImage: "speedometer", value: AppTab.typingTest) {
+                    TypingTestView(heartbeat: settingsStore)
                 }
             }
         }
