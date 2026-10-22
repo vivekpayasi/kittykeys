@@ -768,7 +768,7 @@ The user installs catkeys through SideStore, as with their other sideloaded app,
     - falls back to the profile group;
     - returns nil when nothing exists.
 - [ ] **Step 2: Implement it, and switch `SettingsStore.appGroup(id:)` over.** Run `swift test`. Expected: all pass.
-- [ ] **Step 3: Write `scripts/build-ipa.sh` and run it with `Config/Local.xcconfig`** (`CATKEYS_BUNDLE_PREFIX = com.vivek`). Expected: `build/catkeys.ipa`, with both bundles' entitlements showing `group.com.vivek.catkeys`.
+- [ ] **Step 3: Write `scripts/build-ipa.sh` and run it with `Config/Local.xcconfig`** (the user's own bundle prefix). Expected: `build/catkeys.ipa`, with both bundles' entitlements showing the expanded App Group id.
 - [ ] **Step 4: Commit.** "SideStore path: resolve renamed App Group; IPA build script"
 
 ### Task 12: Device check, measurements and milestone close (with the user)
