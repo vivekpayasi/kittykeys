@@ -33,7 +33,8 @@ public enum ReturnKeyLabel {
 /// - A touch whose lift never arrives is ended for it (ruling R33): when the view leaves or rejoins a window,
 ///   and when a new touch begins while UIKit no longer reports it.
 /// - The suggestion row is an empty band at the top in milestone 1.
-/// - The view itself is clear, so the system's keyboard backdrop shows around and between the keys (ruling R42).
+/// - The view looks clear, so the system's keyboard backdrop shows around and between the keys (ruling R42). Its fill
+///   is `UIColor.touchableClear`, not `.clear`, so taps between the keys still reach it (ruling M3-R8).
 @MainActor public final class KeyboardView: UIView {
     /// The width of a long-press option's cell, the touch processor's own.
     private static let alternateWidth = CGFloat(TouchTiming().alternateWidth)
@@ -94,7 +95,9 @@ public enum ReturnKeyLabel {
         super.init(frame: .zero)
         isMultipleTouchEnabled = true
         liveTouchIDs.reserveCapacity(Self.touchCapacity)
-        backgroundColor = .clear
+        // Not `.clear`: iOS drops touches on fully transparent parts of a keyboard extension, which would lose taps
+        // in the gaps between keys (ruling R9 sends them to the nearest key) and in the suggestion row (ruling M3-R8).
+        backgroundColor = .touchableClear
         layer.addSublayer(keysLayer)
         layer.addSublayer(previewLayer)
         layer.addSublayer(alternatesLayer)

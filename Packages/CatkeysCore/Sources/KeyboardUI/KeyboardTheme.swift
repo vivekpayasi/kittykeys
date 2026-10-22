@@ -5,7 +5,7 @@ import UIKit
 /// The keyboard's colours. The host picks `.light` or `.dark` from the trait collection or the field's `keyboardAppearance`.
 /// Close to Apple's keyboard, as in the approved mockups.
 ///
-/// The keyboard view has no background of its own: the system's keyboard backdrop (Liquid Glass on iOS 26) shows
+/// The keyboard view has no visible background of its own: the system's keyboard backdrop (Liquid Glass on iOS 26) shows
 /// around and between the keys and in the suggestion row (ruling R42). The key colours read well on it.
 public struct KeyboardTheme: Equatable, Sendable {
     /// A grey like the system's keyboard backdrop, for a host that has none behind the keys, such as the app's preview.
@@ -37,6 +37,11 @@ public struct KeyboardTheme: Equatable, Sendable {
 }
 
 extension UIColor {
+    /// A fill that looks clear but still takes touches. iOS doesn't deliver touches that land on fully transparent
+    /// parts of a keyboard extension's view, so the keyboard's own background, the emoji panel and its list use this
+    /// instead of `.clear` (ruling M3-R8). At 1% opacity it can't be told apart from the system backdrop (ruling R42).
+    static let touchableClear = UIColor(white: 0.5, alpha: 0.01)
+
     /// An opaque sRGB colour from a hex value such as `0xD1D3D9`.
     fileprivate convenience init(rgb: UInt32) {
         self.init(
