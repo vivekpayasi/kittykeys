@@ -3,7 +3,7 @@
 ///
 /// It applies the typing rules: shift and caps lock, automatic capitals, the double-space full stop,
 /// the field's bottom row and first page, and the globe key. It opens and closes the emoji panel, and types and
-/// deletes the panel's emoji as typing.
+/// deletes the panel's emoji as typing. In emoji search the keys type into `state.searchQuery` instead (ruling M3-R15).
 ///
 /// Times are the host's touch timestamps in seconds. The host calls `advance(to:)` before forwarding each touch,
 /// and whenever `nextDeadline` passes.
@@ -76,6 +76,13 @@
     private var lastShiftTapTime: Double?
     /// Whether automatic capitals, not a tap, set the current `.once`. Only such a shift turns off by itself.
     private var shiftIsAutomatic = false
+    /// While emoji search shows: the page and bottom row the panel covered, which come back when search closes.
+    private var keysUnderSearch: (pageID: String, bottom: BottomVariant)?
+    /// Whether `frames` are search's, without the number row.
+    private var framesAreForSearch = false
+    /// Whether the ⌫ that last landed in search found the query empty. Only such a ⌫ leaves search: one held while
+    /// it empties the query only stops deleting.
+    private var backspaceLeavesSearch = false
     /// The latest space typed, while it is the latest key typed here: when, and the text before the cursor just after it.
     /// Any other key or edit here, or cursor mode, clears it. A change made elsewhere shows up as different text before the cursor.
     private var lastSpace: (time: Double, textBefore: String?)?
@@ -131,11 +138,12 @@
     }
 
     /// The keyboard is about to show. It starts afresh: no touch left from before (as `cancelAllTouches()`),
-    /// the keys rather than the emoji panel, the field's first page and bottom row even for the same traits,
+    /// the keys rather than the emoji panel or search, the field's first page and bottom row even for the same traits,
     /// shift unlocked, and no earlier shift tap or space to pair with. Then automatic capitals are checked.
     public func keyboardWillAppear(_ traits: FieldTraits) {
         notifying {
             apply(processor.cancelAll())
+            if state.panel == .emojiSearch { leaveSearch() }
             state.panel = .keys
             adopt(traits)
             forgetPreviousKey()
@@ -151,22 +159,22 @@
         notifying { updateAutoShiftIfTextMoved() }
     }
 
-    /// Touches on the keys. While the emoji panel shows, the keys under it take none: the view sends the panel's
-    /// touches to the panel, and these three do nothing.
+    /// Touches on the keys, which search has too. While the emoji panel shows, the keys under it take none: the view
+    /// sends the panel's touches to the panel, and these three do nothing.
     public func touchDown(_ id: TouchID, at p: Point, time: Double) {
-        guard state.panel == .keys else { return }
+        guard state.panel != .emoji else { return }
         now = time
         notifying { apply(processor.touchDown(id, at: p, time: time)) }
     }
 
     public func touchMoved(_ id: TouchID, to p: Point, time: Double) {
-        guard state.panel == .keys else { return }
+        guard state.panel != .emoji else { return }
         now = time
         notifying { apply(processor.touchMoved(id, to: p, time: time)) }
     }
 
     public func touchUp(_ id: TouchID, at p: Point, time: Double) {
-        guard state.panel == .keys else { return }
+        guard state.panel != .emoji else { return }
         now = time
         notifying { apply(processor.touchUp(id, at: p, time: time)) }
     }
@@ -192,6 +200,7 @@
 
     /// Types `emoji` as a character key would: it uses up a one-letter shift (caps lock stays; ruling M3-R6),
     /// the shift taps and space before it stop pairing up, and automatic capitals are checked again.
+    /// From search too, it goes into the document, and search stays as it is.
     public func insertEmoji(_ emoji: String) {
         notifying { typeText(emoji) }
     }
@@ -213,14 +222,98 @@
         }
     }
 
+    // MARK: Emoji search
+
+    /// "Search emoji" in the panel (ruling M3-R15): the letter keys come back, on the letters page with the standard
+    /// bottom row and without the number row, whose band the results take. They type into `state.searchQuery`, which
+    /// starts empty: lowercase, with no shift, automatic capitals, double-space full stop or cursor mode.
+    /// Return, or ⌫ landing on an empty query, goes back to the panel. Does nothing unless the panel shows.
+    public func openEmojiSearch() {
+        guard state.panel == .emoji else { return }
+        notifying {
+            keysUnderSearch = (state.pageID, bottomVariant)
+            state.panel = .emojiSearch
+            state.searchQuery = ""
+            processor.allowsCursorMode = false
+            show(page: layouts.lettersPageID, bottom: .standard)
+        }
+    }
+
+    /// ✕ in the search field: empties the query and stays in search. Does nothing outside search.
+    public func clearEmojiSearch() {
+        guard state.panel == .emojiSearch else { return }
+        notifying { state.searchQuery = "" }
+    }
+
+    /// Back to the panel, for the search view's own way out: every touch on the keys ends, the query empties, and the
+    /// keys the panel covered come back under it. Does nothing outside search.
+    public func closeEmojiSearch() {
+        guard state.panel == .emojiSearch else { return }
+        notifying {
+            apply(processor.cancelAll())
+            leaveSearch()
+        }
+    }
+
+    /// Search's side of leaving it: the panel shows again over the keys it covered. The caller ends the touches.
+    private func leaveSearch() {
+        state.panel = .emoji
+        state.searchQuery = ""
+        processor.allowsCursorMode = true
+        let keys = keysUnderSearch ?? (layouts.lettersPageID, bottomVariant)
+        keysUnderSearch = nil
+        show(page: keys.pageID, bottom: keys.bottom)
+    }
+
+    /// A key typed in search. Characters and long-press options go into the query lowercased, and space as one space;
+    /// return goes back to the panel and the page keys switch pages. Shift and the emoji key do nothing.
+    private func activateInSearch(_ key: KeySpec) {
+        switch key.action {
+        case .character, .space:
+            appendToQuery(key.output)
+        case .returnKey:
+            leaveSearch()
+        case .switchPage(let ref):
+            show(page: layouts.resolve(ref), bottom: bottomVariant)
+        case .globe:
+            onGlobe?()
+        case .shift, .emoji, .backspace:
+            break
+        }
+    }
+
+    /// Adds `text` to the query, lowercased. A space at its start, or after another space, adds nothing.
+    private func appendToQuery(_ text: String) {
+        for character in text.lowercased() {
+            if character.isWhitespace {
+                guard let last = state.searchQuery.last, !last.isWhitespace else { continue }
+                state.searchQuery.append(" ")
+            } else {
+                state.searchQuery.append(character)
+            }
+        }
+    }
+
+    /// ⌫ in search: deletes a character or a word from the query, as from the document. On an empty query, a ⌫ that
+    /// landed on it leaves search; repeats do nothing.
+    private func deleteFromQuery(word: Bool) {
+        guard !state.searchQuery.isEmpty else {
+            if backspaceLeavesSearch { leaveSearch() }
+            return
+        }
+        let count = word ? max(TextRules.previousWordLength(before: state.searchQuery), 1) : 1
+        state.searchQuery.removeLast(min(count, state.searchQuery.count))
+    }
+
     // MARK: Events
 
     private func apply(_ events: [TouchEvent]) {
         let panelWasOpen = state.panel == .emoji
         for event in events {
             if !panelWasOpen && state.panel == .emoji {
-                // The emoji key opened the panel, and nothing acts under it: the rest of the batch only lets go of
-                // keys. A key whose press is skipped has no count, so the cancel below lets go of it quietly.
+                // The emoji key opened the panel, or return or ⌫ went back to it from search, and nothing acts under
+                // it: the rest of the batch only lets go of keys. A key whose press is skipped has no count, so the
+                // cancel below lets go of it quietly.
                 switch event {
                 case .keyUp, .cursorModeEnded: break
                 default: continue
@@ -240,13 +333,19 @@
     }
 
     private func apply(_ event: TouchEvent) {
+        let searching = state.panel == .emojiSearch
         switch event {
         case .keyDown(let frame):
+            if searching && frame.key.action == .backspace { backspaceLeavesSearch = state.searchQuery.isEmpty }
             press(frame)
         case .keyUp(let frame):
             release(frame)
         case .activate(let frame, _):
-            activate(frame.key)
+            if searching {
+                activateInSearch(frame.key)
+            } else {
+                activate(frame.key)
+            }
         case let .alternatesShown(frame, options, selected, originX):
             // Only for a key highlighted now, so the popup's id is a current key.
             guard isCurrent(frame), pressCounts[frame.id] != nil else { return }
@@ -254,10 +353,16 @@
         case let .alternateSelected(frame, selected):
             guard state.alternates?.keyID == frame.id, isCurrent(frame) else { return }
             state.alternates?.selected = selected
+        case .activateAlternate(_, let text) where searching:
+            appendToQuery(text)
         case .activateAlternate(_, let text):
             typeText(text)
+        case .deleteBackward(let word) where searching:
+            deleteFromQuery(word: word)
         case .deleteBackward(let word):
             delete(word ? max(TextRules.previousWordLength(before: document.textBefore), 1) : 1)
+        case .deleteRestOfWord where searching:
+            state.searchQuery.removeLast(TextRules.trailingRunLength(before: state.searchQuery))
         case .deleteRestOfWord:
             delete(TextRules.trailingRunLength(before: document.textBefore))
         case .cursorModeBegan:
@@ -329,6 +434,7 @@
     }
 
     /// Takes `traits` as the field's: its return key, its bottom row, and its first page (symbols for a number field, else letters).
+    /// Search keeps its own keys, and the field's show once it closes.
     private func adopt(_ traits: FieldTraits) {
         self.traits = traits
         state.returnKey = traits.returnKey
@@ -337,22 +443,35 @@
         case .url: .url
         case .text, .number: .standard
         }
-        show(page: traits.kind == .number ? Self.numberPageID : layouts.lettersPageID, bottom: variant)
+        let page = traits.kind == .number ? Self.numberPageID : layouts.lettersPageID
+        if state.panel == .emojiSearch {
+            keysUnderSearch = (page, variant)
+        } else {
+            show(page: page, bottom: variant)
+        }
     }
 
-    /// Shows page `id` with the `variant` bottom row. A page the layout set lacks is ignored.
+    /// Shows page `id` with the `variant` bottom row, laid out for search or not as `state.panel` says.
+    /// A page the layout set lacks is ignored.
     private func show(page id: String, bottom variant: BottomVariant) {
-        guard layouts.page(id) != nil, id != state.pageID || variant != bottomVariant else { return }
-        state.pageID = id
-        bottomVariant = variant
+        let pageChanges = layouts.page(id) != nil && (id != state.pageID || variant != bottomVariant)
+        guard pageChanges || framesAreForSearch != (state.panel == .emojiSearch) else { return }
+        if pageChanges {
+            state.pageID = id
+            bottomVariant = variant
+        }
         layOutKeys()
     }
 
     /// Rebuilds `frames` for the current page, bottom row and width, and hands them to the touch processor.
-    /// Highlights, the preview and the popup go with the old frames, whose ids may now mean other keys.
+    /// Search's frames leave out the number row. Highlights, the preview and the popup go with the old frames, whose ids
+    /// may now mean other keys.
     private func layOutKeys() {
+        framesAreForSearch = state.panel == .emojiSearch
         if let page = layouts.page(state.pageID) {
-            frames = KeyboardGeometry.frames(page: page, bottom: bottomRow(of: page), width: width, metrics: metrics)
+            frames = KeyboardGeometry.frames(
+                page: page, bottom: bottomRow(of: page), width: width, metrics: metrics,
+                includingNumberRows: !framesAreForSearch)
         } else {
             frames = []
         }

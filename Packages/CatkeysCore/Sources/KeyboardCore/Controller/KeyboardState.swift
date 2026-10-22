@@ -13,15 +13,19 @@ public struct AlternatesPopup: Equatable, Sendable {
     public var originX: Double
 }
 
-/// What fills the keyboard below the suggestion row: the keys, or the emoji panel in their place.
-public enum KeyboardPanel: Equatable, Sendable { case keys, emoji }
+/// What fills the keyboard below the suggestion row: the keys, the emoji panel in their place, or emoji search.
+/// Search (ruling M3-R15) shows the letter keys again, without their number row, and they type into
+/// `KeyboardState.searchQuery` rather than the document.
+public enum KeyboardPanel: Equatable, Sendable { case keys, emoji, emojiSearch }
 
 /// Everything the keyboard view draws apart from the key frames.
 /// Key ids index the controller's current `frames`; a page or width change clears every one of them.
 public struct KeyboardState: Equatable, Sendable {
     /// The emoji panel covers the keys without changing their page or frames, so closing it shows the same keys.
+    /// Search has keys of its own, and the panel's keys come back when it closes.
     public var panel: KeyboardPanel = .keys
     public var pageID: String
+    /// The document's shift. Emoji search leaves it alone for when the keys come back; the keys show `shownShift`.
     public var shift: ShiftState
     public var returnKey: ReturnKeyKind
     /// Keys with a finger on them.
@@ -31,4 +35,12 @@ public struct KeyboardState: Equatable, Sendable {
     public var alternates: AlternatesPopup?
     /// Whether space is moving the cursor; the view hides the key labels meanwhile.
     public var cursorMode: Bool
+    /// What the user typed into emoji search: lowercase, never starting with a space or holding two in a row.
+    /// Empty outside search.
+    public var searchQuery = ""
+
+    /// The shift the keys show: off in emoji search, whose query takes no capitals, and `shift` otherwise.
+    public var shownShift: ShiftState {
+        panel == .emojiSearch ? .off : shift
+    }
 }

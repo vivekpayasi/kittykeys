@@ -15,6 +15,16 @@ public final class TouchProcessor {
     }
     /// The keyboard's width in points; long-press popups stay inside it. 0 until set.
     public var keyboardWidth = 0.0
+    /// Whether holding space starts cursor mode. Off, as in emoji search, a held space is typed on its lift like a tap.
+    /// Turning it off cancels the hold of a space already down; a space already moving the cursor goes on doing so.
+    public var allowsCursorMode = true {
+        didSet {
+            guard !allowsCursorMode else { return }
+            for id in downOrder where touches[id]?.phase == .pressed && touches[id]?.frame.key.action == .space {
+                touches[id]?.deadline = nil
+            }
+        }
+    }
 
     private let metrics: KeyboardMetrics
     private var touches: [TouchID: KeyTouch] = [:]
@@ -37,7 +47,8 @@ public final class TouchProcessor {
     /// A finger landed at `p`. A character, space or return key another finger holds, not yet typed,
     /// is typed first (rollover). Then the key under `p` highlights; shift and page keys act at once,
     /// backspace deletes at once and repeats while held, and other keys wait for the lift.
-    /// While a long-press popup is showing, the new key gets no long-press of its own, and space no cursor mode.
+    /// While a long-press popup is showing, the new key gets no long-press of its own, and space no cursor mode;
+    /// nor does space while `allowsCursorMode` is off.
     /// While space is moving the cursor, the whole keyboard is its trackpad: the new finger is ignored.
     public func touchDown(_ id: TouchID, at p: Point, time: Double) -> [TouchEvent] {
         var events: [TouchEvent] = []
@@ -60,7 +71,7 @@ public final class TouchProcessor {
         case .character:
             if !frame.key.longPress.isEmpty && !isShowingAlternates { touch.deadline = time + timing.longPress }
         case .space:
-            if !isShowingAlternates { touch.deadline = time + timing.cursorHold }
+            if allowsCursorMode && !isShowingAlternates { touch.deadline = time + timing.cursorHold }
         case .returnKey, .emoji, .globe:
             break
         }

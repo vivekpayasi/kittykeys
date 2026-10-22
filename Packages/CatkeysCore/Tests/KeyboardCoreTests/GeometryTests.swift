@@ -96,6 +96,20 @@ private func label(at p: Point, in frames: [KeyFrame]) -> String? {
     #expect(label(at: Point(x: 200, y: 44), in: f) == "6")
 }
 
+@Test func numberRowsCanLeaveTheirBandEmpty() throws {
+    // Emoji search shows its results where the number row was (ruling M3-R15): the other rows keep their places and
+    // their row numbers, and ids count the frames left.
+    let page = try #require(try LayoutSet.bundled().page("latin-qwerty"))
+    let all = try qwertyFrames()
+    let without = KeyboardGeometry.frames(
+        page: page, bottom: page.bottomRow(.standard), width: 390, metrics: .standard, includingNumberRows: false)
+    let kept = all.filter { $0.row != 0 }
+    #expect(without.map(\.key) == kept.map(\.key) && without.map(\.rect) == kept.map(\.rect))
+    #expect(without.map(\.row) == kept.map(\.row) && without.map(\.id) == Array(without.indices))
+    // A touch in the empty band goes to the top row left, as one in the gap above it would.
+    #expect(label(at: Point(x: 200, y: 50), in: without) == "y")
+}
+
 @Test func rectDistanceIsZeroInsideAndStraightLineOutside() {
     let r = Rect(x: 10, y: 20, width: 30, height: 40)
     #expect(r.minX == 10 && r.maxX == 40 && r.minY == 20 && r.maxY == 60 && r.midX == 25 && r.midY == 40)

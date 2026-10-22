@@ -156,6 +156,26 @@ struct TouchHoldTests {
         #expect(touches.advance(to: 1) == [])
     }
 
+    @Test func spaceHoldTypesASpaceWithoutCursorMode() throws {
+        // Emoji search turns cursor mode off: held space has no timer, and its lift types it.
+        let space = try key("space"), ps = try center("space")
+        touches.allowsCursorMode = false
+        #expect(touches.touchDown(1, at: ps, time: 0) == [.keyDown(space)])
+        #expect(touches.nextDeadline == nil && touches.advance(to: 1) == [])
+        #expect(touches.touchUp(1, at: ps, time: 1) == [.activate(space, landing: ps), .keyUp(space)])
+        // Turning it off also cancels a hold under way.
+        touches.allowsCursorMode = true
+        #expect(touches.touchDown(1, at: ps, time: 2) == [.keyDown(space)])
+        #expect(touches.nextDeadline == 2.33)
+        touches.allowsCursorMode = false
+        #expect(touches.nextDeadline == nil && touches.advance(to: 3) == [])
+        #expect(touches.touchUp(1, at: ps, time: 3) == [.activate(space, landing: ps), .keyUp(space)])
+        // On again, the next hold starts cursor mode.
+        touches.allowsCursorMode = true
+        #expect(touches.touchDown(1, at: ps, time: 4) == [.keyDown(space)])
+        #expect(touches.advance(to: 4.33) == [.cursorModeBegan])
+    }
+
     @Test func spaceHoldEntersCursorMode() throws {
         let space = try key("space")
         #expect(touches.touchDown(1, at: try center("space"), time: 0) == [.keyDown(space)])

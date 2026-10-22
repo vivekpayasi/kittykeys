@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Builds the emoji panel's data file from Emojibase (MIT).
+"""Builds the emoji panel's data files from Emojibase (MIT).
 
-Downloads emojibase-data@17.0.0 into build/emoji-src/ (gitignored) and writes
-Packages/CatkeysCore/Sources/KeyboardCore/Emoji/emoji.json, which is committed.
+Downloads emojibase-data@17.0.0 into build/emoji-src/ (gitignored) and writes two files into
+Packages/CatkeysCore/Sources/KeyboardCore/Emoji/, both committed: emoji.json (the panel's emoji)
+and emoji-keywords.json (the English search words for each of them).
 
 The downloaded files are untrusted data: they are only ever parsed with json.load and
 every field used is type-checked. Standard library only. Run from anywhere:
@@ -11,14 +12,19 @@ every field used is type-checked. Standard library only. Run from anywhere:
     python3 -I scripts/make-emoji-data.py --refresh  # downloads them again
 
 Output (UTF-8, one emoji per line so diffs stay readable, otherwise compact):
+    emoji.json:
     {"source": "emojibase-data 17.0.0", "recentName": "Recent", "recentIcon": "clock",
      "categories": [{"id", "name", "icon", "emoji": [{"e", "v", "s"?}]}]}
+    emoji-keywords.json, keyed by the same base strings as emoji.json, in the same order:
+    {"source": "emojibase-data 17.0.0", "language": "en",
+     "keywords": {"<base emoji>": [[label words], [tag words not among the label words]]}}
 """
 
 import json
 import os
 import ssl
 import sys
+import unicodedata
 import urllib.request
 
 PACKAGE = "emojibase-data"
@@ -36,7 +42,18 @@ SYSTEM_CA_FILE = "/etc/ssl/cert.pem"
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC_DIR = os.path.join(ROOT, "build", "emoji-src")
-OUT_PATH = os.path.join(ROOT, "Packages", "CatkeysCore", "Sources", "KeyboardCore", "Emoji", "emoji.json")
+OUT_DIR = os.path.join(ROOT, "Packages", "CatkeysCore", "Sources", "KeyboardCore", "Emoji")
+OUT_PATH = os.path.join(OUT_DIR, "emoji.json")
+KEYWORDS_PATH = os.path.join(OUT_DIR, "emoji-keywords.json")
+
+# The language of Emojibase's en/data.json labels and tags. Other languages (Hinglish first) come later as more data.
+KEYWORDS_LANGUAGE = "en"
+# Shorter words, such as the "a" in "a+" or the "t" in "T-Rex", match nearly everything as a prefix, so they are left out.
+MIN_KEYWORD_LENGTH = 2
+
+# How many single-character emoji lose a redundant U+FE0F in `unicode_form` for emojibase-data 17.0.0. A different
+# count means the source changed: check the result against Unicode's emoji-test.txt again before updating it.
+EXPECTED_NORMALISED = 152
 
 # The Recent section: its display name and the SF Symbol for its tab.
 RECENT_NAME = "Recent"
@@ -150,8 +167,8 @@ def unicode_form(emoji, presentation, where):
     Emojibase's `emoji` adds U+FE0F to every character that has a variation sequence, even ones
     that already default to emoji presentation (type 1), e.g. 👍 becomes 👍 + FE0F. Unicode lists
     those bare, as do Emojibase's own skin variants, so the extra selector is dropped. Text-default
-    characters (type 0, e.g. ❤️) keep it. Checked against Unicode 17.0 emoji-test.txt: this gives the
-    fully-qualified form for every emoji and skin written.
+    characters (type 0, e.g. U+2764 red heart) keep it. Checked against Unicode 17.0 emoji-test.txt: this gives
+    the fully-qualified form for every emoji and skin written.
     """
     if presentation not in (0, 1):
         fail(f"bad type {presentation!r} in {where}")
@@ -182,12 +199,83 @@ def skin_variants(item, where):
     return [by_tone[tone] for tone in range(1, 6)]
 
 
+# Characters that join the parts of one word, as in "T-Rex", "o’clock" and "U.S.". Any other character that isn't part
+# of a word, such as a space, colon, en dash or quotation mark, only separates words.
+JOINERS = "-\u2010'\u2019."
+
+
+def is_word_character(ch):
+    """Letters, digits and combining marks, in any script. Marks count so that scripts written with them, such as
+    Devanagari, stay whole."""
+    return unicodedata.category(ch)[0] in "LNM"
+
+
+def runs(text, keep):
+    """The longest stretches of `text` whose every character `keep` accepts, in order."""
+    found = []
+    current = ""
+    for ch in text:
+        if keep(ch):
+            current += ch
+        elif current:
+            found.append(current)
+            current = ""
+    if current:
+        found.append(current)
+    return found
+
+
+def plain_latin(word):
+    """The word without its accents when that leaves plain ASCII, as "crepe" for "crêpe"; else None."""
+    decomposed = unicodedata.normalize("NFKD", word)
+    plain = "".join(ch for ch in decomposed if not unicodedata.combining(ch))
+    return plain if plain.isascii() and plain != word else None
+
+
+def search_words(text):
+    """The search words in `text`, lowercased and NFC: the stretches of word characters.
+
+    A word made of parts with joiners between them also gives its joined form ("t-rex" gives "rex" and "trex",
+    "o’clock" gives "clock" and "oclock"), and an accented Latin word its plain form ("curaçao" gives "curacao"), since
+    the keys type neither joiners nor accents easily. Words shorter than MIN_KEYWORD_LENGTH are left out.
+    The order is the text's; repeats stay for the caller to drop.
+    """
+    text = unicodedata.normalize("NFC", text.lower())
+    words = []
+    for chunk in runs(text, lambda ch: is_word_character(ch) or ch in JOINERS):
+        parts = runs(chunk, is_word_character)
+        for form in parts + (["".join(parts)] if len(parts) > 1 else []):
+            words.append(form)
+            plain = plain_latin(form)
+            if plain:
+                words.append(plain)
+    return [word for word in words if len(word) >= MIN_KEYWORD_LENGTH]
+
+
+def keywords(item, where):
+    """The emoji's search words: its label's words, then its tags' words that the label lacks, each without repeats."""
+    label = item.get("label")
+    tags = item.get("tags", [])
+    if not isinstance(label, str) or not label.strip():
+        fail(f"bad label {label!r} in {where}")
+    if not isinstance(tags, list) or not all(isinstance(tag, str) for tag in tags):
+        fail(f"bad tags in {where}")
+    label_words = list(dict.fromkeys(search_words(label)))
+    if not label_words:
+        fail(f"label {label!r} gives no search words in {where}")
+    taken = set(label_words)
+    tag_words = list(dict.fromkeys(word for tag in tags for word in search_words(tag) if word not in taken))
+    return [label_words, tag_words]
+
+
 def build(data):
     if not isinstance(data, list):
         fail("data.json is not a list")
     by_group = {}
     skipped_no_group = 0
+    normalised = 0
     seen = set()
+    words_by_emoji = {}
     for index, item in enumerate(data):
         if not isinstance(item, dict):
             fail(f"item {index} is not an object")
@@ -198,7 +286,10 @@ def build(data):
             continue
         if not is_int(group) or group not in EXPECTED_GROUPS:
             fail(f"bad group {group!r} in {where}")
-        emoji = unicode_form(checked_emoji(item.get("emoji"), where), item.get("type"), where)
+        raw = checked_emoji(item.get("emoji"), where)
+        emoji = unicode_form(raw, item.get("type"), where)
+        if emoji != raw:
+            normalised += 1
         order = item.get("order")
         version = item.get("version")
         if not is_int(order):
@@ -213,6 +304,7 @@ def build(data):
             if variant in seen:
                 fail(f"duplicate emoji {variant!r} in {where}")
             seen.add(variant)
+        words_by_emoji[emoji] = keywords(item, where)
         by_group.setdefault(group, []).append((order, entry))
 
     categories = []
@@ -223,7 +315,10 @@ def build(data):
         if not emoji:
             fail(f"category {cat_id} is empty")
         categories.append({"id": cat_id, "name": name, "icon": icon, "emoji": emoji})
-    return categories, skipped_no_group, len(by_group.get(2, []))
+    if normalised != EXPECTED_NORMALISED:
+        fail(f"{normalised} emoji lost a redundant U+FE0F, expected {EXPECTED_NORMALISED}; check against emoji-test.txt")
+    search = {entry["e"]: words_by_emoji[entry["e"]] for category in categories for entry in category["emoji"]}
+    return categories, search, skipped_no_group, len(by_group.get(2, [])), normalised
 
 
 def dumps(value):
@@ -247,6 +342,24 @@ def render(categories):
     return "\n".join(lines) + "\n"
 
 
+def render_keywords(search):
+    """Compact JSON with one emoji per line, in the panel's order; deterministic for the same input."""
+    lines = ["{" + dumps("source") + ":" + dumps(f"{PACKAGE} {VERSION}") + ","
+             + dumps("language") + ":" + dumps(KEYWORDS_LANGUAGE) + ","
+             + dumps("keywords") + ":{"]
+    items = list(search.items())
+    for index, (emoji, words) in enumerate(items):
+        lines.append(dumps(emoji) + ":" + dumps(words) + ("," if index < len(items) - 1 else ""))
+    lines.append("}}")
+    return "\n".join(lines) + "\n"
+
+
+def write(path, text):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8", newline="\n") as f:
+        f.write(text)
+
+
 def main():
     refresh = "--refresh" in sys.argv[1:]
     os.makedirs(SRC_DIR, exist_ok=True)
@@ -254,16 +367,19 @@ def main():
     verify_package(paths["package.json"])
     verify_groups(paths["groups.json"])
 
-    categories, skipped_no_group, components = build(load_json(paths["data.json"]))
+    categories, search, skipped_no_group, components, normalised = build(load_json(paths["data.json"]))
     text = render(categories)
     expected = {"source": f"{PACKAGE} {VERSION}", "recentName": RECENT_NAME, "recentIcon": RECENT_ICON,
                 "categories": categories}
     if json.loads(text) != expected:
         fail("rendered JSON does not round-trip")
+    keywords_text = render_keywords(search)
+    expected_keywords = {"source": f"{PACKAGE} {VERSION}", "language": KEYWORDS_LANGUAGE, "keywords": search}
+    if json.loads(keywords_text) != expected_keywords:
+        fail("rendered keywords JSON does not round-trip")
 
-    os.makedirs(os.path.dirname(OUT_PATH), exist_ok=True)
-    with open(OUT_PATH, "w", encoding="utf-8", newline="\n") as f:
-        f.write(text)
+    write(OUT_PATH, text)
+    write(KEYWORDS_PATH, keywords_text)
 
     total = 0
     with_skins = 0
@@ -274,7 +390,13 @@ def main():
         print(f"{category['id']:<16} {count:>5}")
     print(f"{'total':<16} {total:>5}  ({with_skins} with skin tones; "
           f"{components} components and {skipped_no_group} ungrouped left out)")
+    print(f"{normalised} emoji lost a redundant U+FE0F (fully-qualified form)")
     print(f"wrote {os.path.relpath(OUT_PATH, ROOT)}: {len(text.encode('utf-8'))} bytes")
+    label_words = sum(len(words[0]) for words in search.values())
+    tag_words = sum(len(words[1]) for words in search.values())
+    distinct = len({word for words in search.values() for part in words for word in part})
+    print(f"keywords: {len(search)} emoji, {label_words} label words and {tag_words} tag words, {distinct} distinct")
+    print(f"wrote {os.path.relpath(KEYWORDS_PATH, ROOT)}: {len(keywords_text.encode('utf-8'))} bytes")
 
 
 if __name__ == "__main__":

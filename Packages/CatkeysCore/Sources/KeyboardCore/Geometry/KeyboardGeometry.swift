@@ -7,13 +7,20 @@ public enum KeyboardGeometry {
     ///
     /// Rows stack from the bottom of the suggestion row down, `rowGap` apart. Number rows are
     /// `numberRowHeight` tall and all other rows `keyHeight`. Each row is centred in `width`.
+    /// Without `includingNumberRows`, number rows get no frames but keep their band, so the other rows keep their places
+    /// and row numbers; emoji search shows its results there (ruling M3-R15).
     /// Returns no frames when `width` leaves no room for keys, as on an input view's first, 0-wide layout pass.
-    public static func frames(page: LayoutPage, bottom: [KeySpec], width: Double, metrics: KeyboardMetrics) -> [KeyFrame] {
+    public static func frames(
+        page: LayoutPage, bottom: [KeySpec], width: Double, metrics: KeyboardMetrics, includingNumberRows: Bool = true
+    ) -> [KeyFrame] {
         let available = width - 2 * metrics.sidePadding
         let unit = (available - (unitsPerRow - 1) * metrics.keyGap) / unitsPerRow
         guard unit > 0 else { return [] }
-        let rows = page.rows.map { (keys: $0.keys, height: $0.kind == .number ? metrics.numberRowHeight : metrics.keyHeight) }
-            + [(keys: bottom, height: metrics.keyHeight)]
+        let rows = page.rows.map { row in
+            let isNumber = row.kind == .number
+            let keys = isNumber && !includingNumberRows ? [] : row.keys
+            return (keys: keys, height: isNumber ? metrics.numberRowHeight : metrics.keyHeight)
+        } + [(keys: bottom, height: metrics.keyHeight)]
 
         var frames: [KeyFrame] = []
         var y = metrics.suggestionRowHeight
