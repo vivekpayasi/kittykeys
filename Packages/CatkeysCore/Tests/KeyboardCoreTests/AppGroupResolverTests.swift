@@ -5,10 +5,10 @@ import KeyboardCore
 /// Each test gets its own folder to stand in for the app's bundle, so `resolve` can read an
 /// `embedded.mobileprovision` from it. The folder is removed when the test ends.
 final class AppGroupResolverTests {
-    static let canonical = "group.com.vivek.catkeys"
+    static let canonical = "group.com.example.catkeys"
     /// How SideStore renames the canonical group for the signing team.
-    static let renamed = "group.com.vivek.catkeys.ABCDE12345"
-    static let unrelated = "group.com.vivek.othergroup"
+    static let renamed = "group.com.example.catkeys.ABCDE12345"
+    static let unrelated = "group.com.example.othergroup"
 
     let bundleFolder: URL
 
@@ -27,7 +27,7 @@ final class AppGroupResolverTests {
         let plist: [String: Any] = [
             "AppIDName": "Catkeys",
             "Entitlements": [
-                "application-identifier": "ABCDE12345.com.vivek.catkeys.ABCDE12345",
+                "application-identifier": "ABCDE12345.com.example.catkeys.ABCDE12345",
                 "com.apple.security.application-groups": groups,
             ],
         ]

@@ -60,7 +60,7 @@ check_bundle_id "$APPEX" "$PREFIX.catkeys.keyboard"
 expand_entitlements() {
   local content
   content=$(<"$1")
-  content=${content//'$(CATKEYS_APP_GROUP)'/$APP_GROUP}
+  content=${content//'$(CATKEYS_APP_GROUP)'/"$APP_GROUP"}
   [[ "$content" != *'$('* && "$content" != *'${'* ]] || fail "$1 uses a build setting this script doesn't expand."
   printf '%s\n' "$content" >"$2"
   plutil -lint -s "$2" || fail "$2 isn't a valid property list."
@@ -73,10 +73,14 @@ codesign -f -s - --entitlements "$ENTITLEMENTS_DIR/CatkeysKeyboard.entitlements"
 codesign -f -s - --entitlements "$ENTITLEMENTS_DIR/Catkeys.entitlements" "$APP"
 
 check_app_group() {
-  local signed actual
+  local signed actual output
   signed="$ENTITLEMENTS_DIR/$(basename "$1").signed.plist"
   # The same check as `codesign -d --entitlements :-`, without that form's deprecation warning.
-  codesign -d --entitlements - --xml "$1" >"$signed" 2>/dev/null
+  # codesign chats on stderr even when it works; show what it said only when it fails.
+  if ! output=$(codesign -d --entitlements - --xml "$1" 2>&1 >"$signed"); then
+    echo "$output" >&2
+    fail "Couldn't read the signed entitlements of $1."
+  fi
   actual=$(/usr/libexec/PlistBuddy -c "Print :com.apple.security.application-groups:0" "$signed" 2>/dev/null) ||
     fail "$1 is signed without an App Group."
   [[ "$actual" == "$APP_GROUP" ]] || fail "$1 is signed with App Group '$actual', expected '$APP_GROUP'."

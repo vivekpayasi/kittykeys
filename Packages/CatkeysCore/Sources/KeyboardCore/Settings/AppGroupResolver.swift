@@ -3,7 +3,7 @@ import Foundation
 /// Finds the App Group this install can actually use.
 ///
 /// Sideloading tools that re-sign with a free Apple ID (SideStore, AltStore) rewrite bundle IDs and rename
-/// App Groups, for example `group.com.vivek.catkeys` to `group.com.vivek.catkeys.ABCDE12345`, so the
+/// App Groups, for example `group.com.example.catkeys` to `group.com.example.catkeys.ABCDE12345`, so the
 /// canonical id from Info.plist may not be the group this install was granted. The granted groups are
 /// listed in the bundle's `embedded.mobileprovision`; each bundle (the app, the keyboard) carries its own.
 /// Pattern from the Sahaja app's `AppGroup`.
@@ -35,7 +35,7 @@ public enum AppGroupResolver {
               let groups = entitlements[groupsKey] as? [Any]
         else { return [] }
         let ids = groups.compactMap { $0 as? String }
-        // "catkeys" for "group.com.vivek.catkeys": SideStore keeps it when it renames the group.
+        // "catkeys" for "group.com.example.catkeys": SideStore keeps it when it renames the group.
         guard let name = canonical?.split(separator: ".").last else { return ids }
         let renamed = ids.filter { $0.contains(name) }
         return renamed + ids.filter { !$0.contains(name) }

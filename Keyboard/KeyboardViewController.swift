@@ -12,6 +12,12 @@ final class KeyboardViewController: UIInputViewController {
     private static let logger = Logger(subsystem: "catkeys", category: "keyboard")
     /// Speed measurements for Instruments. They cost next to nothing while nothing records them.
     private static let signposter = OSSignposter(subsystem: "catkeys", category: "perf")
+    /// The App Group, resolved once per process: iOS creates a controller each time the keyboard appears, and
+    /// when SideStore has renamed the group, resolving it reads the provisioning profile.
+    private static let appGroupID = AppGroupResolver.resolve(
+        canonical: Bundle.main.object(forInfoDictionaryKey: "CatkeysAppGroup") as? String)
+    /// The settings on that group, also made once per process. A resolved id resolves to itself.
+    private static let appGroupStore = SettingsStore.appGroup(id: appGroupID)
 
     private let feedback = DeviceFeedback()
     /// The settings shared with the app. nil without the App Group, when the defaults apply.
@@ -38,9 +44,12 @@ final class KeyboardViewController: UIInputViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         startupInterval = Self.signposter.beginInterval("startup")
-        let appGroupID = Bundle.main.object(forInfoDictionaryKey: "CatkeysAppGroup") as? String
-        settingsStore = SettingsStore.appGroup(id: appGroupID)
-        if settingsStore == nil { Self.logger.notice("No App Group; using the default settings") }
+        settingsStore = Self.appGroupStore
+        if let group = Self.appGroupID, settingsStore != nil {
+            Self.logger.notice("App Group: \(group, privacy: .public)")
+        } else {
+            Self.logger.notice("No App Group; using the default settings")
+        }
 
         let layouts: LayoutSet
         do {
