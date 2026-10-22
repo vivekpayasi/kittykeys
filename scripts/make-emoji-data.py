@@ -17,6 +17,7 @@ every field used is type-checked. Standard library only. Run from anywhere:
 Output (UTF-8, one emoji per line so diffs stay readable, otherwise compact):
     emoji.json:
     {"source": "emojibase-data 17.0.0", "recentName": "Recent", "recentIcon": "clock",
+     "searchPlaceholder": "Search emoji", "searchIcon": "magnifyingglass", "searchClearIcon": "xmark.circle.fill",
      "categories": [{"id", "name", "icon", "emoji": [{"e", "v", "s"?}]}]}
     EmojiKeywords/en.json, keyed by the same base strings as emoji.json, in the same order:
     {"source": "emojibase-data 17.0.0", "language": "en", "stopwords": [...],
@@ -80,6 +81,11 @@ EXPECTED_NORMALISED = 152
 # The Recent section: its display name and the SF Symbol for its tab.
 RECENT_NAME = "Recent"
 RECENT_ICON = "clock"
+
+# The search field above the panel: its placeholder, and the SF Symbols for its magnifier and its clear button.
+SEARCH_PLACEHOLDER = "Search emoji"
+SEARCH_ICON = "magnifyingglass"
+SEARCH_CLEAR_ICON = "xmark.circle.fill"
 
 # Apple's category order. Each entry: id, display name, SF Symbol for the tab, Emojibase groups.
 # Group 2 (component: skin-tone swatches, hair parts) is left out on purpose.
@@ -353,6 +359,9 @@ def render(categories):
     lines = ["{" + dumps("source") + ":" + dumps(f"{PACKAGE} {VERSION}") + ","
              + dumps("recentName") + ":" + dumps(RECENT_NAME) + ","
              + dumps("recentIcon") + ":" + dumps(RECENT_ICON) + ","
+             + dumps("searchPlaceholder") + ":" + dumps(SEARCH_PLACEHOLDER) + ","
+             + dumps("searchIcon") + ":" + dumps(SEARCH_ICON) + ","
+             + dumps("searchClearIcon") + ":" + dumps(SEARCH_CLEAR_ICON) + ","
              + dumps("categories") + ":["]
     for c_index, category in enumerate(categories):
         head = {k: category[k] for k in ("id", "name", "icon")}
@@ -426,7 +435,8 @@ def main():
     categories, search, skipped_no_group, components, normalised = build(load_json(paths["data.json"]))
     text = render(categories)
     expected = {"source": f"{PACKAGE} {VERSION}", "recentName": RECENT_NAME, "recentIcon": RECENT_ICON,
-                "categories": categories}
+                "searchPlaceholder": SEARCH_PLACEHOLDER, "searchIcon": SEARCH_ICON,
+                "searchClearIcon": SEARCH_CLEAR_ICON, "categories": categories}
     if json.loads(text) != expected:
         fail("rendered JSON does not round-trip")
     keywords_text = render_keywords(search)

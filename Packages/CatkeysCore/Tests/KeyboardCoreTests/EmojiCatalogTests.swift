@@ -21,6 +21,12 @@ import KeyboardCore
     #expect(try EmojiCatalog.load(maxVersion: 17.0).recentIcon == "clock")
 }
 
+@Test func searchFieldTextAndIconsComeFromData() throws {
+    let data = try EmojiCatalog.load(maxVersion: 17.0)
+    #expect(data.searchPlaceholder == "Search emoji")
+    #expect(data.searchIcon == "magnifyingglass" && data.searchClearIcon == "xmark.circle.fill")
+}
+
 @Test func versionFilterDropsNewer() throws {
     let v16 = try EmojiCatalog.load(maxVersion: 16.0).categories.flatMap(\.items)
     let v17 = try EmojiCatalog.load(maxVersion: 17.0).categories.flatMap(\.items)

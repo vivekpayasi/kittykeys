@@ -30,16 +30,27 @@ public struct EmojiCategory: Equatable, Sendable {
     }
 }
 
-/// What `EmojiCatalog.load` returns: the categories in panel order, and the Recent section's display name and
-/// tab icon (an SF Symbol name), which also come from data so no user-facing text or symbol lives in Swift.
+/// What `EmojiCatalog.load` returns: the categories in panel order, the Recent section's display name and tab icon,
+/// and the search field's placeholder, magnifier and clear button. The icons are SF Symbol names. All of it comes from
+/// data, so no user-facing text or symbol lives in Swift.
 public struct EmojiData: Equatable, Sendable {
     public var recentName: String
     public var recentIcon: String
+    /// The search field's text while nothing is typed in it, such as "Search emoji" (ruling M3-R15).
+    public var searchPlaceholder: String
+    /// The search field's magnifier, and the button that clears what is typed.
+    public var searchIcon: String, searchClearIcon: String
     public var categories: [EmojiCategory]
 
-    public init(recentName: String, recentIcon: String, categories: [EmojiCategory]) {
+    public init(
+        recentName: String, recentIcon: String, searchPlaceholder: String, searchIcon: String, searchClearIcon: String,
+        categories: [EmojiCategory]
+    ) {
         self.recentName = recentName
         self.recentIcon = recentIcon
+        self.searchPlaceholder = searchPlaceholder
+        self.searchIcon = searchIcon
+        self.searchClearIcon = searchClearIcon
         self.categories = categories
     }
 }
@@ -54,6 +65,9 @@ public enum EmojiCatalog {
     private struct File: Decodable {
         var recentName: String
         var recentIcon: String
+        var searchPlaceholder: String
+        var searchIcon: String
+        var searchClearIcon: String
         var categories: [Category]
     }
 
@@ -89,7 +103,9 @@ public enum EmojiCatalog {
                 }
             )
         }
-        return EmojiData(recentName: file.recentName, recentIcon: file.recentIcon, categories: categories)
+        return EmojiData(
+            recentName: file.recentName, recentIcon: file.recentIcon, searchPlaceholder: file.searchPlaceholder,
+            searchIcon: file.searchIcon, searchClearIcon: file.searchClearIcon, categories: categories)
     }
 
     /// The newest Emoji version the given iOS version can draw: 17.0 from iOS 26.4, else 16.0.

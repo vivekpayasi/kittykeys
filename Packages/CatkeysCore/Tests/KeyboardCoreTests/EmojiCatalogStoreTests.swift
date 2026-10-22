@@ -7,7 +7,7 @@ import KeyboardCore
     struct Broken: Error {}
 
     static let sample = EmojiData(
-        recentName: "Recent", recentIcon: "clock",
+        recentName: "Recent", recentIcon: "clock", searchPlaceholder: "Search", searchIcon: "s", searchClearIcon: "x",
         categories: [EmojiCategory(id: "c", name: "C", icon: "i", items: [EmojiItem(base: "👋", version: 0.6, skins: [])])])
 
     @Test func decodesOnceAndReuses() throws {

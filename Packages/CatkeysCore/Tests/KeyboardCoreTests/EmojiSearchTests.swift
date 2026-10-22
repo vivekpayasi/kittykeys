@@ -16,7 +16,7 @@ struct EmojiSearchTests {
     /// A one-category catalog of `bases`, in that order.
     static func catalog(_ bases: [String]) -> EmojiData {
         EmojiData(
-            recentName: "Recent", recentIcon: "clock",
+            recentName: "Recent", recentIcon: "clock", searchPlaceholder: "Search", searchIcon: "s", searchClearIcon: "x",
             categories: [
                 EmojiCategory(id: "c", name: "C", icon: "i", items: bases.map { EmojiItem(base: $0, version: 1, skins: []) })
             ])
@@ -197,7 +197,8 @@ struct EmojiSearchTests {
         let all = v17.categories.flatMap(\.items)
         let picked = ["👋", "😹", "😂"].compactMap { base in all.first { $0.base == base } }
         let small = EmojiData(
-            recentName: "Recent", recentIcon: "clock", categories: [EmojiCategory(id: "c", name: "C", icon: "i", items: picked)])
+            recentName: "Recent", recentIcon: "clock", searchPlaceholder: "Search", searchIcon: "s", searchClearIcon: "x",
+            categories: [EmojiCategory(id: "c", name: "C", icon: "i", items: picked)])
         #expect(search.results(for: "laugh", catalog: small, recents: []).map(\.base) == ["😂", "😹"])
         #expect(search.results(for: "wave", catalog: small, recents: []).first?.skins.count == 5)
         // A prepared catalog gives the same results.
