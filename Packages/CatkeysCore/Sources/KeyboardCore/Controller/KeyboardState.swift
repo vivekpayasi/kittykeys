@@ -1,0 +1,29 @@
+/// Shift: off, on for the next letter, or caps lock.
+public enum ShiftState: Sendable { case off, once, locked }
+
+/// A key's long-press options on screen.
+public struct AlternatesPopup: Equatable, Sendable {
+    /// The key's id in the controller's current `frames`.
+    public var keyID: Int
+    /// The options in display order, left to right.
+    public var options: [String]
+    /// The highlighted option, an index into `options`.
+    public var selected: Int
+    /// Where the first cell starts.
+    public var originX: Double
+}
+
+/// Everything the keyboard view draws apart from the key frames.
+/// Key ids index the controller's current `frames`; a page or width change clears every one of them.
+public struct KeyboardState: Equatable, Sendable {
+    public var pageID: String
+    public var shift: ShiftState
+    public var returnKey: ReturnKeyKind
+    /// Keys with a finger on them.
+    public var pressedKeyIDs: Set<Int>
+    /// The key whose magnified preview shows: the latest pressed character key, while key popups are on in settings.
+    public var previewKeyID: Int?
+    public var alternates: AlternatesPopup?
+    /// Whether space is moving the cursor; the view hides the key labels meanwhile.
+    public var cursorMode: Bool
+}

@@ -1,0 +1,82 @@
+{
+  "id": "latin-qwerty",
+  "rows": [
+    {
+      "kind": "number",
+      "keys": [
+        {"label": "1"}, {"label": "2"}, {"label": "3"}, {"label": "4"}, {"label": "5"},
+        {"label": "6"}, {"label": "7"}, {"label": "8"}, {"label": "9"}, {"label": "0"}
+      ]
+    },
+    {
+      "kind": "keys",
+      "keys": [
+        {"label": "q", "longPress": ["%"]},
+        {"label": "w", "longPress": ["\\"]},
+        {"label": "e", "longPress": ["|"]},
+        {"label": "r", "longPress": ["="]},
+        {"label": "t", "longPress": ["["]},
+        {"label": "y", "longPress": ["]"]},
+        {"label": "u", "longPress": ["<"]},
+        {"label": "i", "longPress": [">"]},
+        {"label": "o", "longPress": ["{"]},
+        {"label": "p", "longPress": ["}"]}
+      ]
+    },
+    {
+      "kind": "keys",
+      "keys": [
+        {"label": "a", "longPress": ["@"]},
+        {"label": "s", "longPress": ["#"]},
+        {"label": "d", "longPress": ["₹", "$", "€"]},
+        {"label": "f", "longPress": ["_"]},
+        {"label": "g", "longPress": ["&"]},
+        {"label": "h", "longPress": ["-"]},
+        {"label": "j", "longPress": ["+"]},
+        {"label": "k", "longPress": ["("]},
+        {"label": "l", "longPress": [")"]}
+      ]
+    },
+    {
+      "kind": "keys",
+      "keys": [
+        {"label": "⇧", "action": "shift", "width": 1.5},
+        {"label": "z", "longPress": ["*"]},
+        {"label": "x", "longPress": ["\""]},
+        {"label": "c", "longPress": ["'"]},
+        {"label": "v", "longPress": [":"]},
+        {"label": "b", "longPress": [";"]},
+        {"label": "n", "longPress": ["!"]},
+        {"label": "m", "longPress": ["?"]},
+        {"label": "⌫", "action": "backspace", "width": 1.5}
+      ]
+    }
+  ],
+  "bottom": {
+    "default": [
+      {"label": "123", "action": "page:symbols-1", "width": 1.5},
+      {"label": "😊", "action": "emoji", "icon": "face.smiling"},
+      {"label": ","},
+      {"label": "space", "output": " ", "action": "space", "width": 0},
+      {"label": ".", "longPress": [".", "?", "!", "…", ":", "/"]},
+      {"label": "return", "output": "\n", "action": "return", "width": 2}
+    ],
+    "email": [
+      {"label": "123", "action": "page:symbols-1", "width": 1.5},
+      {"label": "😊", "action": "emoji", "icon": "face.smiling"},
+      {"label": "@"},
+      {"label": "space", "output": " ", "action": "space", "width": 0},
+      {"label": ".", "longPress": [".", "?", "!", "…", ":", "/"]},
+      {"label": "return", "output": "\n", "action": "return", "width": 2}
+    ],
+    "url": [
+      {"label": "123", "action": "page:symbols-1", "width": 1.5},
+      {"label": "😊", "action": "emoji", "icon": "face.smiling"},
+      {"label": "/"},
+      {"label": "space", "output": " ", "action": "space", "width": 0},
+      {"label": ".com", "width": 1.5},
+      {"label": ".", "longPress": [".", "?", "!", "…", ":", "/"]},
+      {"label": "return", "output": "\n", "action": "return", "width": 2}
+    ]
+  }
+}

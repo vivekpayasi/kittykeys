@@ -54,7 +54,7 @@ These five situations are what's most likely to hurt a user while no task's main
 
 1. **Emoji and other multi-part characters before the cursor** (👍🏽, 🇮🇳). Backspace, word delete and cursor moves treat each one as one character. iOS's `adjustTextPosition` gets the matching UTF-16 offset. Tested in Task 4 (`utf16OffsetCountsWholeEmoji`) and Task 7 (`wordDeleteRemovesEmojiAsOneUnit`).
 2. **Missing or empty text before the cursor** (`nil` at the start of a field, or a short window iOS hands over). Auto-capitals, the double-space full stop and word delete behave as if at the start of a field, with no crash. Tested in Task 4 (`rulesTreatNilAsStartOfField`).
-3. **A touch cancelled by the system mid-press,** such as an incoming call or a notification pull-down. It leaves no stuck highlight, types nothing and leaves no live timers. Tested in Task 5 (`cancelClearsEverything`) and Task 6 (`cancelDuringCursorModeEndsIt`).
+3. **A touch cancelled by the system mid-press,** such as an incoming call or a notification pull-down. It leaves no stuck highlight, types nothing and leaves no live timers. Tested in Task 5 (`cancelClearsEverything`) and Task 6 (`cancelDuringCursorModeEndsIt`). A lift that never arrives is ended by `cancelAll()` (ruling R33), tested in `cancelAllEndsCursorMode`, `cancelAllStopsHeldBackspace` and `keyboardWillAppearEndsAStuckCursorMode`.
 4. **The page changes while another finger is still down,** for example holding a letter and tapping `123`. The held key types its original character, and nothing reads an out-of-range key. Tested in Task 5 (`framesReplacedMidTouchUseOriginalKey`).
 5. **Many fingers or a palm at once, or a touch starting in the suggestion row.** No crash, nothing typed from the suggestion row, and commits in finger-down order. Tested in Task 5 (`elevenTouchesCommitInOrder`, `suggestionRowTouchesIgnored`).
 
@@ -110,8 +110,8 @@ scripts/sim-screenshots.sh                    build + launch preview + capture P
   - Package products `KeyboardCore` and `KeyboardUI`.
   - Bundle IDs `$(CATKEYS_BUNDLE_PREFIX).catkeys` (app) and `$(CATKEYS_BUNDLE_PREFIX).catkeys.keyboard` (extension).
 
-- [ ] **Step 1: Create the branch.** Run `git checkout -b m1-typing-shell`.
-- [ ] **Step 2: Write the package and a smoke test.**
+- [x] **Step 1: Create the branch.** Run `git checkout -b m1-typing-shell`.
+- [x] **Step 2: Write the package and a smoke test.**
   - `Package.swift`: tools version 6.2 and package name `CatkeysCore`.
     - Targets: `KeyboardCore` with `resources: [.copy("Layouts")]`, `KeyboardUI` depending on `KeyboardCore`, and test target `KeyboardCoreTests`.
     - Create an empty `Layouts/` folder with a `.gitkeep`.
@@ -122,8 +122,8 @@ scripts/sim-screenshots.sh                    build + launch preview + capture P
     @Test func packageBuilds() { #expect(KeyboardCore.version == "0.1.0") }
     ```
   - Add `public enum KeyboardCore { public static let version = "0.1.0" }`.
-- [ ] **Step 3: Run the tests.** Run `cd Packages/CatkeysCore && swift test`. Expected: 1 test passed.
-- [ ] **Step 4: Write the project.**
+- [x] **Step 3: Run the tests.** Run `cd Packages/CatkeysCore && swift test`. Expected: 1 test passed.
+- [x] **Step 4: Write the project.**
   - `Base.xcconfig`:
     - Set `CATKEYS_BUNDLE_PREFIX`, `CATKEYS_APP_GROUP`, an empty `DEVELOPMENT_TEAM`, `CODE_SIGN_STYLE = Automatic`, `SWIFT_VERSION = 6.0` and `IPHONEOS_DEPLOYMENT_TARGET = 26.0`.
     - End with `#include? "Local.xcconfig"`.
@@ -133,13 +133,13 @@ scripts/sim-screenshots.sh                    build + launch preview + capture P
   - Keyboard `Info.plist`, under `NSExtension`:
     - `NSExtensionPointIdentifier = com.apple.keyboard-service`
     - `NSExtensionPrincipalClass = $(PRODUCT_MODULE_NAME).KeyboardViewController`
-    - `NSExtensionAttributes`: `IsASCIICapable = false`, `PrefersRightToLeft = false`, `PrimaryLanguage = en-IN`, `RequestsOpenAccess = true`
+    - `NSExtensionAttributes`: `IsASCIICapable = true` (ruling R7: catkeys types ASCII), `PrefersRightToLeft = false`, `PrimaryLanguage = en-IN`, `RequestsOpenAccess = true`
   - `KeyboardViewController`: a `UIInputViewController` subclass that shows a 292 pt tall empty view for now.
   - The app: a single `Text("catkeys")` view.
-- [ ] **Step 5: Generate and build for the simulator.**
+- [x] **Step 5: Generate and build for the simulator.**
   - Run `xcodegen generate && xcodebuild -project Catkeys.xcodeproj -scheme Catkeys -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.4' -derivedDataPath build/DerivedData build`.
   - Expected: `** BUILD SUCCEEDED **`.
-- [ ] **Step 6: Commit.** `git add -A && git commit -m "Scaffold app, keyboard extension and core package"`
+- [x] **Step 6: Commit.** `git add -A && git commit -m "Scaffold app, keyboard extension and core package"`
 
 ### Task 2: Layout model and layout files
 
@@ -185,7 +185,7 @@ scripts/sim-screenshots.sh                    build + launch preview + capture P
 - **Letters row 3:** shift 1.5, seven letters, backspace 1.5.
 - **Symbols rows 1-3:** as in design §4.2. `1/2` and `2/2` are 1.5 wide.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
   ```swift
   @Test func lettersPageMatchesDesign() throws {
       let set = try LayoutSet.bundled()
@@ -224,10 +224,10 @@ scripts/sim-screenshots.sh                    build + launch preview + capture P
       #expect(k.output == "a" && k.width == 1 && k.longPress.isEmpty && k.action == .character)
   }
   ```
-- [ ] **Step 2: Run them to verify they fail.** Run `swift test --filter LayoutTests`. Expected: compile errors for the missing types.
-- [ ] **Step 3: Implement the types and write the four JSON files.** `cornerHint` returns `longPress.first` only when `action == .character` and the key isn't on the number row. Pass this into the row's keys when decoding, or compute it in `LayoutPage`. Either works, but the test above must hold.
-- [ ] **Step 4: Run the tests.** Run `swift test --filter LayoutTests`. Expected: PASS.
-- [ ] **Step 5: Commit.** `git commit -am "Add layout model and letters/symbols layout files"`, after `git add` of the new files.
+- [x] **Step 2: Run them to verify they fail.** Run `swift test --filter LayoutTests`. Expected: compile errors for the missing types.
+- [x] **Step 3: Implement the types and write the four JSON files.** `cornerHint` returns `longPress.first` only when `action == .character` and the key isn't on the number row. Pass this into the row's keys when decoding, or compute it in `LayoutPage`. Either works, but the test above must hold.
+- [x] **Step 4: Run the tests.** Run `swift test --filter LayoutTests`. Expected: PASS.
+- [x] **Step 5: Commit.** `git commit -am "Add layout model and letters/symbols layout files"`, after `git add` of the new files.
 
 ### Task 3: Geometry and hit-testing
 
@@ -258,9 +258,12 @@ scripts/sim-screenshots.sh                    build + launch preview + capture P
   - Width-0 keys share whatever space is left in their row.
   - Every row is centred.
   - `id` is the key's index in the returned array, in row-major order.
-  - `hitTest` returns nil when `p.y < metrics.suggestionRowHeight`. Otherwise it returns the frame with the smallest `distance(to:)`, so gaps and edges go to the nearest key.
+  - `hitTest` returns nil when `p.y < metrics.suggestionRowHeight`. Otherwise it picks the row first, then the key, so gaps and edges go to the nearest key in that row (ruling R9). A pure nearest-rectangle rule would send edge-gutter taps to the row above.
+    - **Row:** each row owns the vertical band from the midpoint of the gap above it down to the midpoint of the gap below it, and a midpoint belongs to the row above. The top row starts at `suggestionRowHeight`, and the bottom row extends down without limit.
+    - **Key:** within the row, the key with the smallest horizontal distance wins. Ties go to the earlier key.
+  - `frames` returns `[]` when the unit width is ≤ 0, and `Rect.contains` uses plain comparisons, never ranges.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
   ```swift
   // width 390 → unit = (390 - 6 - 54) / 10 = 33
   @Test func rowsLayOutEdgeToEdge() throws {
@@ -278,10 +281,10 @@ scripts/sim-screenshots.sh                    build + launch preview + capture P
   @Test func gapsGoToNearestKey() throws { /* point midway+1pt toward g in the f|g gap → "g"; x=0 on row 2 → "a"; below the bottom row → nearest bottom key */ }
   @Test func suggestionRowIsNotAKey() throws { /* hitTest(Point(x: 200, y: 20)) == nil */ }
   ```
-- [ ] **Step 2: Run them to verify they fail.** Run `swift test --filter GeometryTests`. Expected: compile errors.
-- [ ] **Step 3: Implement the geometry types and functions.** Rows run top to bottom: number row, letter rows, bottom row. The number row starts at `y = suggestionRowHeight`.
-- [ ] **Step 4: Run the tests.** Run `swift test --filter GeometryTests`. Expected: PASS.
-- [ ] **Step 5: Commit.** "Add key geometry and nearest-key hit-testing"
+- [x] **Step 2: Run them to verify they fail.** Run `swift test --filter GeometryTests`. Expected: compile errors.
+- [x] **Step 3: Implement the geometry types and functions.** Rows run top to bottom: number row, letter rows, bottom row. The number row starts at `y = suggestionRowHeight`.
+- [x] **Step 4: Run the tests.** Run `swift test --filter GeometryTests`. Expected: PASS.
+- [x] **Step 5: Commit.** "Add key geometry and nearest-key hit-testing"
 
 ### Task 4: Text document protocol and text rules
 
@@ -292,7 +295,7 @@ scripts/sim-screenshots.sh                    build + launch preview + capture P
 **Interfaces:**
 - Produces:
   ```swift
-  public protocol TextDocument: AnyObject {
+  @MainActor public protocol TextDocument: AnyObject {   // ruling R12
       var textBefore: String? { get }      // nil = unknown/start of field
       var textAfter: String? { get }
       func insert(_ text: String)
@@ -312,14 +315,14 @@ scripts/sim-screenshots.sh                    build + launch preview + capture P
       public static func utf16Offset(graphemes: Int, before: String?, after: String?) -> Int  // UTF-16 length of the graphemes crossed
   }
   ```
-- `FakeTextDocument` (test target only): `init(_ text: String, cursor: Int? = nil)`, with `text: String` and `cursor: Int` counted in graphemes. It implements the protocol over a `[Character]`.
+- `FakeTextDocument` (test target only): `init(_ text: String, cursor: Int? = nil)`, with `text: String` and `cursor: Int` counted in graphemes. It implements the protocol over a `[Character]`, is `@MainActor`, and returns nil for an empty side, as iOS does (ruling R10).
 - Rules:
-  - **Sentences:** capitalise when the text before is nil or empty, ends in a newline, or ends in `.`, `!` or `?` followed by whitespace.
+  - **Sentences:** capitalise when the text before is nil or empty, ends in a newline, or ends in a sentence terminal (Unicode `isSentenceTerminal`, ruling R11) followed by whitespace. Apostrophes between letters count as part of a word for word delete.
   - **Words:** capitalise when the text before is nil, empty or ends in whitespace.
   - **All:** always capitalise. **None:** never.
   - **Vertical moves:** the cursor keeps its column, meaning the number of graphemes since the last `\n`. When moving to a shorter line, it clamps to that line's end.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
   ```swift
   @Test func autoCap() {
       #expect(TextRules.shouldCapitalize(before: "", mode: .sentences))
@@ -357,10 +360,10 @@ scripts/sim-screenshots.sh                    build + launch preview + capture P
       #expect(TextOffsets.utf16Offset(graphemes: 2, before: nil, after: "🇮🇳a") == 5)
   }
   ```
-- [ ] **Step 2: Run them to verify they fail.** Run `swift test --filter TextRulesTests`. Expected: compile errors.
-- [ ] **Step 3: Implement the rules and `FakeTextDocument`.** Iterate over `Character`s, never over UTF-16 units, except inside `TextOffsets`.
-- [ ] **Step 4: Run the tests.** Run `swift test --filter TextRulesTests`. Expected: PASS.
-- [ ] **Step 5: Commit.** "Add text document protocol and text rules"
+- [x] **Step 2: Run them to verify they fail.** Run `swift test --filter TextRulesTests`. Expected: compile errors.
+- [x] **Step 3: Implement the rules and `FakeTextDocument`.** Iterate over `Character`s, never over UTF-16 units, except inside `TextOffsets`.
+- [x] **Step 4: Run the tests.** Run `swift test --filter TextRulesTests`. Expected: PASS.
+- [x] **Step 5: Commit.** "Add text document protocol and text rules"
 
 ### Task 5: Touch processor (taps, fast typing, long-press)
 
@@ -380,7 +383,8 @@ scripts/sim-screenshots.sh                    build + launch preview + capture P
       case alternatesShown(KeyFrame, options: [String], selected: Int, originX: Double)
       case alternateSelected(KeyFrame, selected: Int)
       case activateAlternate(KeyFrame, text: String)
-      case deleteBackward(word: Bool)                          // Task 6
+      case deleteBackward(word: Bool)                          // Task 6: held backspace
+      case deleteRestOfWord                                    // Task 6: backspace swipe (ruling R18)
       case cursorModeBegan, cursorModeEnded                    // Task 6
       case cursorMoved(characters: Int)                        // Task 6
       case cursorMovedLines(Int)                               // Task 6
@@ -402,17 +406,23 @@ scripts/sim-screenshots.sh                    build + launch preview + capture P
       public func touchCancelled(_ id: TouchID) -> [TouchEvent]
       public func advance(to time: Double) -> [TouchEvent]     // fires due timers in time order
       public var nextDeadline: Double? { get }                 // nil when no timer is pending
+      public var isShowingAlternates: Bool { get }             // ruling R29
+      public func cancelAll() -> [TouchEvent]                  // ruling R33: cursorModeEnded if needed, keyUp per touch, no touches or timers left
   }
   ```
 - Rules:
   - **Act on touch-down:** shift and `switchPage` keys emit `[.keyDown, .activate]` on touch-down, and backspace's touch-down is handled in Task 6.
   - **Act on lift:** character, space, return, emoji and globe keys emit `.activate` on lift. The `landing` point is the touch-down point.
   - **Long-press options:** they show only for `.character` keys with a non-empty `longPress` list.
-    - The popup origin is `min(max(key.rect.minX, 0), keyboardWidth - options.count * alternateWidth)`.
-    - The selected option is `clamp(Int((x - originX) / alternateWidth), 0, count-1)`.
-  - **Fast typing (rollover):** a new touch-down while an earlier touch holds a character key or space that hasn't fired its long-press yet first emits `.activate` for the earlier key, then cancels its timers. That earlier touch is then spent, so its lift emits only `.keyUp`.
+    - **Layout (ruling R13):** options are emitted in display order, left to right.
+      - If they fit from `key.rect.minX`, they run left to right from there, with the default option leftmost and `selected = 0`.
+      - Otherwise they run right to left: the default option takes the cell ending at `key.rect.maxX`, `originX = max(key.rect.maxX - n*alternateWidth, 0)`, the options are reversed, and `selected = n-1`.
+    - **Selection:** the cell under the finger, `clamp(Int((x - originX) / alternateWidth), 0, n-1)`. If the cell width is ≤ 0 or the value isn't finite, the default option is used (ruling R17).
+    - **One popup at a time (ruling R16):** while any touch is choosing an option, new touches get no long-press.
+  - **Fast typing (rollover):** a new touch-down while an earlier touch holds a character key, space or return (ruling R14) that hasn't fired its long-press yet first emits `.activate` for the earlier key, then cancels its timers. That earlier touch is then spent, so its lift emits only `.keyUp`.
+  - **Reused touch id (ruling R15):** a touch-down that reuses a still-down id ends the stale touch as if it had lifted.
 
-- [ ] **Step 1: Write the failing tests.** Use frames from `KeyboardGeometry.frames` at width 390 and a helper `center(_ label: String) -> Point`.
+- [x] **Step 1: Write the failing tests.** Use frames from `KeyboardGeometry.frames` at width 390 and a helper `center(_ label: String) -> Point`.
   ```swift
   @Test func tapCommitsOnLiftAtLandingPoint()   // down a, move to s, up → [.activate(a, landing: center("a")), .keyUp(a)]
   @Test func rolloverCommitsEarlierKeyFirst()   // down a t0, down s t0.05 → [.activate(a,…), .keyDown(s)]; up a → [.keyUp(a)]; up s → [.activate(s,…), .keyUp(s)]
@@ -427,10 +437,10 @@ scripts/sim-screenshots.sh                    build + launch preview + capture P
   @Test func elevenTouchesCommitInOrder()       // 11 downs on distinct keys 10ms apart → activates in down order, no crash
   @Test func framesReplacedMidTouchUseOriginalKey() // down a; frames = symbols-1 frames; up → activate(original a frame)
   ```
-- [ ] **Step 2: Run them to verify they fail.** Run `swift test --filter TouchTapTests`. Expected: compile errors.
-- [ ] **Step 3: Implement `TouchProcessor`.** Keep per-touch state in a dictionary keyed by `TouchID`, plus an array that preserves down order. Timers are a stored deadline per touch, and `advance` fires every deadline ≤ time in deadline order. The touch path must not allocate beyond the event array.
-- [ ] **Step 4: Run the tests.** Run `swift test --filter TouchTapTests`. Expected: PASS.
-- [ ] **Step 5: Commit.** "Add touch processor with rollover and long-press"
+- [x] **Step 2: Run them to verify they fail.** Run `swift test --filter TouchTapTests`. Expected: compile errors.
+- [x] **Step 3: Implement `TouchProcessor`.** Keep per-touch state in a dictionary keyed by `TouchID`, plus an array that preserves down order. Timers are a stored deadline per touch, and `advance` fires every deadline ≤ time in deadline order. The touch path must not allocate beyond the event array.
+- [x] **Step 4: Run the tests.** Run `swift test --filter TouchTapTests`. Expected: PASS.
+- [x] **Step 5: Commit.** "Add touch processor with rollover and long-press"
 
 ### Task 6: Touch processor (backspace and space-bar cursor)
 
@@ -444,7 +454,8 @@ scripts/sim-screenshots.sh                    build + launch preview + capture P
   - Touch-down emits `[.keyDown, .deleteBackward(word: false)]`.
   - Repeats start at `0.4` s and come every `0.07` s.
   - From `1.5` s after touch-down, each repeat is `.deleteBackward(word: true)`, every `0.2` s.
-  - The first horizontal move of ≥ `20` pt to the left emits one `.deleteBackward(word: true)` and stops the repeats. Nothing more happens until lift.
+  - The first horizontal move of ≥ `20` pt to the left emits one `.deleteRestOfWord` (ruling R18) and stops the repeats. Nothing more happens until lift.
+  - When cursor mode begins, a deleting backspace stops (ruling R19).
 - **Space:**
   - Holding for `0.33` s with no rollover emits `.cursorModeBegan`.
   - In cursor mode, the horizontal movement since the last emitted step is turned into `.cursorMoved(characters: n)`, where n is `Int(dx / 9)` (rounding towards zero). If the speed over the last move is above `300` pt/s, n is multiplied by `3`.
@@ -452,7 +463,7 @@ scripts/sim-screenshots.sh                    build + launch preview + capture P
   - Lifting in cursor mode gives `[.cursorModeEnded, .keyUp(space)]` and types no space.
   - While cursor mode is on, other touches are ignored and return `[]`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
   ```swift
   @Test func backspaceRepeatsThenDeletesWords() // down t0 → [.keyDown(b), .deleteBackward(word: false)]; advance(0.4) → 1 char delete; advance(0.47) → 1 more;
                                                  // advance(1.5) → contains .deleteBackward(word: true); advance(1.7) → one word delete; up → [.keyUp(b)], nextDeadline nil
@@ -465,10 +476,10 @@ scripts/sim-screenshots.sh                    build + launch preview + capture P
   @Test func spaceRolloverBeforeHold()          // down space t0, down a t0.1 → [.activate(space,…), .keyDown(a)]; advance(0.5) → []
   @Test func cancelDuringCursorModeEndsIt()     // cursor mode, cancel → [.cursorModeEnded, .keyUp(space)]; nextDeadline nil
   ```
-- [ ] **Step 2: Run them to verify they fail.** Run `swift test --filter TouchHoldTests`. Expected: FAIL.
-- [ ] **Step 3: Implement backspace and cursor mode in `TouchProcessor`.**
-- [ ] **Step 4: Run all package tests.** Run `swift test`. Expected: all PASS.
-- [ ] **Step 5: Commit.** "Add backspace repeat/swipe and space-bar cursor mode"
+- [x] **Step 2: Run them to verify they fail.** Run `swift test --filter TouchHoldTests`. Expected: FAIL.
+- [x] **Step 3: Implement backspace and cursor mode in `TouchProcessor`.**
+- [x] **Step 4: Run all package tests.** Run `swift test`. Expected: all PASS.
+- [x] **Step 5: Commit.** "Add backspace repeat/swipe and space-bar cursor mode"
 
 ### Task 7: Keyboard controller
 
@@ -499,35 +510,47 @@ scripts/sim-screenshots.sh                    build + launch preview + capture P
   @MainActor public final class KeyboardController {
       public init(document: any TextDocument, layouts: LayoutSet, settings: KeyboardSettings, feedback: any FeedbackSink, metrics: KeyboardMetrics = .standard)
       public var settings: KeyboardSettings                    // didSet updates processor timing
-      public var needsGlobeKey: Bool                           // didSet inserts/removes a 🌐 (action .globe) key before 😊
+      public var needsGlobeKey: Bool                           // didSet inserts/removes the globe key spec from Layouts/index.json "globeKey" (ruling R8) before 😊
       public var onGlobe: (() -> Void)?                        // called on globe activate
       public var onChange: (() -> Void)?                       // called after any state/frames change
       public private(set) var state: KeyboardState
       public private(set) var frames: [KeyFrame]
       public var height: Double { get }
       public func setWidth(_ width: Double)
-      public func fieldDidChange(_ traits: FieldTraits)       // picks variant/page/return key, re-evaluates auto-shift
-      public func documentDidChange()                          // re-evaluates auto-shift
+      public func fieldDidChange(_ traits: FieldTraits)       // re-picks variant/page/return key only when the traits change (ruling R23) and then
+                                                               // re-evaluates auto-shift; same traits re-evaluate only if textBefore changed (ruling R34)
+      public func documentDidChange()                          // re-evaluates auto-shift only if textBefore differs from the last value seen (ruling R34)
+      public func keyboardWillAppear(_ traits: FieldTraits)    // ruling R28: ends every touch (R33), resets page/variant from traits, clears shift history, re-evaluates auto-shift
       public func touchDown(_ id: TouchID, at: Point, time: Double)
       public func touchMoved(_ id: TouchID, to: Point, time: Double)
       public func touchUp(_ id: TouchID, at: Point, time: Double)
       public func touchCancelled(_ id: TouchID)
+      public func cancelAllTouches()                           // ruling R33: ends every touch, types nothing; clears highlights, preview, popup, cursor mode; one onChange
+      public func key(at p: Point) -> KeyFrame?                // hit-test only, for the keyDown signpost's bottomRow metadata
       public func advance(to time: Double)
       public var nextDeadline: Double? { get }
   }
   ```
 - **What each event does:**
   - `keyDown`: calls `feedback.keyDown()` and adds the key to `pressedKeyIDs`.
-  - `activate(.character)`: inserts the output, uppercased when shift is `once` or `locked`. A `once` shift is then used up.
-  - `activate(.space)`: if `settings.doubleSpacePeriod` is on, the previous key was also space within `0.5` s, and `isDoubleSpaceCandidate(before:)` holds, it deletes 1 and inserts `". "`. Otherwise it inserts `" "`.
+  - `activate(.character)`: inserts the output, uppercased when shift is `once` or `locked` and the output is a single grapheme (ruling R25). A `once` shift is then used up.
+  - `activate(.space)`: if `settings.doubleSpacePeriod` is on, the previous key was also space within `0.5` s, the text before the cursor is unchanged since that space (ruling R26), and `isDoubleSpaceCandidate(before:)` holds, it deletes 1 and inserts `". "`. Otherwise it inserts `" "`.
   - `activate(.returnKey)`: inserts `"\n"`.
   - `activate(.shift)`:
     - From off, it goes to once.
+    - Ruling R24 overrides the next two rules: every shift tap records its time, and a tap within `0.3` s of the previous shift tap goes to locked from any state except locked.
     - From once, it goes to locked if the press came within `0.3` s of the shift tap that set it, and otherwise to off.
     - From locked, it goes to off.
   - `activate(.switchPage)`: changes `pageID` and recomputes the frames.
   - `activateAlternate`: inserts the text unchanged and uses up a `once` shift.
   - `deleteBackward(word: false)`: deletes 1 character. `deleteBackward(word: true)` deletes `previousWordLength`, or 1 if that is 0.
+  - `deleteRestOfWord`: deletes `TextRules.trailingRunLength(before:)`, and nothing if that is 0 (ruling R18).
+  - Popups and frame ids:
+    - `alternatesShown` renders `options` exactly as given, in display order.
+    - The popup is shown exactly while `TouchProcessor.isShowingAlternates` is true, checked after each batch of events (ruling R29).
+    - Replacing frames cancels pending long-presses of held character keys (ruling R30).
+    - Never index the current `frames` by an event's `KeyFrame.id` after a page change: pressed-key highlighting matches by id only within the current page.
+    - Two fingers on one key keep it highlighted until both lift.
   - `cursorMoved(n)`: calls `moveCursor(by: n)` and `feedback.cursorTick()` |n| times.
   - `cursorMovedLines(n)`: moves by `CursorMath.verticalMove` and calls `cursorTick()` once.
   - `.emoji`: does nothing in M1.
@@ -537,7 +560,7 @@ scripts/sim-screenshots.sh                    build + launch preview + capture P
   - `.number` switches to page `symbols-1` when the field is focused.
   - Every other kind selects letters with the `.standard` bottom row.
 
-- [ ] **Step 1: Write the failing tests.** They use `FakeTextDocument`, `RecordingFeedback` (which counts calls) and a `tap(_ label:)` helper (touchDown/touchUp at the key centre, 0.1 s apart, with time advancing).
+- [x] **Step 1: Write the failing tests.** They use `FakeTextDocument`, `RecordingFeedback` (which counts calls) and a `tap(_ label:)` helper (touchDown/touchUp at the key centre, 0.1 s apart, with time advancing).
   ```swift
   @Test func typesLetters()                     // fieldDidChange(autoCap: .none); tap h, i → doc.text == "hi"
   @Test func autoCapitalisesSentences()          // autoCap .sentences, empty doc: tap h, i → "Hi"; then ". " typed via "." + space → next tap "o" gives "Hi. O"
@@ -553,10 +576,10 @@ scripts/sim-screenshots.sh                    build + launch preview + capture P
   @Test func previewOnlyForCharacterKeys()      // keyDown on "a" → previewKeyID == a.id; on shift → nil; settings.keyPopup = false → nil
   @Test func keyDownGivesFeedback()             // one tap → feedback.keyDowns == 1
   ```
-- [ ] **Step 2: Run them to verify they fail.** Run `swift test --filter ControllerTests`. Expected: FAIL.
-- [ ] **Step 3: Implement `KeyboardController`.** `height` comes from `metrics.totalHeight(rowCount:)` for the current page.
-- [ ] **Step 4: Run all package tests.** Run `swift test`. Expected: all PASS.
-- [ ] **Step 5: Commit.** "Add keyboard controller"
+- [x] **Step 2: Run them to verify they fail.** Run `swift test --filter ControllerTests`. Expected: FAIL.
+- [x] **Step 3: Implement `KeyboardController`.** `height` comes from `metrics.totalHeight(rowCount:)` for the current page.
+- [x] **Step 4: Run all package tests.** Run `swift test`. Expected: all PASS.
+- [x] **Step 5: Commit.** "Add keyboard controller"
 
 ### Task 8: Settings
 
@@ -576,7 +599,7 @@ Implement this before Task 7, or alongside it, because the controller takes `Key
   }
   public struct SettingsStore {
       public init(defaults: UserDefaults)
-      public static func appGroup(id: String?) -> SettingsStore?   // nil if id is nil or UserDefaults(suiteName:) fails
+      public static func appGroup(id: String?) -> SettingsStore?   // nil if id is nil, the App Group container is unavailable (ruling R22), or UserDefaults(suiteName:) fails
       public func load() -> KeyboardSettings                        // missing or corrupt data → defaults
       public func save(_ s: KeyboardSettings)
       public var lastKeyboardOpen: Date? { get nonmutating set }    // heartbeat written by the keyboard, read by the app
@@ -584,7 +607,7 @@ Implement this before Task 7, or alongside it, because the controller takes `Key
   ```
 - Settings are stored as JSON under the key `catkeys.settings`. The heartbeat is stored under `catkeys.keyboardOpenedAt`.
 
-- [ ] **Step 1: Write the failing tests.** They cover:
+- [x] **Step 1: Write the failing tests.** They cover:
   - defaults equal the design values (`haptics` true, `sound` false, `keyPopup` true, `doubleSpacePeriod` true, `longPressDelay` 0.3)
   - a save-then-load round trip
   - garbage `Data` gives the defaults
@@ -592,10 +615,10 @@ Implement this before Task 7, or alongside it, because the controller takes `Key
   - the heartbeat round trip
 
   Each test uses `UserDefaults(suiteName: "catkeys-test-\(UUID())")!`.
-- [ ] **Step 2: Run them to verify they fail.** Run `swift test --filter SettingsTests`. Expected: FAIL.
-- [ ] **Step 3: Implement settings and the store.**
-- [ ] **Step 4: Run the tests.** Run `swift test --filter SettingsTests`. Expected: PASS.
-- [ ] **Step 5: Commit.** "Add settings model and store"
+- [x] **Step 2: Run them to verify they fail.** Run `swift test --filter SettingsTests`. Expected: FAIL.
+- [x] **Step 3: Implement settings and the store.**
+- [x] **Step 4: Run the tests.** Run `swift test --filter SettingsTests`. Expected: PASS.
+- [x] **Step 5: Commit.** "Add settings model and store"
 
 ### Task 9: Keyboard view and simulator screenshots
 
@@ -618,6 +641,8 @@ Implement this before Task 7, or alongside it, because the controller takes `Key
 - `KeyboardView` behaviour:
   - **Touches:** `isMultipleTouchEnabled = true`. It forwards `touchesBegan`, `Moved`, `Ended` and `Cancelled` to the controller using `ObjectIdentifier(touch).hashValue`, `touch.location(in: self)` and `touch.timestamp`.
   - **Timers:** while `controller.nextDeadline != nil`, a `CADisplayLink` calls `controller.advance(to: ProcessInfo.processInfo.systemUptime)`. It's invalidated when there's no deadline.
+  - **Order:** before forwarding any touch event at time t, call `controller.advance(to: t)`, so a lift just after a deadline sees that deadline fired first.
+  - **Stale touches (ruling R33):** it tracks the touch ids it forwarded and not yet ended. `didMoveToWindow` calls `controller.cancelAllTouches()` when the view leaves a window and when it enters one, before the timer restarts. `touchesBegan` first cancels any tracked id missing from `event.allTouches`.
   - **Layers:** one `KeyLayer` (a `CALayer` with label and corner-hint `CATextLayer`s) per frame. Implicit animations are disabled with `CATransaction.setDisableActions(true)`.
   - **Re-rendering:** `render()` rebuilds layers only when the frames change. Otherwise it updates only the pressed and preview states, which keeps per-key work small.
   - **Key preview:** a magnified balloon above the key, clamped inside the view's bounds. The number row's balloon covers the suggestion row.
@@ -634,16 +659,16 @@ Implement this before Task 7, or alongside it, because the controller takes `Key
   3. Saves with `xcrun simctl io booted screenshot build/screenshots/<name>.png`, in both `xcrun simctl ui booted appearance light` and `dark`.
   4. Names: `letters`, `symbols-1`, `symbols-2`, `hold-d`, `hold-period`, `cursor`, each with a `-light` or `-dark` suffix.
 
-- [ ] **Step 1: Implement the theme, layers and `KeyboardView`.**
-- [ ] **Step 2: Implement `KeyboardPreviewView` and the launch arguments.**
-- [ ] **Step 3: Run `scripts/sim-screenshots.sh`.** Expected: 12 PNGs in `build/screenshots/`.
-- [ ] **Step 4: Compare the screenshots with design §4.1-4.2 and the approved mockups.**
+- [x] **Step 1: Implement the theme, layers and `KeyboardView`.**
+- [x] **Step 2: Implement `KeyboardPreviewView` and the launch arguments.**
+- [x] **Step 3: Run `scripts/sim-screenshots.sh`.** Expected: 12 PNGs in `build/screenshots/`.
+- [x] **Step 4: Compare the screenshots with design §4.1-4.2 and the approved mockups.**
   - Number row on top; corner hints on the letter keys, matching Task 2; comma and emoji keys.
   - `hold-d` shows `₹ $ €` with ₹ selected, and `hold-period` shows `. ? ! … : /`.
   - In cursor mode the labels are blank.
   - Dark mode is readable.
   - Fix anything off, and attach the PNG paths to the task report.
-- [ ] **Step 5: Commit.** "Add keyboard view, preview host and screenshot script"
+- [x] **Step 5: Commit.** "Add keyboard view, preview host and screenshot script"
 
 ### Task 10: Keyboard extension
 
@@ -667,20 +692,21 @@ Implement this before Task 7, or alongside it, because the controller takes `Key
   - The input view adopts `UIInputViewAudioFeedback` with `enableInputClicksWhenVisible = true`.
 - **`KeyboardViewController`:**
   - **`viewDidLoad`:** loads `LayoutSet.bundled()` and settings from `SettingsStore.appGroup(id: Bundle.main.object(forInfoDictionaryKey: "CatkeysAppGroup") as? String)`, falling back to `KeyboardSettings()`. It builds the controller and the `KeyboardView`, sets a height constraint from `controller.height`, wires `onGlobe` to `advanceToNextInputMode()`, and sets `needsGlobeKey = needsInputModeSwitchKey`.
-  - **`viewWillAppear`:** reloads settings, writes the `lastKeyboardOpen = Date()` heartbeat, and calls `fieldDidChange`.
+  - **`viewWillAppear`:** reloads settings, writes the `lastKeyboardOpen = Date()` heartbeat, and calls `controller.keyboardWillAppear(traits)` (ruling R28).
   - **`viewDidAppear`:** turns off `delaysTouchesBegan` on every gesture recognizer in `view.window?.gestureRecognizers`. This is design §9's bottom-row workaround.
   - **`textDidChange`:** calls `fieldDidChange` and `documentDidChange`. The theme is dark when `proxy.keyboardAppearance == .dark` or the trait collection is dark.
   - **`didReceiveMemoryWarning`:** no-op for M1.
-- **Signposts:** `OSSignposter(subsystem: "catkeys", category: "perf")`.
+- **Signposts:** `OSSignposter(subsystem: "catkeys", category: "perf")`. `KeyboardView` doesn't import the extension: it reports through hooks (`onTouchDown`, `measure`, `onFirstKeysDrawn`) that the extension sets.
   - An interval `startup` from `viewDidLoad` to the first `render()` that has frames.
-  - An event `keyDown` on every touch-down, with the latency `systemUptime - touch.timestamp` in ms as metadata.
+  - An event `keyDown` on every touch-down, with the latency `systemUptime - touch.timestamp` in ms and `bottomRow` (1 if the touched key is on the bottom row, else 0) as metadata. Never the position or the key.
+  - An interval `touch` around each batch of touches `KeyboardView` hands to the controller (the touch processor and the controller's whole response), and an interval `render` around each `render()`.
   - An interval `insert` around every `TextDocument.insert` call in `ProxyTextDocument`.
 
-- [ ] **Step 1: Implement `ProxyTextDocument` and `DeviceFeedback`.**
-- [ ] **Step 2: Implement `KeyboardViewController` with the signposts.**
-- [ ] **Step 3: Build for the simulator.** Use the Task 1 `xcodebuild` command. Expected: `** BUILD SUCCEEDED **` with no Swift 6 concurrency errors.
-- [ ] **Step 4: Best effort, try the real extension in the simulator.** Install the app and add the keyboard with `xcrun simctl spawn booted defaults write com.apple.Preferences KeyboardsCurrentAndNext -array <bundle id>` or the Settings app. If it shows up, screenshot it inside the app's Try-it field. If it doesn't, say so in the report and leave it to the device check in Task 12.
-- [ ] **Step 5: Commit.** "Add keyboard extension controller, proxy document and feedback"
+- [x] **Step 1: Implement `ProxyTextDocument` and `DeviceFeedback`.**
+- [x] **Step 2: Implement `KeyboardViewController` with the signposts.**
+- [x] **Step 3: Build for the simulator.** Use the Task 1 `xcodebuild` command. Expected: `** BUILD SUCCEEDED **` with no Swift 6 concurrency errors.
+- [x] **Step 4: Best effort, try the real extension in the simulator.** Install the app and add the keyboard with `xcrun simctl spawn booted defaults write com.apple.Preferences KeyboardsCurrentAndNext -array <bundle id>` or the Settings app. If it shows up, screenshot it inside the app's Try-it field. If it doesn't, say so in the report and leave it to the device check in Task 12.
+- [x] **Step 5: Commit.** "Add keyboard extension controller, proxy document and feedback"
 
 ### Task 11: Container app
 
@@ -693,16 +719,82 @@ Implement this before Task 7, or alongside it, because the controller takes `Key
 - **Setup:**
   - Numbered steps: Settings → General → Keyboard → Keyboards → Add New Keyboard → catkeys; then tap catkeys → Allow Full Access.
   - The Full Access paragraph reads, exactly: "Full Access lets catkeys use haptics and read the settings you choose here. catkeys never connects to the internet: nothing you type leaves your phone."
-  - A status line, "Keyboard last opened: <relative time>", from `lastKeyboardOpen`. It shows "Settings can't be shared on this install: the App Group isn't available" when `SettingsStore.appGroup` returns nil, and "Not opened yet" when there's no heartbeat.
+  - A status line, "Keyboard last opened: <relative time>", from `lastKeyboardOpen`. It shows "Settings can't be shared on this install: the App Group isn't available" when `SettingsStore.appGroup` returns nil, and "Not opened yet, or Full Access is off" when there's no heartbeat (ruling R38: without Full Access the keyboard can't write it).
 - **Settings:**
   - Toggles: Haptics, Key click sound, Key popup, Double-space full stop.
   - A long-press delay slider from 0.2 to 0.6 s in 0.05 steps, showing its value in seconds.
   - Every change saves through `SettingsStore`.
 - **Try it:** a multi-line `TextField`, plus a note that the catkeys keyboard must be picked with 🌐.
 
-- [ ] **Step 1: Implement the three views.**
-- [ ] **Step 2: Build and screenshot each tab on the simulator,** light and dark, into `build/screenshots/app-*.png`. Expected: the text matches the spec above.
-- [ ] **Step 3: Commit.** "Add container app setup, settings and try-it screens"
+- [x] **Step 1: Implement the three views.**
+- [x] **Step 2: Build and screenshot each tab on the simulator,** light and dark, into `build/screenshots/app-*.png`. Expected: the text matches the spec above.
+- [x] **Step 3: Commit.** "Add container app setup, settings and try-it screens"
+
+### Task 11a: SideStore install path (ruling R39)
+
+The user installs catkeys through SideStore, as with their other sideloaded app, not from Xcode. SideStore re-signs an unsigned IPA with the user's free Apple ID and refreshes it daily. It also rewrites bundle IDs and renames App Groups. This task makes catkeys work under that path.
+
+**Files:**
+- Create: `Packages/CatkeysCore/Sources/KeyboardCore/Settings/AppGroupResolver.swift`, `Tests/KeyboardCoreTests/AppGroupResolverTests.swift`, `scripts/build-ipa.sh`
+- Modify: `Packages/CatkeysCore/Sources/KeyboardCore/Settings/SettingsStore.swift`, plus the callers of `appGroup(id:)` in `Keyboard/` and `App/` if their call changes
+
+**Interfaces:**
+- Produces:
+  ```swift
+  public enum AppGroupResolver {
+      /// The App Group usable in this process, or nil: the canonical id if its container exists,
+      /// otherwise the first group from this bundle's embedded.mobileprovision whose container exists.
+      public static func resolve(canonical: String?, bundle: Bundle = .main,
+                                 containerExists: (String) -> Bool = { FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: $0) != nil }) -> String?
+      /// `com.apple.security.application-groups` from a raw .mobileprovision (CMS envelope around an XML plist);
+      /// groups containing the canonical id's last component come first.
+      public static func groups(fromProvisioningProfile data: Data, canonical: String?) -> [String]
+  }
+  ```
+  `SettingsStore.appGroup(id:)` uses `AppGroupResolver.resolve(canonical: id)`. The rest of its contract is unchanged, including nil when nothing resolves.
+- `scripts/build-ipa.sh` writes `build/catkeys.ipa`:
+  1. Builds a Release archive for `generic/platform=iOS` with `CODE_SIGNING_ALLOWED=NO`.
+  2. Writes entitlements files with the build settings expanded. `$(CATKEYS_APP_GROUP)` must become the real group id, read via `xcodebuild -showBuildSettings`.
+  3. Ad-hoc signs the appex first, then the app, each with its entitlements (`codesign -f -s - --entitlements …`).
+  4. Zips `Payload/`.
+  5. Verifies with `codesign -d --entitlements :-` that both bundles carry the App Group.
+- The parsing approach follows the user's own Sahaja app (`Shared/AppGroup.swift`): scan for `<?xml` … `</plist>`, then `PropertyListSerialization`.
+
+- [ ] **Step 1: Write failing tests.**
+  - Parsing a synthetic profile blob (junk bytes + XML plist + junk) returns its groups, with the renamed group carrying the canonical name ordered first.
+  - Garbage gives `[]`.
+  - `resolve` with an injected `containerExists`:
+    - prefers the canonical id;
+    - falls back to the profile group;
+    - returns nil when nothing exists.
+- [ ] **Step 2: Implement it, and switch `SettingsStore.appGroup(id:)` over.** Run `swift test`. Expected: all pass.
+- [ ] **Step 3: Write `scripts/build-ipa.sh` and run it with `Config/Local.xcconfig`** (the user's own bundle prefix). Expected: `build/catkeys.ipa`, with both bundles' entitlements showing the expanded App Group id.
+- [ ] **Step 4: Commit.** "SideStore path: resolve renamed App Group; IPA build script"
+
+### Task 12b: Look polish from the device feel test (rulings R41, R42)
+
+The user's feel test on the iPhone found two problems with how the keyboard looks:
+
+- The 😊 emoji key should be an emoji *icon*, like Apple's keyboard.
+- On iOS 26/27, catkeys' opaque grey background clashes with the system's Liquid Glass keyboard backdrop. That backdrop is the rounded band above the keys and the globe/mic area below them. It also appears as a floating rounded container, for example in search pulled down from the home screen.
+
+**Files:**
+- Modify: `Packages/CatkeysCore/Sources/KeyboardCore/Layout/KeySpec.swift` (optional `icon`), the three layout JSON files (the emoji key), `Packages/CatkeysCore/Sources/KeyboardUI/KeyLayer.swift`, `KeyboardView.swift` and `KeyboardTheme.swift`, `Tests/KeyboardCoreTests/LayoutTests.swift`
+
+**Changes:**
+- **R41:** `KeySpec` gains `public var icon: String?`, an SF Symbol name decoded from JSON and nil by default.
+  - The emoji key in every bottom row gets `"icon": "face.smiling"`. Keep its `label` as the accessibility/fallback text.
+  - `KeyLayer` draws the symbol, tinted with the theme's label colour and sized like the key labels, instead of the label text whenever `icon` is set and the image exists. Otherwise it draws the label as today. In cursor mode the icon hides like the labels do.
+  - No symbol names appear in Swift code.
+- **R42:** the key grid's background is clear, so the system keyboard backdrop shows through around and between the keys and in the empty suggestion row. The extension's `inputView` already uses the `.keyboard` input-view style.
+  - The theme keeps the key, special-key, popup and label colours, so the keys stay readable on the glass in light and dark.
+  - The app's preview host gives its container a keyboard-like grey, so screenshots still read well.
+- **Tests:** a JSON decoding test for `icon` (present and absent), and every bundled page's emoji key carries `face.smiling`.
+- **Verify:**
+  1. Run `swift test`.
+  2. Run `scripts/sim-screenshots.sh`.
+  3. Screenshot the real extension in the simulator in light and dark. iOS 26.4 has the glass backdrop. Look at the screenshots.
+  4. Run `scripts/build-ipa.sh`.
 
 ### Task 12: Device check, measurements and milestone close (with the user)
 
@@ -710,32 +802,47 @@ Implement this before Task 7, or alongside it, because the controller takes `Key
 - Create: `Config/Local.xcconfig` (gitignored; the user's team and bundle prefix)
 - Modify: this plan's **Progress** section, and `docs/design.md` §10 if the targets change
 
-- [ ] **Step 1: The user prepares signing.**
+- [x] **Step 1: The user prepares signing.** (superseded by R39: SideStore signs on the phone)
   1. Add their Apple ID in Xcode → Settings → Accounts.
   2. Choose a unique `CATKEYS_BUNDLE_PREFIX`, for example `io.github.<handle>`.
   3. Turn on Developer Mode on the iPhone.
 
-  Then Claude writes `Config/Local.xcconfig` with `DEVELOPMENT_TEAM` and `CATKEYS_BUNDLE_PREFIX`.
-- [ ] **Step 2: Build and install on the device.**
-  1. Run `xcodebuild -project Catkeys.xcodeproj -scheme Catkeys -destination 'platform=iOS,name=V’s iPhone' -derivedDataPath build/DerivedData -allowProvisioningUpdates build`.
-  2. Install with `xcrun devicectl device install app --device <id> build/DerivedData/Build/Products/Debug-iphoneos/Catkeys.app`.
+  Then Claude writes `Config/Local.xcconfig` with `DEVELOPMENT_TEAM` and `CATKEYS_BUNDLE_PREFIX`. If signing fails because the Apple ID can't provision App Groups, it also sets `CATKEYS_APP_ENTITLEMENTS =` and `CATKEYS_KB_ENTITLEMENTS =` (ruling R36, see `Local.xcconfig.example`) and records that: the app then says the App Group isn't available and the keyboard uses the default settings.
+- [ ] **Step 2: Build and install on the device.** Use the Release configuration (ruling R35): Debug inflates time and memory and would mislead the speed and memory checks. Automatic development signing still applies. The simulator screenshot script stays on Debug.
+  1. Run `xcodebuild -project Catkeys.xcodeproj -scheme Catkeys -configuration Release -destination 'platform=iOS,name=V’s iPhone' -derivedDataPath build/DerivedData -allowProvisioningUpdates build`.
+  2. Install with `xcrun devicectl device install app --device <id> build/DerivedData/Build/Products/Release-iphoneos/Catkeys.app`.
 
   Expected: the app installs.
 - [ ] **Step 3: The user enables the keyboard and Full Access.** Then check the App Group: the app's Setup tab shows "Keyboard last opened: just now" after the keyboard opens. Record whether it works. If it doesn't, file a follow-up task for design §9's in-keyboard settings fallback.
-- [ ] **Step 4: Measure.** Use `xcrun xctrace record --device <id> --template 'Logging' --attach CatkeysKeyboard --output "/Volumes/Extreme SSD/catkeys-traces/m1-signposts.trace"` while the user types for 30 s.
-  - Read the `keyDown` latency, `insert` and `startup` from the trace.
+- [ ] **Step 4: Measure the Release build from Step 2.** Use `xcrun xctrace record --device <id> --template 'Logging' --attach CatkeysKeyboard --output "/Volumes/Extreme SSD/catkeys-traces/m1-signposts.trace"` while the user types for 30 s.
+  - Read the `keyDown` latency (split by its `bottomRow` metadata), `touch`, `render`, `insert` and `startup` from the trace.
   - Record a second trace with the `Allocations` template and read `phys_footprint`.
   - Compare against design §10: insert ≤ 2 ms, startup ≤ 50 ms, UI memory ≤ 22 MB. Also check whether bottom-row `keyDown` latency is higher than other rows.
-- [ ] **Step 5: The user's feel check.** Go through this list and record the user's verdicts:
-  - Fast typing doesn't drop letters.
-  - Long-press symbols work.
-  - Cursor drag works.
-  - Backspace hold and swipe work.
-  - Shift and caps lock work.
-  - Double-space works.
-  - Email and URL fields show their variants.
-  - Dark mode works.
-  - Haptics work.
+- [ ] **Step 5: The user's feel check and the device checks.** All on the Release build from Step 2. Go through both lists and record the user's verdicts and the readings.
+  - **Feel:**
+    - Fast typing doesn't drop letters.
+    - Long-press symbols work.
+    - Cursor drag works.
+    - Backspace hold and swipe work.
+    - Shift and caps lock work.
+    - Double-space works.
+    - Email and URL fields show their variants.
+    - Dark mode works.
+    - Haptics work.
+    - Typing fast at a sentence start gives one capital, not two (ruling R34).
+    - Shift tapped off at a sentence start stays off (ruling R34).
+    - Holding space and releasing without moving types no space; the user judges whether that's right.
+    - Cursor up and down across typed line breaks works in Notes and in WhatsApp.
+    - Backspace deletes 👍🏽 and 🇮🇳 whole in a real app, and a fast cursor drag across emoji lands between characters.
+    - Landscape lays out and types correctly.
+  - **Device checks:**
+    - Memory over about 30 open/close cycles of the keyboard stays flat (Allocations `phys_footprint`), and switching away with 🌐 frees the old keyboard.
+    - Hiding the keyboard while holding backspace: when it comes back nothing more is deleted and keys work (ruling R33).
+    - The App Group works with Full Access on (Setup shows "Keyboard last opened: …"); with it off, Setup shows "Not opened yet, or Full Access is off".
+    - Haptics and the key click work with Full Access. If haptics are silent, try `UIImpactFeedbackGenerator(style:view:)`.
+    - Bottom-row `keyDown` latency against the other rows, from the trace's `bottomRow` metadata.
+    - The layouts load: the `Bundle.module` resource bundle is in the device build (a missing bundle crashes the keyboard).
+    - Colour seams above and below the keyboard: the user judges.
 
   Optionally, film catkeys against Apple's keyboard in 240 fps slow motion.
 - [ ] **Step 6: Wrap up.**
@@ -749,3 +856,120 @@ Implement this before Task 7, or alongside it, because the controller takes `Key
 ## Progress
 
 - 2026-10-21: plan written. Building on the simulator starts on branch `m1-typing-shell`, with the device check (Task 12) once the user is back.
+- 2026-10-21: Tasks 1-11 done on the simulator, each reviewed clean (commit ranges are base..last):
+  - Task 1, scaffold: `23274c0..4a7c8e2`
+  - Task 2, layouts: `e112ac0..cc2feb6`
+  - Task 3, geometry: `cc2feb6..e7e501e`
+  - Task 4, text rules: `ed19085..fb46c0b`
+  - Task 5, touch taps and long-press: `e76ddb6..bb69d35`
+  - Task 6, backspace and cursor mode: `698d4f9..dd497e8`
+  - Task 8, settings (run before Task 7, ruling R1): `e5d23d1..160b24a`
+  - Task 7, controller: `71a9a1d..1919868`
+  - Task 9, keyboard view: `08ddb66..731582d`
+  - Task 10, keyboard extension: `731582d..bfbb8cb`
+  - Task 11, container app: `bfbb8cb..0654db6`
+- 2026-10-21: final whole-branch review of `23274c0..0654db6` (ruling R32, before Task 12): ready to merge with fixes; 0 Critical, 5 Important, 4 Minor. None of the deferred minors must be fixed before merge.
+- 2026-10-21: final-review fix wave, `0654db6..95809e5` plus this plan update: stale-touch reset (R33), host-notice guard (R34), `touch`/`render` signposts and `bottomRow` metadata, Release builds for the device (R35), switchable entitlements (R36), iPhone only and clamped corner radii (R37), Setup status copy (R38). A scoped re-review follows.
+- 2026-10-21: the fix wave's scoped re-review is clean. The screenshot script was re-run, and the scripted long-press and cursor scenes still render.
+- 2026-10-22: Task 11a, the SideStore install path (ruling R39): `14e9b44..1d679ce`, reviewed clean.
+- 2026-10-22: Task 12, device check, on the user's iPhone 16 (iOS 27.0.1). This is the Release build, signed by SideStore, measured with Instruments using `--all-processes`:
+  - **Install and App Group:** installed via SideStore. The App Group survives SideStore's rename: the app shows "Keyboard last opened" from the keyboard's heartbeat.
+  - **Startup:** median 4.6 ms over 6 opens, worst 7.2 ms. Target ≤ 50 ms.
+  - **insertText:** median 0.05 ms, worst 0.15 ms.
+  - **Touch handling** (processor, controller and render per touch event): median 0.57 ms, p95 2.63 ms, worst 5.1 ms. 93% are under the 2 ms target, and all are well inside one 16.7 ms frame.
+  - **Render:** median 0.35 ms, p95 2.9 ms.
+  - **Touch delivery from iOS:** median 10.6 ms, p95 18.7 ms. The bottom row matches the other rows, so there is no system-gesture delay.
+  - **Memory:** the keyboard's footprint stays at 9.3–12.1 MiB, flat across 20–30 open/close cycles. Budget 22 MB. The container app uses 33–37 MiB.
+  - **The user's feel test:** "the feel is great. it is snappy and taps are accurate." Every checklist item works. The stale-touch edge case is not tested yet. The emoji key opening nothing is expected until the emoji panel milestone.
+- 2026-10-22: Task 12b, look polish from the feel test (R41, R42): `be31339..6262fe1`, reviewed clean. The emoji key is now an icon, and the keys sit on iOS's Liquid Glass keyboard backdrop.
+- 2026-10-22: the app icon was added (`9afb4c7`). Milestone 1 is closed and merged to `main`. Next comes the emoji panel (milestone 3), moved ahead of the suggestion row at the user's request.
+
+## Rulings
+
+Decisions made while building, one line each. The ledger behind them is local and not in git.
+
+- R1: Task 8 (settings) runs before Task 7 (controller), which consumes `KeyboardSettings`.
+- R2: The smoke test uses `CoreInfo.version`; a type named like its module (`KeyboardCore`) breaks module-qualified lookup.
+- R3: `KeySpec.cornerHint` is `longPress.first` for character keys; the view draws hints only on rows between the number row and the bottom row.
+- R4: Backspace switches to word deletes at exactly 1.5 s after touch-down, then every 0.2 s; character repeats stop before 1.5 s.
+- R5: The preview host uses a no-op `FeedbackSink`.
+- R6: Process only (how the build was run); no effect on the product.
+- R7: The keyboard's Info.plist sets `IsASCIICapable = true`.
+- R8: The globe key's spec lives in `Layouts/index.json` as `globeKey`; the controller inserts it.
+- R9: Hit-testing picks the row first (bands split at the gap midpoints), then the horizontally nearest key in it.
+- R10: `FakeTextDocument` returns nil for an empty side, as iOS does.
+- R11: Sentence ends use Unicode `isSentenceTerminal`, not a hard-coded `. ! ?`.
+- R12: `TextDocument` (and the fake) is `@MainActor`.
+- R13: Long-press options come in display order: rightward from the key's left edge when they fit, else leftward with the default in the cell ending at the key's right edge; the selection is the cell under the finger.
+- R14: Return joins rollover.
+- R15: A touch-down reusing a still-down `TouchID` ends the stale touch as a lift would.
+- R16: One long-press popup at a time: while one shows, other touches get no long-press.
+- R17: Alternate-index maths falls back to the default option on non-finite values or a zero cell width.
+- R18: The backspace swipe emits `.deleteRestOfWord`, applied with `TextRules.trailingRunLength(before:)`; held-backspace word repeats keep `.deleteBackward(word: true)`.
+- R19: Cursor mode starting stops a deleting backspace.
+- R20: An apostrophe after a word character joins the word run, even at the end of the text.
+- R21: Settings tests use an absolute-path suite in a per-run temporary directory, leaving nothing in `~/Library/Preferences`.
+- R22: `SettingsStore.appGroup(id:)` also requires the App Group's container to exist.
+- R23: `fieldDidChange` re-picks the page and bottom row only when the traits change.
+- R24 (amended): Every shift tap records its time; a tap within 0.3 s of the previous shift tap locks caps from any state but locked; anything else typed or deleted clears that history.
+- R25: Shift changes only single-grapheme outputs; ".com" is typed as written.
+- R26: Double space also needs the text before the cursor unchanged since the first space.
+- R27: Replacing the frames sends a finger choosing an option back to pressed, so it types its own key.
+- R28: `keyboardWillAppear(_:)` resets the page and bottom row from the traits, clears the shift history and re-checks capitals; the extension calls it from `viewWillAppear`.
+- R29: The controller shows the popup exactly while the processor's `isShowingAlternates` is true.
+- R30: Replacing the frames also cancels pending long-presses of held character keys.
+- R31: Accept the dark popup colour #828286 and 21 pt single-character labels on the bottom row.
+- R32: The final whole-branch review runs before Task 12, which needs the user and the phone.
+- R33: Stale touches are reset: `TouchProcessor.cancelAll()`, `KeyboardController.cancelAllTouches()` (also at the start of `keyboardWillAppear`), called by `KeyboardView` on window changes and for touches UIKit no longer reports.
+- R34: `documentDidChange` and same-traits `fieldDidChange` do nothing when the text before the cursor is what the controller last saw.
+- R35: Device installs and measurements use `-configuration Release`; Debug only for the simulator script.
+- R36: Entitlements come from `CATKEYS_APP_ENTITLEMENTS` and `CATKEYS_KB_ENTITLEMENTS`, so `Local.xcconfig` can build without the App Group.
+- R37: iPhone only (`TARGETED_DEVICE_FAMILY = 1`), and rounded-rect radii are clamped to min(r, w/2, h/2).
+- R38: With no heartbeat, the Setup status reads "Not opened yet, or Full Access is off".
+- R39: Install through SideStore with an unsigned IPA (`scripts/build-ipa.sh`), not Xcode free signing. SideStore renames the App Group, so `AppGroupResolver` finds the real group in `embedded.mobileprovision`.
+- R40: The resolved App Group is cached once per process.
+- R41: The emoji key shows an SF Symbol (`face.smiling`) through the optional `KeySpec.icon` in layout JSON. The rendered image is cached.
+- R42: The key grid's background is clear, so iOS's keyboard backdrop (Liquid Glass on iOS 26 and 27) shows through.
+
+## Deferred to later milestones
+
+Minor review findings left for later, one line each.
+
+- **Task 1:** the `appintentsmetadataprocessor` "Metadata extraction skipped" warnings are toolchain noise; `swift test` builds into `Packages/CatkeysCore/.build` (gitignored), not `build/`.
+- **Task 2:**
+  - `LayoutSet.bundled()` doesn't check cross-file page refs; add a test that resolves them all.
+  - A missing "default" bottom row decodes silently to `[]`.
+  - The bottom rows are repeated in each page file with no test against drift.
+  - Field-variant tests check that keys are present, not where.
+  - No tests for decode failures (unknown action, empty `page:`).
+- **Task 3:**
+  - `totalHeight` assumes exactly one number row; `rowCount` ≤ 0 gives nonsense.
+  - Force-unwraps in tests; variants and ties untested.
+  - `KeySpec` accepts fractional widths in (0, 1), which can go negative at tiny units.
+- **Task 4:**
+  - The fake doesn't merge combining marks or modifiers on insert (needed for Indic scripts).
+  - `.sentences` after whitespace containing a newline doesn't capitalise, and a closing quote or bracket after a terminal blocks the capital.
+  - One word delete can cross several blank lines plus punctuation.
+  - No goal column across repeated vertical moves.
+  - Coverage gaps (CRLF, combining marks, `.words` with nil); "1️⃣" counts as a digit for double space.
+  - `previousWordLength` builds an array on every word delete; walk back with `String.Index` instead.
+  - The sentence-terminal check ignores a trailing variation selector ("‼️").
+- **Task 5:**
+  - R13's clamp branch and keys wider than 72 pt can leave the default cell away from the finger (unreachable on iPhone portrait).
+  - M2: a suggestion-row tap while a letter is held must roll the letter over first.
+- **Task 6:**
+  - Move the repeat schedule, trackpad maths and popup layout onto phase structs before glide typing adds a phase.
+  - `fireTimer`'s `default: break` silently absorbs unhandled phase/action pairs.
+  - R20 isn't applied in the punctuation-run scan ("dogs'." → 2).
+  - The `deleteRestOfWord` doc overclaims after a trailing "?" or emoji; reword it.
+- **Task 7:**
+  - `KeyboardState` and `AlternatesPopup` have no public inits.
+  - "symbols-1" and ". " are Swift constants; move them to `index.json` with the second layout set.
+  - A held emoji or globe key, or a choosing finger, between shift taps doesn't break the double-tap; no test for shift, backspace, shift.
+- **Task 9:**
+  - R3 is applied by row index rather than a row kind on `KeyFrame`.
+  - The display link advances to `systemUptime`, so a lift delivered late within one frame of the long-press deadline can open the popup.
+  - No display-link invalidation in `deinit`; the popup cell width is read from a default `TouchTiming()`; small quoting and `awk` SIGPIPE nits in the script; the view's rules can't be unit-tested in the UIKit target.
+- **Task 10:** the `startup` interval stays open if the layouts fail to load; `onChange` chaining depends on order (documented); the traits mapping is untested; an empty `ClickingInputView` is kept per appearance (negligible).
+- **Task 11:** VoiceOver reads "Long-press delay" twice; step numbers are decorative for VoiceOver; "just now" is hard-coded English; the status row is empty before `onAppear`; the `-catkeysTab` hook ships in release builds.
+- **Final review, out of M1 scope:** no modifier-shift or slide-from-shift; 😊 does nothing until M3; no automatic return to letters after a symbol; no `enablesReturnKeyAutomatically`; no VoiceOver for the key grid; suggestion-row taps ignored; no accented letters; `ReturnKeyLabel` and ⇪ live in Swift; exact colours left to the device comparison.

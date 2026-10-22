@@ -1,0 +1,61 @@
+# XcodeGen spec. Run `xcodegen generate` to create Catkeys.xcodeproj (gitignored).
+name: Catkeys
+
+options:
+  createIntermediateGroups: true
+
+# Shared settings, including the optional, gitignored Config/Local.xcconfig.
+# Signing and bundle-prefix settings live only in the xcconfig files, so that
+# Local.xcconfig can override them.
+configFiles:
+  Debug: Config/Base.xcconfig
+  Release: Config/Base.xcconfig
+
+settings:
+  base:
+    MARKETING_VERSION: 0.1.0
+    CURRENT_PROJECT_VERSION: 1
+
+packages:
+  CatkeysCore:
+    path: Packages/CatkeysCore
+
+targets:
+  Catkeys:
+    type: application
+    platform: iOS
+    sources:
+      - App
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(CATKEYS_BUNDLE_PREFIX).catkeys
+        INFOPLIST_FILE: App/Info.plist
+        # From the xcconfig files, so Local.xcconfig can build without the App Group.
+        CODE_SIGN_ENTITLEMENTS: $(CATKEYS_APP_ENTITLEMENTS)
+        # iPhone only, as the design says.
+        TARGETED_DEVICE_FAMILY: "1"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+    dependencies:
+      - target: CatkeysKeyboard
+      - package: CatkeysCore
+        product: KeyboardCore
+      - package: CatkeysCore
+        product: KeyboardUI
+    scheme: {}
+
+  CatkeysKeyboard:
+    type: app-extension
+    platform: iOS
+    sources:
+      - Keyboard
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(CATKEYS_BUNDLE_PREFIX).catkeys.keyboard
+        INFOPLIST_FILE: Keyboard/Info.plist
+        CODE_SIGN_ENTITLEMENTS: $(CATKEYS_KB_ENTITLEMENTS)
+        TARGETED_DEVICE_FAMILY: "1"
+    dependencies:
+      - package: CatkeysCore
+        product: KeyboardCore
+      - package: CatkeysCore
+        product: KeyboardUI

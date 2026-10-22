@@ -1,0 +1,62 @@
+{
+  "id": "symbols-1",
+  "rows": [
+    {
+      "kind": "number",
+      "keys": [
+        {"label": "1"}, {"label": "2"}, {"label": "3"}, {"label": "4"}, {"label": "5"},
+        {"label": "6"}, {"label": "7"}, {"label": "8"}, {"label": "9"}, {"label": "0"}
+      ]
+    },
+    {
+      "kind": "keys",
+      "keys": [
+        {"label": "@"}, {"label": "#"}, {"label": "₹"}, {"label": "$"}, {"label": "_"},
+        {"label": "&"}, {"label": "-"}, {"label": "+"}, {"label": "("}, {"label": ")"}
+      ]
+    },
+    {
+      "kind": "keys",
+      "keys": [
+        {"label": "*"}, {"label": "\""}, {"label": "'"}, {"label": ":"}, {"label": ";"},
+        {"label": "!"}, {"label": "?"}, {"label": "/"}, {"label": "%"}, {"label": "="}
+      ]
+    },
+    {
+      "kind": "keys",
+      "keys": [
+        {"label": "1/2", "action": "page:symbols-2", "width": 1.5},
+        {"label": "<"}, {"label": ">"}, {"label": "["}, {"label": "]"},
+        {"label": "{"}, {"label": "}"}, {"label": "|"},
+        {"label": "⌫", "action": "backspace", "width": 1.5}
+      ]
+    }
+  ],
+  "bottom": {
+    "default": [
+      {"label": "ABC", "action": "page:letters", "width": 1.5},
+      {"label": "😊", "action": "emoji", "icon": "face.smiling"},
+      {"label": ","},
+      {"label": "space", "output": " ", "action": "space", "width": 0},
+      {"label": ".", "longPress": [".", "?", "!", "…", ":", "/"]},
+      {"label": "return", "output": "\n", "action": "return", "width": 2}
+    ],
+    "email": [
+      {"label": "ABC", "action": "page:letters", "width": 1.5},
+      {"label": "😊", "action": "emoji", "icon": "face.smiling"},
+      {"label": "@"},
+      {"label": "space", "output": " ", "action": "space", "width": 0},
+      {"label": ".", "longPress": [".", "?", "!", "…", ":", "/"]},
+      {"label": "return", "output": "\n", "action": "return", "width": 2}
+    ],
+    "url": [
+      {"label": "ABC", "action": "page:letters", "width": 1.5},
+      {"label": "😊", "action": "emoji", "icon": "face.smiling"},
+      {"label": "/"},
+      {"label": "space", "output": " ", "action": "space", "width": 0},
+      {"label": ".com", "width": 1.5},
+      {"label": ".", "longPress": [".", "?", "!", "…", ":", "/"]},
+      {"label": "return", "output": "\n", "action": "return", "width": 2}
+    ]
+  }
+}
