@@ -309,6 +309,8 @@ public struct TypingRunStore { public init(defaults: UserDefaults); public func 
 - M3-R9: the app gets a typing test (Task 4b), which the user approved.
 - M3-R10: the skin popup pre-selects the variant the cell shows, the remembered tone, and places it under the finger.
 - M3-R11: the decoded emoji catalog stays loaded for the keyboard process and is dropped only on a memory warning.
+- M3-R12: 0.3 s after the keys first draw, once per process and at utility priority, catkeys draws Recent plus the first category's first 64 emoji into a tiny offscreen bitmap. Tab icons render on the main thread, one per run-loop turn. This avoids a slow first open: 172 ms becomes 35 ms on the simulator.
+- M3-R13: the warm-up decodes the catalog, reads its emoji list and drops it, so the panel still decodes on first open. This keeps the plan's memory rule.
 - Data: `emoji.json` also carries `recentIcon` (`clock`), so no SF Symbol name is hard-coded in Swift.
 
 ## Progress
