@@ -239,6 +239,22 @@ import KeyboardCore
         #expect(k.controller.state.pageID == "symbols-1" && bottom().contains("@") && hasKey("1", k))
     }
 
+    @Test func pageKeyReadsABCBesideTheGlobeKey() throws {
+        // With the globe key in the row (just left of 😊), the page key still reads ABC, and the globe still switches.
+        let k = try Harness()
+        var globes = 0
+        k.controller.onGlobe = { globes += 1 }
+        k.controller.needsGlobeKey = true
+        try k.tap("😊")
+        k.controller.openEmojiSearch()
+        let bottom = k.controller.frames.filter { $0.row == k.controller.frames.last?.row }.map(\.key.label)
+        #expect(bottom == ["ABC", "🌐", "😊", ",", "space", ".", "return"])
+        try k.tap("🌐")
+        #expect(globes == 1 && k.controller.state.panel == .emojiSearch)
+        try k.tap("ABC")
+        #expect(k.controller.state.panel == .emoji)
+    }
+
     @Test func emojiKeyGoesBackToThePanel() throws {
         let k = try searching("ok")
         try type("a", into: k)

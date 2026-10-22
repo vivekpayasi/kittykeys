@@ -75,9 +75,15 @@ public enum ReturnKeyLabel {
     /// - "emojiPanelOpen", from the emoji panel opening to its first frame with emoji drawn;
     /// - "emojiSearchOpen", from search opening (a touch on the search field) to its first frame with the keys and the
     ///   results drawn, including the first search's keyword load;
-    /// - "emojiSearchQuery", from a change to the query to the frame with its results drawn.
+    /// - "emojiSearchQuery", from a change to the query (the first whose results don't show yet) to the frame with its
+    ///   results drawn, which comes after the keystroke's own frame (ruling M3-R20);
+    /// - "emojiSearchDraw", drawing the emoji results show for the first time off the main thread, before they show.
     /// The keyboard extension begins a signpost interval here. Without it nothing is timed.
     public var startMeasure: ((_ name: StaticString) -> @MainActor @Sendable () -> Void)?
+    /// Whether emoji search's caret blinks. The app's preview turns it off, so screenshots always show it.
+    public var blinksSearchCaret = true {
+        didSet { searchField?.blinks = blinksSearchCaret }
+    }
     /// Called once, after the first render that drew keys. The keyboard extension ends its startup measurement with it.
     public var onFirstKeysDrawn: (() -> Void)?
 
@@ -399,17 +405,11 @@ public enum ReturnKeyLabel {
         CATransaction.commit()
     }
 
-    /// The query changed in search: the field shows it, and the results follow. Timed as "emojiSearchQuery", until Core
-    /// Animation has committed the frame with the new results drawn.
+    /// The query changed in search: the field shows it in this keystroke's frame, and the results follow on a later
+    /// turn of the run loop, so they never hold up typing (ruling M3-R20). The results time it as "emojiSearchQuery".
     private func updateSearch(query: String) {
-        // Before the timed transaction, for the caret's blink as in `openEmojiSearch(query:)`.
         searchField?.show(.editing(query: query))
-        guard let searchResults, searchResults.query != query else { return }
-        let endMeasure = startMeasure?("emojiSearchQuery")
-        CATransaction.begin()
-        CATransaction.setCompletionBlock(endMeasure.map { end in { MainActor.assumeIsolated { end() } } })
-        searchResults.show(query: query)
-        CATransaction.commit()
+        searchResults?.request(query: query)
     }
 
     private func makeEmojiPanel() -> EmojiPanelView {
@@ -436,6 +436,7 @@ public enum ReturnKeyLabel {
             placeholder: data?.searchPlaceholder ?? "", icon: data?.searchIcon ?? "",
             clearIcon: data?.searchClearIcon ?? "")
         searchField.theme = theme
+        searchField.blinks = blinksSearchCaret
         searchField.onOpen = { [weak self] in
             guard let self, controller.state.panel == .emoji else { return }
             feedback.keyDown()
@@ -459,6 +460,7 @@ public enum ReturnKeyLabel {
             guard let self else { return work() }
             measuring(name, work)
         }
+        searchResults.startMeasure = { [weak self] name in self?.startMeasure?(name) ?? {} }
         searchResults.onTyped = { [weak self] in self?.emojiPanel?.emojiTypedElsewhere() }
         addSubview(searchResults)
         self.searchResults = searchResults

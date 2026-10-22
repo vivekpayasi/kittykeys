@@ -48,6 +48,13 @@ final class EmojiSearchField: UIView {
         }
     }
 
+    /// Whether the caret blinks; when off it stays lit.
+    var blinks = true {
+        didSet {
+            guard blinks != oldValue, case .editing = mode else { return }
+            restartBlinking()
+        }
+    }
     private(set) var mode = Mode.button
     private let field = CALayer()
     private let magnifier = CALayer()
@@ -185,6 +192,7 @@ final class EmojiSearchField: UIView {
     /// The caret blinks as a text field's does: lit for a moment, then on and off once a second.
     private func restartBlinking() {
         caret.removeAnimation(forKey: Self.blinkKey)
+        guard blinks else { return }
         let blink = CAKeyframeAnimation(keyPath: "opacity")
         blink.values = [1, 0]
         blink.keyTimes = [0, 0.5, 1]

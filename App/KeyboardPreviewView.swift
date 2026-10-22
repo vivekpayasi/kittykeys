@@ -101,6 +101,8 @@ final class KeyboardPreviewHost: UIView {
         controller.keyboardWillAppear(FieldTraits())
         keyboardView = KeyboardView(
             controller: controller, feedback: SilentFeedback(), emojiPreferences: Self.sampleEmojiPreferences())
+        // A steady caret, so every screenshot of search shows it.
+        keyboardView.blinksSearchCaret = false
         super.init(frame: .zero)
         backgroundColor = .systemBackground
         backdrop.backgroundColor = theme.backdrop

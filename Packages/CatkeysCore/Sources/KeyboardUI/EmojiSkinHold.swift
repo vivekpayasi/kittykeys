@@ -53,6 +53,11 @@ import UIKit
         host.addSubview(popup)
     }
 
+    /// Whether a hold's popup shows, waiting for the finger to pick.
+    var isHolding: Bool {
+        holding != nil
+    }
+
     /// Ends a hold: the popup hides, and its lift types nothing.
     func cancel() {
         // Disabling a recognizer cancels it.

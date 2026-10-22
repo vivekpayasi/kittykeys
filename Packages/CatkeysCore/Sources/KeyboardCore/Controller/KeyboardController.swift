@@ -491,19 +491,25 @@
     }
 
     /// The page's bottom row for the field, with the globe key just left of the emoji key when needed
-    /// (second in a row without one). In search, the row's first page key reads as the layout's way back to the
-    /// letters, ABC, since it goes back to the emoji panel (ruling M3-R18); it keeps its place and width.
+    /// (second in a row without one). In search, its page key reads ABC (`searchBottomRow(_:letters:)`).
     private func bottomRow(of page: LayoutPage) -> [KeySpec] {
         var row = page.bottomRow(bottomVariant)
         if needsGlobeKey, let globe = layouts.globeKey {
             row.insert(globe, at: row.firstIndex { $0.action == .emoji } ?? min(1, row.count))
         }
-        if framesAreForSearch, let index = row.firstIndex(where: \.isPageKey),
-            let letters = layouts.firstKey(where: { $0.action == .switchPage(.letters) })
-        {
-            row[index].label = letters.label
-            row[index].icon = letters.icon
-        }
+        guard framesAreForSearch else { return row }
+        return Self.searchBottomRow(row, letters: layouts.firstKey { $0.action == .switchPage(.letters) })
+    }
+
+    /// Search's bottom row (ruling M3-R18). Every page key there goes back to the emoji panel, so the row's first page
+    /// key reads as `letters`, the layout's way back to the letters (ABC): its label and icon, in the key's own place
+    /// and width. A later page key keeps its label; the letters page has none. With no such key in the layout
+    /// (`letters` nil) the row is unchanged, and its page key still goes back.
+    nonisolated static func searchBottomRow(_ row: [KeySpec], letters: KeySpec?) -> [KeySpec] {
+        guard let letters, let index = row.firstIndex(where: \.isPageKey) else { return row }
+        var row = row
+        row[index].label = letters.label
+        row[index].icon = letters.icon
         return row
     }
 

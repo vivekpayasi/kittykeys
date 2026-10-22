@@ -84,7 +84,8 @@ final class KeyboardViewController: UIInputViewController {
         }
         // "emojiPanelOpen": the emoji panel opening, to its first frame committed with the emoji drawn.
         // "emojiSearchOpen": a touch on the search field, to search's first frame committed with its keys and results.
-        // "emojiSearchQuery": a change to the search query, to the frame committed with its results drawn.
+        // "emojiSearchQuery": a change to the search query, to the later frame committed with its results drawn.
+        // "emojiSearchDraw": drawing results' first-seen emoji off the main thread, before they show.
         keyboardView.startMeasure = { name in
             let state = signposter.beginInterval(name)
             return { signposter.endInterval(name, state) }

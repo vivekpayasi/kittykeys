@@ -12,18 +12,30 @@ import UIKit
 /// - **Data:** the catalog comes from `EmojiCatalogStore.shared` (the panel opened it first) and the keywords from
 ///   `EmojiSearchStore.shared`, which loads them the first time search opens and keeps them for the keyboard process.
 ///   Every query runs on the store's prepared search, made once per catalog.
+/// - **Results never block typing** (ruling M3-R20). A query change only records the query. Its results show on a later
+///   turn of the run loop, after the keystroke's own frame has gone out. Before that, the emoji they show first that
+///   this process hasn't drawn yet are drawn off the main thread (`EmojiFontWarmup.draw`), so showing them is quick.
+///   Keystrokes meanwhile replace the query, so only the latest one's results show, and results never change under a
+///   finger on the row, so a lift always types the emoji it pressed.
 /// - Recent and the skin tones are read when search opens. Recent is read again at the next query change after
 ///   something was typed, so results never reshuffle under a finger.
 /// - Nothing types unless search shows, and no touch reaches the keyboard view behind.
 final class EmojiSearchResultsView: UIView, UICollectionViewDataSource, UICollectionViewDelegateFlowLayout {
     private static let logger = Logger(subsystem: "catkeys", category: "emoji")
-    /// Each result's width. The row is the band's height, and the emoji are the panel's size.
-    private static let cellWidth: CGFloat = 44
+    /// About how wide each result is. The width is fitted so that part of a result always shows at the row's end, which
+    /// says the row scrolls. The row is the band's height, and the emoji are the panel's size.
+    private static let preferredCellWidth: CGFloat = 46
     /// Space before the first result and after the last, as beside the keys.
     private static let sideInset: CGFloat = 3
+    /// How often to look again whether a finger has left the row, while results wait for it.
+    private static let touchRetryDelay = 0.05
 
     /// Runs a stretch of work for timing ("emojiInsert"); the keyboard view passes its own `measure` through.
     var measure: ((_ name: StaticString, _ work: () -> Void) -> Void)?
+    /// Starts timing a stretch and returns the call that ends it: "emojiSearchQuery", from a query change (the first
+    /// whose results don't show yet) to the committed frame that shows its results, and "emojiSearchDraw", the
+    /// off-the-main-thread drawing of results' first-seen emoji. The keyboard view passes its own `startMeasure` through.
+    var startMeasure: ((_ name: StaticString) -> @MainActor @Sendable () -> Void)?
     /// A result was typed: Recent and maybe a skin tone changed, which the panel reads again when it next opens.
     var onTyped: (() -> Void)?
     var theme: KeyboardTheme = .light {
@@ -38,8 +50,19 @@ final class EmojiSearchResultsView: UIView, UICollectionViewDataSource, UICollec
         }
     }
 
-    /// The query whose results show; nil before the first, and after a reopen until it shows them.
+    /// The query whose results show; nil before the first.
     private(set) var query: String?
+    /// The latest query asked for whose results don't show yet; nil when they do.
+    private var wantedQuery: String?
+    /// The wanted query's results, once worked out.
+    private var wantedResults: (query: String, results: [(variant: String, item: EmojiItem)])?
+    private var isStepScheduled = false
+    /// Whether emoji the wanted results show are being drawn off the main thread.
+    private var isDrawing = false
+    /// Ends the "emojiSearchQuery" interval of the first query change whose results don't show yet.
+    private var endQueryMeasure: (@MainActor @Sendable () -> Void)?
+    /// For the app's preview: the emoji to hold once the wanted results show.
+    private var heldForPreview: String?
 
     private let controller: KeyboardController
     private let feedback: any FeedbackSink
@@ -124,18 +147,18 @@ final class EmojiSearchResultsView: UIView, UICollectionViewDataSource, UICollec
             let reason = String(describing: error)
             Self.logger.error("Emoji search can't load its data, so it shows only Recent: \(reason, privacy: .public)")
         }
-        query = nil
-        show(query: controller.state.searchQuery)
+        // Search's first frame shows the results at once (they are Recent, which the font warm-up drew).
+        dropWanted()
+        let query = controller.state.searchQuery
+        show(query, results(for: query))
     }
 
-    /// Shows the results for `query`, scrolled to the start, unless they show already.
-    func show(query: String) {
-        guard query != self.query else { return }
-        self.query = query
-        results = results(for: query)
-        collectionView.reloadData()
-        collectionView.setContentOffset(.zero, animated: false)
-        collectionView.layoutIfNeeded()
+    /// The query changed. Its results show later, as the type's description says. Timed as "emojiSearchQuery".
+    func request(query: String) {
+        guard query != (wantedQuery ?? self.query) else { return }
+        wantedQuery = query
+        if endQueryMeasure == nil { endQueryMeasure = startMeasure?("emojiSearchQuery") }
+        scheduleStep()
     }
 
     /// Search is hidden, or the keyboard leaves the screen: a hold and a scroll in progress end.
@@ -147,8 +170,13 @@ final class EmojiSearchResultsView: UIView, UICollectionViewDataSource, UICollec
         collectionView.setContentOffset(CGPoint(x: x, y: 0), animated: false)
     }
 
-    /// For the app's preview: scrolls `emoji`'s result into view and shows its skin popup as if a finger held it there.
+    /// For the app's preview: scrolls `emoji`'s result into view and shows its skin popup as if a finger held it there,
+    /// once the results asked for show.
     func showHoldForPreview(_ emoji: String) {
+        guard wantedQuery == nil else {
+            heldForPreview = emoji
+            return
+        }
         guard let base = catalog?.index.lookup(emoji)?.item.base,
             let index = results.firstIndex(where: { $0.item.base == base })
         else { return }
@@ -160,6 +188,87 @@ final class EmojiSearchResultsView: UIView, UICollectionViewDataSource, UICollec
         let shown = results[index]
         skinHold.showForPreview(
             EmojiSkinHold.Target(item: shown.item, shown: shown.variant, cell: rect), fingerX: Double(rect.midX))
+    }
+
+    // MARK: Showing results
+
+    /// Runs `step()` on a later turn of the run loop, after `delay` seconds; once, however often it is asked.
+    private func scheduleStep(after delay: TimeInterval = 0) {
+        guard !isStepScheduled else { return }
+        isStepScheduled = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+            MainActor.assumeIsolated { self?.step() }
+        }
+    }
+
+    /// Moves the wanted query on: works out its results, draws the first-seen emoji among those that show first off the
+    /// main thread (then comes back here), waits for a finger on the row to lift, and shows them. A query that changed
+    /// meanwhile is worked out afresh, so stale work is dropped.
+    private func step() {
+        isStepScheduled = false
+        guard isOpen else { return dropWanted() }
+        guard let wanted = wantedQuery, !isDrawing else { return }
+        let results: [(variant: String, item: EmojiItem)]
+        if let worked = wantedResults, worked.query == wanted {
+            results = worked.results
+        } else {
+            results = self.results(for: wanted)
+            wantedResults = (wanted, results)
+        }
+        let firstSeen = EmojiFontWarmup.notYetDrawn(results.prefix(visibleCount).map(\.variant), limit: visibleCount)
+        guard firstSeen.isEmpty else {
+            isDrawing = true
+            let endDraw = startMeasure?("emojiSearchDraw")
+            EmojiFontWarmup.draw(firstSeen, scale: max(traitCollection.displayScale, 1)) { [weak self] in
+                endDraw?()
+                self?.isDrawing = false
+                self?.step()
+            }
+            return
+        }
+        // A lift would type whatever the cell under it shows by then.
+        guard !collectionView.isTracking, !collectionView.isDragging, !skinHold.isHolding else {
+            return scheduleStep(after: Self.touchRetryDelay)
+        }
+        wantedQuery = nil
+        wantedResults = nil
+        let endMeasure = endQueryMeasure
+        endQueryMeasure = nil
+        CATransaction.begin()
+        CATransaction.setCompletionBlock(endMeasure.map { end in { MainActor.assumeIsolated { end() } } })
+        show(wanted, results)
+        CATransaction.commit()
+        if let emoji = heldForPreview {
+            heldForPreview = nil
+            showHoldForPreview(emoji)
+        }
+    }
+
+    /// Forgets the query asked for, as when search closes or opens again; its timing ends here.
+    private func dropWanted() {
+        wantedQuery = nil
+        wantedResults = nil
+        heldForPreview = nil
+        if let endMeasure = endQueryMeasure {
+            endQueryMeasure = nil
+            endMeasure()
+        }
+    }
+
+    /// Shows `results` for `query`, scrolled to the start. Their emoji count as drawn from now on.
+    private func show(_ query: String, _ results: [(variant: String, item: EmojiItem)]) {
+        self.query = query
+        self.results = results
+        collectionView.reloadData()
+        collectionView.setContentOffset(.zero, animated: false)
+        collectionView.layoutIfNeeded()
+        EmojiFontWarmup.markDrawn(results.prefix(visibleCount).map(\.variant))
+    }
+
+    /// About how many results show at once, with the part-shown one.
+    private var visibleCount: Int {
+        let count = bounds.width / max(layout.itemSize.width, 1)
+        return count.isFinite ? min(max(Int(count.rounded(.up)), 1), 20) : 10
     }
 
     /// Recent's emoji for an empty query, else the search's matches in their picked skin tones.
@@ -183,7 +292,15 @@ final class EmojiSearchResultsView: UIView, UICollectionViewDataSource, UICollec
         if collectionView.frame != bounds { collectionView.frame = bounds }
         // As tall as the row, in whole points, and never empty: the flow layout needs a positive size.
         let height = bounds.height.isFinite ? max(bounds.height.rounded(.down), 1) : 1
-        let itemSize = CGSize(width: Self.cellWidth, height: height)
+        // As many whole results as fit at about the preferred width, and half of one more, so the last one shows cut
+        // off: 8.5 on a 390-point-wide iPhone (45 points each), 9.5 on a 440-point one (46).
+        let available = bounds.width - Self.sideInset
+        var width = Self.preferredCellWidth
+        if available.isFinite, available > Self.preferredCellWidth {
+            let whole = (available / Self.preferredCellWidth).rounded(.down)
+            width = max((available / (whole + 0.5)).rounded(.down), 1)
+        }
+        let itemSize = CGSize(width: width, height: height)
         if layout.itemSize != itemSize { layout.itemSize = itemSize }
     }
 
