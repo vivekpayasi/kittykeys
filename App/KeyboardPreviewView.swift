@@ -175,7 +175,10 @@ final class KeyboardPreviewHost: UIView {
         UserDefaults.standard.removePersistentDomain(forName: emojiSuite)
         let preferences = EmojiPreferences(defaults: UserDefaults(suiteName: emojiSuite) ?? .standard)
         for emoji in sampleRecent.reversed() { preferences.recordUse(emoji, base: emoji) }
-        preferences.setPreferredVariant("👍🏽", for: "👍")
+        // The edge scenes' emoji remember the third skin, so their popups show it picked away from the finger.
+        for (variant, base) in [("👍🏽", "👍"), ("👉🏽", "👉"), ("👈🏽", "👈")] {
+            preferences.setPreferredVariant(variant, for: base)
+        }
         return preferences
     }
 

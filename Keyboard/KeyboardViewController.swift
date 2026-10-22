@@ -78,9 +78,14 @@ final class KeyboardViewController: UIInputViewController {
                 "keyDown", "latencyMs=\(latency, format: .fixed(precision: 2)) bottomRow=\(bottomRow)")
         }
         // "touch": each batch of touches through the touch processor and the controller; "render": each redraw;
-        // "emojiPanelOpen": the emoji panel opening, to its first layout with emoji; "emojiInsert": each emoji it types.
+        // "emojiInsert": each emoji the panel types.
         keyboardView.measure = { name, work in
             signposter.withIntervalSignpost(name, around: work)
+        }
+        // "emojiPanelOpen": the emoji panel opening, to its first frame committed with the emoji drawn.
+        keyboardView.startMeasure = { name in
+            let state = signposter.beginInterval(name)
+            return { signposter.endInterval(name, state) }
         }
         keyboardView.onFirstKeysDrawn = { [weak self] in self?.endStartupInterval() }
         // The view redraws from onChange; the height follows the page too.

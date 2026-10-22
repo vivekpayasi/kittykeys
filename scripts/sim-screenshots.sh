@@ -24,7 +24,8 @@ SCENES=(
   "hold-period|-catkeysPreview -catkeysPreviewHold ."
   "cursor|-catkeysPreview -catkeysPreviewCursor"
   "emoji|-catkeysPreview -catkeysPreviewEmoji"
-  # Skin-tone popups at a middle column, the left-most column and the right-most column (8 columns at 402 points).
+  # Skin-tone popups at a middle column (base remembered), and at the left-most and right-most columns (the third skin
+  # remembered, so it starts picked though the edge keeps it from the finger). 8 columns at 402 points.
   "emoji-hold|-catkeysPreview -catkeysPreviewEmojiHold 👋"
   "emoji-hold-left|-catkeysPreview -catkeysPreviewEmojiHold 👉"
   "emoji-hold-right|-catkeysPreview -catkeysPreviewEmojiHold 👈"

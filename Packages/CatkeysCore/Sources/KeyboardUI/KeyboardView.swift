@@ -60,10 +60,13 @@ public enum ReturnKeyLabel {
     /// before the controller sees the touch. The keyboard extension measures touch delivery with it.
     public var onTouchDown: ((_ timestamp: TimeInterval, _ isBottomRow: Bool) -> Void)?
     /// Runs a stretch of the view's work, for timing: "touch" for each batch of touches handed to the controller
-    /// (the touch processor and the controller's whole response), "render" for each `render()`, "emojiPanelOpen" from
-    /// the emoji panel opening to its first layout with emoji, and "emojiInsert" for each emoji the panel types.
-    /// The keyboard extension wraps `work` in a signpost interval. Without it the work just runs.
+    /// (the touch processor and the controller's whole response), "render" for each `render()`, and "emojiInsert" for
+    /// each emoji the panel types. The keyboard extension wraps `work` in a signpost interval. Without it the work just runs.
     public var measure: ((_ name: StaticString, _ work: () -> Void) -> Void)?
+    /// Starts timing a stretch that ends only once Core Animation has committed and drawn it, and returns the call that
+    /// ends it: "emojiPanelOpen", from the emoji panel opening to its first frame with emoji drawn. The keyboard
+    /// extension begins a signpost interval here. Without it nothing is timed.
+    public var startMeasure: ((_ name: StaticString) -> @MainActor @Sendable () -> Void)?
     /// Called once, after the first render that drew keys. The keyboard extension ends its startup measurement with it.
     public var onFirstKeysDrawn: (() -> Void)?
 
@@ -275,12 +278,13 @@ public enum ReturnKeyLabel {
 
     // MARK: Emoji panel
 
-    /// Frees the emoji panel, its decoded emoji and its cells, unless it is showing; it is made again when it next opens.
-    /// The keyboard extension calls this on a memory warning.
+    /// Frees the emoji panel and its cells, and the decoded emoji kept for the process, unless the panel is showing.
+    /// The next open makes the panel and decodes the emoji again. The keyboard extension calls this on a memory warning.
     public func didReceiveMemoryWarning() {
-        guard shownPanel == .keys, let emojiPanel else { return }
-        emojiPanel.removeFromSuperview()
-        self.emojiPanel = nil
+        guard shownPanel == .keys else { return }
+        emojiPanel?.removeFromSuperview()
+        emojiPanel = nil
+        EmojiCatalogStore.shared.release()
     }
 
     /// For the app's preview: shows the emoji panel's skin popup for `emoji` as if a finger held it, once the panel is open.
@@ -288,8 +292,8 @@ public enum ReturnKeyLabel {
         emojiPanel?.showHoldForPreview(emoji)
     }
 
-    /// Shows the emoji panel in place of the keys, or the keys again. Opening is timed as "emojiPanelOpen", up to the
-    /// panel's first layout with its emoji.
+    /// Shows the emoji panel in place of the keys, or the keys again. Opening is timed as "emojiPanelOpen", until Core
+    /// Animation has committed the frame, so the emoji's first drawing counts.
     private func updatePanel(_ panel: KeyboardPanel) {
         guard panel != shownPanel else { return }
         shownPanel = panel
@@ -299,14 +303,17 @@ public enum ReturnKeyLabel {
             keysLayer.isHidden = false
             return
         }
-        measuring("emojiPanelOpen") {
-            let emojiPanel = self.emojiPanel ?? makeEmojiPanel()
-            keysLayer.isHidden = true
-            emojiPanel.isHidden = false
-            layOutEmojiPanel()
-            emojiPanel.open()
-            emojiPanel.layoutIfNeeded()
-        }
+        let endMeasure = startMeasure?("emojiPanelOpen")
+        CATransaction.begin()
+        // Called once the outermost transaction has committed, after the new cells' text was drawn.
+        CATransaction.setCompletionBlock(endMeasure.map { end in { MainActor.assumeIsolated { end() } } })
+        let emojiPanel = self.emojiPanel ?? makeEmojiPanel()
+        keysLayer.isHidden = true
+        emojiPanel.isHidden = false
+        layOutEmojiPanel()
+        emojiPanel.open()
+        emojiPanel.layoutIfNeeded()
+        CATransaction.commit()
     }
 
     private func makeEmojiPanel() -> EmojiPanelView {
