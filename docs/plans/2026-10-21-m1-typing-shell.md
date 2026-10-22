@@ -771,6 +771,31 @@ The user installs catkeys through SideStore, as with their other sideloaded app,
 - [ ] **Step 3: Write `scripts/build-ipa.sh` and run it with `Config/Local.xcconfig`** (the user's own bundle prefix). Expected: `build/catkeys.ipa`, with both bundles' entitlements showing the expanded App Group id.
 - [ ] **Step 4: Commit.** "SideStore path: resolve renamed App Group; IPA build script"
 
+### Task 12b: Look polish from the device feel test (rulings R41, R42)
+
+The user's feel test on the iPhone found two problems with how the keyboard looks:
+
+- The 😊 emoji key should be an emoji *icon*, like Apple's keyboard.
+- On iOS 26/27, catkeys' opaque grey background clashes with the system's Liquid Glass keyboard backdrop. That backdrop is the rounded band above the keys and the globe/mic area below them. It also appears as a floating rounded container, for example in search pulled down from the home screen.
+
+**Files:**
+- Modify: `Packages/CatkeysCore/Sources/KeyboardCore/Layout/KeySpec.swift` (optional `icon`), the three layout JSON files (the emoji key), `Packages/CatkeysCore/Sources/KeyboardUI/KeyLayer.swift`, `KeyboardView.swift` and `KeyboardTheme.swift`, `Tests/KeyboardCoreTests/LayoutTests.swift`
+
+**Changes:**
+- **R41:** `KeySpec` gains `public var icon: String?`, an SF Symbol name decoded from JSON and nil by default.
+  - The emoji key in every bottom row gets `"icon": "face.smiling"`. Keep its `label` as the accessibility/fallback text.
+  - `KeyLayer` draws the symbol, tinted with the theme's label colour and sized like the key labels, instead of the label text whenever `icon` is set and the image exists. Otherwise it draws the label as today. In cursor mode the icon hides like the labels do.
+  - No symbol names appear in Swift code.
+- **R42:** the key grid's background is clear, so the system keyboard backdrop shows through around and between the keys and in the empty suggestion row. The extension's `inputView` already uses the `.keyboard` input-view style.
+  - The theme keeps the key, special-key, popup and label colours, so the keys stay readable on the glass in light and dark.
+  - The app's preview host gives its container a keyboard-like grey, so screenshots still read well.
+- **Tests:** a JSON decoding test for `icon` (present and absent), and every bundled page's emoji key carries `face.smiling`.
+- **Verify:**
+  1. Run `swift test`.
+  2. Run `scripts/sim-screenshots.sh`.
+  3. Screenshot the real extension in the simulator in light and dark. iOS 26.4 has the glass backdrop. Look at the screenshots.
+  4. Run `scripts/build-ipa.sh`.
+
 ### Task 12: Device check, measurements and milestone close (with the user)
 
 **Files:**
