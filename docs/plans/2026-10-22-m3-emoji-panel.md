@@ -218,6 +218,59 @@ public func closePanel()                   // back to the page that was showing 
 - [ ] **Step 4:** Run `swift test`, the simulator build and `scripts/build-ipa.sh`.
 - [ ] **Step 5: Commit:** "Add the emoji panel"
 
+### Task 4b: Typing test in the app (M3-R9; the user approved the design in chat on 2026-10-22)
+
+The user wants to measure tap accuracy with numbers, comparing builds and comparing catkeys with Apple's keyboard. The trigger was a regression: R42's fully clear background dropped taps in the gaps between keys, which ruling M3-R8 fixes.
+
+**Files:**
+- Create: `Packages/CatkeysCore/Sources/KeyboardCore/TypingTest/TypingMetrics.swift`, `TypingTest/TypingRun.swift`, `TypingTest/sentences.json`, `Tests/KeyboardCoreTests/TypingTestTests.swift`, `App/TypingTestView.swift`
+- Modify: `App/ContentView.swift` (a new "Typing test" tab), `Package.swift` (resource)
+
+**Interfaces:**
+```swift
+public enum TypingMetrics {
+    public static func editDistance(_ a: String, _ b: String) -> Int          // Levenshtein over Characters (graphemes)
+    public static func wordsPerMinute(characters: Int, seconds: Double) -> Double   // (characters / 5) / minutes; 0 if seconds <= 0
+}
+public struct TypingSentence: Equatable, Sendable { public var text: String; public var language: String }   // "en" or "hi-Latn"
+public enum TypingSentences { public static func bundled() throws -> [TypingSentence] }   // reads TypingTest/sentences.json
+public struct TypingRun: Codable, Equatable, Sendable {
+    public var date: Date; public var keyboard: String            // "catkeys" | "Apple" | "Other"
+    public var targetCharacters: Int; public var errorsLeft: Int; public var corrections: Int; public var seconds: Double
+    public var errorRate: Double { get }                          // errorsLeft / targetCharacters
+    public var wordsPerMinute: Double { get }
+}
+public struct TypingRunStore { public init(defaults: UserDefaults); public func load() -> [TypingRun]; public func append(_ run: TypingRun) }   // key catkeys.typingTest.runs; newest first; corrupt data loads as []
+```
+
+**Sentences:** about 12 short invented ones in `sentences.json`, half English and half Hinglish (Roman script), each 25–60 characters with ordinary punctuation. Never from `../private`.
+
+**App tab ("Typing test"):**
+- **Before a run:**
+  - A keyboard picker: catkeys, Apple or Other. It defaults to catkeys when the shared heartbeat is less than 60 s old, and to Apple otherwise.
+  - A Start button.
+- **A run:** 5 sentences drawn at random from the set.
+  - Each shows "Sentence i of 5", the target text, and a text field with `.autocorrectionDisabled(true)`, so Apple's keyboard is compared fairly without autocorrect. Capitalisation stays as normal.
+  - **Done** submits the sentence.
+  - The timer starts at the first edit of each sentence.
+  - `corrections` grows by the number of graphemes removed each time the text gets shorter.
+  - `errorsLeft` is `editDistance(target, submitted)`.
+- **Summary:** errors left (count and %), corrections and WPM for the run, then a history list of past runs (date, keyboard, the three numbers).
+- **Privacy:** typed text is never stored; only the run's numbers are. No network.
+- **Copy:** use plain, short labels. Explain the three numbers in one line each under the summary.
+
+- [ ] **Step 1: Write the failing tests:**
+  - edit distance: "kitten"/"sitting" = 3; emoji count as one grapheme; empty strings
+  - WPM: 50 characters in 60 s = 10.0
+  - sentences load: 10–14 sentences, both languages present, every length 25–60
+  - run store: round trip, newest first, corrupt data loads as []
+  - `errorRate` with zero target characters is 0
+- [ ] **Step 2: Run them and see them fail.**
+- [ ] **Step 3: Implement.**
+- [ ] **Step 4: Run the full `swift test`.**
+- [ ] **Step 5: Build the app tab.** Screenshot it in light and dark to `build/screenshots/app-typingtest-*.png` and look at the screenshots.
+- [ ] **Step 6: Commit:** "Add a typing test to the app"
+
 ### Task 5: Device check and close (with the user)
 
 - [ ] **Step 1:** Build the IPA, copy it to iCloud Drive, and have the user install it over the current one in SideStore.
@@ -252,6 +305,11 @@ public func closePanel()                   // back to the page that was showing 
 - M3-R5: process only.
 - M3-R6: an emoji uses up a one-shot shift; caps lock stays.
 - M3-R7: when 😊 lifts while another key is held, the panel opens and that key is dropped. Nothing else in that touch batch acts under the panel.
+- M3-R8: the backgrounds use a near-invisible fill (alpha 0.01) instead of `.clear`. iOS drops touches on fully transparent parts of a keyboard extension; the user confirmed this on the device (taps in the f/g gap typed nothing).
+- M3-R9: the app gets a typing test (Task 4b), which the user approved.
+- M3-R10: the skin popup pre-selects the variant the cell shows, the remembered tone, and places it under the finger.
+- M3-R11: the decoded emoji catalog stays loaded for the keyboard process and is dropped only on a memory warning.
+- Data: `emoji.json` also carries `recentIcon` (`clock`), so no SF Symbol name is hard-coded in Swift.
 
 ## Progress
 
