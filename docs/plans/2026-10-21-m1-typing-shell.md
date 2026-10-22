@@ -802,7 +802,7 @@ The user's feel test on the iPhone found two problems with how the keyboard look
 - Create: `Config/Local.xcconfig` (gitignored; the user's team and bundle prefix)
 - Modify: this plan's **Progress** section, and `docs/design.md` §10 if the targets change
 
-- [ ] **Step 1: The user prepares signing.**
+- [x] **Step 1: The user prepares signing.** (superseded by R39: SideStore signs on the phone)
   1. Add their Apple ID in Xcode → Settings → Accounts.
   2. Choose a unique `CATKEYS_BUNDLE_PREFIX`, for example `io.github.<handle>`.
   3. Turn on Developer Mode on the iPhone.
@@ -870,7 +870,19 @@ The user's feel test on the iPhone found two problems with how the keyboard look
   - Task 11, container app: `bfbb8cb..0654db6`
 - 2026-10-21: final whole-branch review of `23274c0..0654db6` (ruling R32, before Task 12): ready to merge with fixes; 0 Critical, 5 Important, 4 Minor. None of the deferred minors must be fixed before merge.
 - 2026-10-21: final-review fix wave, `0654db6..95809e5` plus this plan update: stale-touch reset (R33), host-notice guard (R34), `touch`/`render` signposts and `bottomRow` metadata, Release builds for the device (R35), switchable entitlements (R36), iPhone only and clamped corner radii (R37), Setup status copy (R38). A scoped re-review follows.
-- Task 12 (device check, measurements, merge to `main`): pending with the user.
+- 2026-10-21: the fix wave's scoped re-review is clean. The screenshot script was re-run, and the scripted long-press and cursor scenes still render.
+- 2026-10-22: Task 11a, the SideStore install path (ruling R39): `14e9b44..1d679ce`, reviewed clean.
+- 2026-10-22: Task 12, device check, on the user's iPhone 16 (iOS 27.0.1). This is the Release build, signed by SideStore, measured with Instruments using `--all-processes`:
+  - **Install and App Group:** installed via SideStore. The App Group survives SideStore's rename: the app shows "Keyboard last opened" from the keyboard's heartbeat.
+  - **Startup:** median 4.6 ms over 6 opens, worst 7.2 ms. Target ≤ 50 ms.
+  - **insertText:** median 0.05 ms, worst 0.15 ms.
+  - **Touch handling** (processor, controller and render per touch event): median 0.57 ms, p95 2.63 ms, worst 5.1 ms. 93% are under the 2 ms target, and all are well inside one 16.7 ms frame.
+  - **Render:** median 0.35 ms, p95 2.9 ms.
+  - **Touch delivery from iOS:** median 10.6 ms, p95 18.7 ms. The bottom row matches the other rows, so there is no system-gesture delay.
+  - **Memory:** the keyboard's footprint stays at 9.3–12.1 MiB, flat across 20–30 open/close cycles. Budget 22 MB. The container app uses 33–37 MiB.
+  - **The user's feel test:** "the feel is great. it is snappy and taps are accurate." Every checklist item works. The stale-touch edge case is not tested yet. The emoji key opening nothing is expected until the emoji panel milestone.
+- 2026-10-22: Task 12b, look polish from the feel test (R41, R42): `be31339..6262fe1`, reviewed clean. The emoji key is now an icon, and the keys sit on iOS's Liquid Glass keyboard backdrop.
+- 2026-10-22: the app icon was added (`9afb4c7`). Milestone 1 is closed and merged to `main`. Next comes the emoji panel (milestone 3), moved ahead of the suggestion row at the user's request.
 
 ## Rulings
 
@@ -914,6 +926,10 @@ Decisions made while building, one line each. The ledger behind them is local an
 - R36: Entitlements come from `CATKEYS_APP_ENTITLEMENTS` and `CATKEYS_KB_ENTITLEMENTS`, so `Local.xcconfig` can build without the App Group.
 - R37: iPhone only (`TARGETED_DEVICE_FAMILY = 1`), and rounded-rect radii are clamped to min(r, w/2, h/2).
 - R38: With no heartbeat, the Setup status reads "Not opened yet, or Full Access is off".
+- R39: Install through SideStore with an unsigned IPA (`scripts/build-ipa.sh`), not Xcode free signing. SideStore renames the App Group, so `AppGroupResolver` finds the real group in `embedded.mobileprovision`.
+- R40: The resolved App Group is cached once per process.
+- R41: The emoji key shows an SF Symbol (`face.smiling`) through the optional `KeySpec.icon` in layout JSON. The rendered image is cached.
+- R42: The key grid's background is clear, so iOS's keyboard backdrop (Liquid Glass on iOS 26 and 27) shows through.
 
 ## Deferred to later milestones
 
