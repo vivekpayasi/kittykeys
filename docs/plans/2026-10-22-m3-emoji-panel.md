@@ -271,6 +271,88 @@ public struct TypingRunStore { public init(defaults: UserDefaults); public func 
 - [ ] **Step 5: Build the app tab.** Screenshot it in light and dark to `build/screenshots/app-typingtest-*.png` and look at the screenshots.
 - [ ] **Step 6: Commit:** "Add a typing test to the app"
 
+### Task 4c: Emoji search, data and logic (M3-R15; the user approved the design in chat on 2026-10-22)
+
+**What the user approved:**
+- A "Search emoji" field sits at the top of the emoji panel.
+- Tapping it brings back letter keys, with the search text and a strip of results above them. Taps type into the search, not into the app.
+- Tapping a result inserts it into the app, and search stays open.
+- ✕ clears the query. ABC, or ⌫ on an empty query, goes back to the panel.
+- Matching uses English names and tags, by word beginnings. Exact matches come first, and recent emoji get a nudge.
+- Hinglish keywords come later, as data only.
+- Keyword data loads only when search opens.
+
+**Files:** modify `scripts/make-emoji-data.py`. Create `Packages/CatkeysCore/Sources/KeyboardCore/Emoji/emoji-keywords.json` (generated, committed), `Emoji/EmojiSearch.swift` and `Tests/KeyboardCoreTests/EmojiSearchTests.swift`. Modify `Controller/KeyboardController.swift`, `Controller/KeyboardState.swift` and `Package.swift`.
+
+**Data:** `emoji-keywords.json` is `{"source": "...", "language": "en", "keywords": {"<base emoji>": ["grinning", "face", ...]}}`.
+- Each list is the Emojibase `label` words plus `tags`, lowercased, de-duplicated, with words under 2 letters dropped. The label words come first.
+- Keys are the same fully-qualified base strings as `emoji.json`.
+- The output is deterministic and should be roughly ≤ 200 KB. Skin variants get no keys of their own; search maps variants to bases through `EmojiIndex`.
+
+**Logic:**
+```swift
+public struct EmojiSearch {
+    public static func load() throws -> EmojiSearch                    // reads the bundled keywords once; the caller holds it
+    public func results(for query: String, catalog: EmojiData, recents: [String], limit: Int = 60) -> [EmojiItem]
+}
+```
+- **Words:** the query is lowercased and split on whitespace. Every query word must be a prefix of some keyword of the emoji.
+- **Ranking:**
+  1. Emoji with a keyword exactly equal to a query word come first.
+  2. Then emoji whose label word matches.
+  3. Then emoji with only a tag prefix match.
+  4. Within each tier, emoji in `recents` come first, in recency order. After that, the catalog order.
+- **Filter:** only emoji present in the version-filtered catalog.
+- **Empty query:** returns [].
+
+**Controller:**
+- `KeyboardPanel` gains `.emojiSearch`, and `KeyboardState` gains `searchQuery: String`.
+- `openEmojiSearch()` goes from `.emoji` to `.emojiSearch` and shows the letters page with the `.standard` bottom row.
+- **Key taps** edit `searchQuery` instead of the document:
+  - Character outputs are appended lowercased.
+  - Space appends " ". Repeated spaces collapse, and there is no double-space full stop.
+  - ⌫ removes one character. On an empty query it returns to `.emoji`.
+  - Return closes search back to `.emoji`.
+  - Shift and auto-capitals don't apply.
+  - Long-press symbols append their symbol.
+  - The 123 page works.
+  - The emoji key does nothing.
+- `clearEmojiSearch()` empties the query.
+- `closeEmojiSearch()` returns to `.emoji`.
+- `insertEmoji` still inserts into the document.
+- `keyboardWillAppear` resets to `.keys`.
+- Cursor mode is off in search: the space hold types a space.
+
+- [ ] **Step 1: Extend the generator.** Run it and check `emoji.json` is byte-identical. Commit the keywords file and the size.
+- [ ] **Step 2: Write the failing tests.**
+  - search: "lau" → 😂 among the first 3; "red heart" → ❤️ first; "hea" includes ❤️; "zzzz" → []; a recent emoji outranks an equal-tier one; only catalog-filtered emoji come back
+  - controller: typing in search doesn't touch the document; ⌫ on empty returns to `.emoji`; inserting from search types into the document; keyboardWillAppear resets; no shift or auto-cap in the query
+- [ ] **Step 3: Implement.** Run the full `swift test`.
+- [ ] **Step 4: Commit:** "Emoji search: keywords and logic"
+
+### Task 4d: Emoji search, view (M3-R15)
+
+**Layout** (the keyboard height never changes):
+- In `.emojiSearch`, the 44 pt suggestion row becomes the search field: a magnifier, the query text with a caret (or the "Search emoji" placeholder), and ✕ when the query isn't empty.
+- The number row's band becomes a horizontal results strip of about 36 pt emoji cells, which scrolls sideways. With no query it shows Recent, and with no results it is empty.
+- The rest is the normal letter keys from the controller, with the same touch handling as typing.
+- In `.emoji`, the panel gains a "Search emoji" field at its top. It sits in the suggestion-row band, so the height doesn't change, and tapping it calls `openEmojiSearch()`.
+
+**Behaviour:**
+- Tapping a result inserts it (`preferredVariant` + `recordUse` + feedback) and stays in search.
+- Holding a result with skins opens the skin popup, like the panel.
+- Placeholder and labels come from data: `emoji.json` gains `"searchPlaceholder": "Search emoji"`.
+- The keyword data loads on the first `openEmojiSearch()` and is kept for the process (as in M3-R11). It is dropped on a memory warning while search is closed.
+
+- [ ] **Step 1: Implement.**
+- [ ] **Step 2: Screenshots.**
+  - Add the preview launch arguments `-catkeysPreviewEmojiSearch <query>`.
+  - Add the scenes `emoji-search-empty` and `emoji-search-lau`, in light and dark.
+  - Check the real extension: open search, type "lau", tap 😂, ⌫ ×3 then ⌫ again returns to the panel, then ABC.
+  - Look at every PNG.
+- [ ] **Step 3:** Run `swift test`, the simulator build and `scripts/build-ipa.sh`.
+- [ ] **Step 4: Commit:** "Emoji search view"
+
 ### Task 5: Device check and close (with the user)
 
 - [ ] **Step 1:** Build the IPA, copy it to iCloud Drive, and have the user install it over the current one in SideStore.
@@ -311,6 +393,7 @@ public struct TypingRunStore { public init(defaults: UserDefaults); public func 
 - M3-R11: the decoded emoji catalog stays loaded for the keyboard process and is dropped only on a memory warning.
 - M3-R12: 0.3 s after the keys first draw, once per process and at utility priority, catkeys draws Recent plus the first category's first 64 emoji into a tiny offscreen bitmap. Tab icons render on the main thread, one per run-loop turn. This avoids a slow first open: 172 ms becomes 35 ms on the simulator.
 - M3-R13: the warm-up decodes the catalog, reads its emoji list and drops it, so the panel still decodes on first open. This keeps the plan's memory rule.
+- M3-R15: emoji search, approved by the user (Tasks 4c and 4d). The keyboard height stays the same: the search field takes the suggestion-row band and the results strip takes the number-row band. Hinglish keywords come later, as data.
 - Data: `emoji.json` also carries `recentIcon` (`clock`), so no SF Symbol name is hard-coded in Swift.
 
 ## Progress
