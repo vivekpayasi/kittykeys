@@ -11,7 +11,7 @@ let package = Package(
     targets: [
         .target(
             name: "KeyboardCore",
-            resources: [.copy("Layouts")]
+            resources: [.copy("Layouts"), .copy("Emoji/emoji.json")]
         ),
         .target(
             name: "KeyboardUI",
