@@ -109,7 +109,7 @@ Tests/KeyboardCoreTests/EmojiCatalogTests.swift, EmojiPreferencesTests.swift, Em
 public struct EmojiItem: Equatable, Sendable { public var base: String; public var version: Double; public var skins: [String] }   // skins empty or 5
 public struct EmojiCategory: Equatable, Sendable { public var id: String; public var name: String; public var icon: String; public var items: [EmojiItem] }
 public enum EmojiCatalog {
-    public static func load(maxVersion: Double) throws -> [EmojiCategory]          // reads bundled emoji.json; drops items with version > maxVersion
+    public static func load(maxVersion: Double) throws -> EmojiData   // EmojiData { recentName, categories } (M3-R3); drops items with version > maxVersion
     public static func maxSupportedVersion(osMajor: Int, osMinor: Int) -> Double   // 26.0–26.3 → 16.0; ≥ 26.4 → 17.0; lower → 16.0
 }
 public final class EmojiPreferences {
