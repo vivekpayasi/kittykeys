@@ -57,10 +57,13 @@
         KeyboardGeometry.hitTest(p, in: frames, metrics: metrics)
     }
 
+    /// The layout set the keys come from. The emoji panel copies its ABC and ⌫ labels from it.
+    public let layouts: LayoutSet
+    /// The sizes the keys are laid out with. The emoji panel sits below `suggestionRowHeight`.
+    public let metrics: KeyboardMetrics
+
     private let document: any TextDocument
-    private let layouts: LayoutSet
     private let feedback: any FeedbackSink
-    private let metrics: KeyboardMetrics
     private let processor: TouchProcessor
     private var width = 0.0
     private var bottomVariant = BottomVariant.standard

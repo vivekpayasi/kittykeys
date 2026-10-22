@@ -47,3 +47,27 @@ func maxSupportedVersion(_ major: Int, _ minor: Int, _ expected: Double) {
     #expect(wave.skins == ["👋🏻", "👋🏼", "👋🏽", "👋🏾", "👋🏿"])
     #expect(items.first { $0.base == "😀" }?.skins == [])
 }
+
+@Test func indexFindsTheItemForAnyVariant() throws {
+    let index = EmojiIndex(try EmojiCatalog.load(maxVersion: 17.0))
+    let wave = try #require(index.lookup("👋🏽"))
+    #expect(wave.item.base == "👋" && wave.variant == "👋🏽")
+    #expect(index.lookup("👋")?.variant == "👋")
+    // Recent may hold a spelling without U+FE0F; the catalog's own spelling is shown.
+    let smile = try #require(index.lookup("☺"))
+    #expect(smile.item.base == "☺️" && smile.variant == "☺️")
+    #expect(index.lookup("☝🏾")?.item.base == "☝️")
+    #expect(index.lookup("🇮🇳")?.variant == "🇮🇳")
+    #expect(index.lookup("👨‍👩‍👧")?.item.skins == [])
+    #expect(index.lookup("x") == nil)
+    #expect(index.lookup("") == nil)
+    // A skin spelling the item lacks still finds the item, shown as its base.
+    #expect(index.lookup("😀🏽")?.variant == "😀")
+}
+
+@Test func indexLeavesOutEmojiNewerThanTheCatalog() throws {
+    let v16 = EmojiIndex(try EmojiCatalog.load(maxVersion: 16.0))
+    let v17 = try EmojiCatalog.load(maxVersion: 17.0)
+    let newer = try #require(v17.categories.flatMap(\.items).first { $0.version > 16.0 })
+    #expect(v16.lookup(newer.base) == nil)
+}

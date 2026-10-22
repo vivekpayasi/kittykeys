@@ -65,3 +65,13 @@ import KeyboardCore
         }
     }
 }
+
+/// The emoji panel takes its ABC and ⌫ labels from the keys that do the same jobs.
+@Test func firstKeyFindsTheKeysThePanelCopies() throws {
+    let set = try LayoutSet.bundled()
+    #expect(set.firstKey { $0.action == .switchPage(.letters) }?.label == "ABC")
+    #expect(set.firstKey { $0.action == .backspace }?.label == "⌫")
+    // Page order is the index's: the letters page's "123" comes before symbols-1's "2/2".
+    #expect(set.firstKey { $0.action == .switchPage(.named("symbols-1")) }?.label == "123")
+    #expect(set.firstKey { _ in false } == nil)
+}

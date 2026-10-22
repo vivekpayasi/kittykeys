@@ -89,6 +89,31 @@ final class EmojiPreferencesTests {
         #expect(prefs.preferredVariant(for: Self.wave) == "👋")
     }
 
+    /// The panel reads the choices once and then per cell, without touching the defaults.
+    @Test func skinChoicesAreASnapshot() {
+        prefs.setPreferredVariant("👋🏽", for: "👋")
+        var choices = prefs.skinChoices
+        #expect(choices.preferredVariant(for: Self.wave) == "👋🏽")
+        #expect(choices.preferredVariant(for: Self.grin) == "😀")
+
+        prefs.setPreferredVariant("👋🏿", for: "👋")
+        #expect(choices.preferredVariant(for: Self.wave) == "👋🏽")
+        #expect(prefs.skinChoices.preferredVariant(for: Self.wave) == "👋🏿")
+
+        choices.setPreferredVariant("👋🏻", for: "👋")
+        #expect(choices.preferredVariant(for: Self.wave) == "👋🏻")
+        choices.setPreferredVariant("🙂", for: "👋")
+        #expect(choices.preferredVariant(for: Self.wave) == "👋")
+        choices.setPreferredVariant("👋🏼", for: "👋")
+        choices.setPreferredVariant("👋", for: "👋")
+        #expect(choices.preferredVariant(for: Self.wave) == "👋")
+        let point = EmojiItem(base: "☝️", version: 0.6, skins: ["☝🏻", "☝🏼", "☝🏽", "☝🏾", "☝🏿"])
+        choices.setPreferredVariant("☝🏾", for: "☝")
+        #expect(choices.preferredVariant(for: point) == "☝🏾")
+        #expect(prefs.preferredVariant(for: Self.wave) == "👋🏿")
+        #expect(EmojiSkinChoices().preferredVariant(for: Self.wave) == "👋")
+    }
+
     @Test(arguments: [0, 1])
     func corruptRecentsLoadEmpty(_ kind: Int) {
         let junk: Any = kind == 0 ? Data([0xDE, 0xAD, 0xBE, 0xEF]) : 42
