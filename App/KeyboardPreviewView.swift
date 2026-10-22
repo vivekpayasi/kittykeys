@@ -29,6 +29,9 @@ struct KeyboardPreviewView: UIViewRepresentable {
 /// - `-catkeysPreviewEmoji`: taps the emoji key, opening the emoji panel.
 /// - `-catkeysPreviewEmojiHold <emoji>`: opens the emoji panel, scrolls to `emoji` and holds it, so its skin-tone popup
 ///   shows if it has skin tones.
+/// - `-catkeysPreviewEmojiSearch [query]`: opens the emoji panel, then search, as a touch on its field does, and types
+///   `query` on the keys (none when the next argument is missing or another flag). With `-catkeysPreviewEmojiHold`, the
+///   emoji is held in the results instead; with `-catkeysPreviewHold`, the key is held in search.
 /// Held keys are never lifted.
 struct PreviewScene {
     var pageID: String?
@@ -36,6 +39,8 @@ struct PreviewScene {
     var holdsSpace: Bool
     var opensEmoji: Bool
     var heldEmoji: String?
+    /// The query to type into emoji search; nil to stay out of search.
+    var searchQuery: String?
 
     init(_ arguments: [String]) {
         func value(after flag: String) -> String? {
@@ -46,7 +51,10 @@ struct PreviewScene {
         heldLabel = value(after: "-catkeysPreviewHold")
         holdsSpace = arguments.contains("-catkeysPreviewCursor")
         heldEmoji = value(after: "-catkeysPreviewEmojiHold")
-        opensEmoji = heldEmoji != nil || arguments.contains("-catkeysPreviewEmoji")
+        if arguments.contains("-catkeysPreviewEmojiSearch") {
+            searchQuery = value(after: "-catkeysPreviewEmojiSearch").flatMap { $0.hasPrefix("-") ? nil : $0 } ?? ""
+        }
+        opensEmoji = heldEmoji != nil || searchQuery != nil || arguments.contains("-catkeysPreviewEmoji")
     }
 }
 
@@ -130,15 +138,21 @@ final class KeyboardPreviewHost: UIView {
         play(scene)
     }
 
-    /// Opens the page, then holds one key: the labelled one, else space for cursor mode. Or opens the emoji panel and
-    /// holds an emoji.
+    /// Opens the page, then holds one key: the labelled one, else space for cursor mode. Or opens the emoji panel, maybe
+    /// searches, and holds an emoji.
     private func play(_ scene: PreviewScene) {
         var clock = ProcessInfo.processInfo.systemUptime
         if let pageID = scene.pageID { open(page: pageID, clock: &clock) }
         if scene.opensEmoji, let emojiKey = controller.frames.first(where: { $0.key.action == .emoji }) {
-            let centre = Self.centre(of: emojiKey)
-            controller.touchDown(Self.scriptedTouch, at: centre, time: clock)
-            controller.touchUp(Self.scriptedTouch, at: centre, time: clock + Self.tapDuration)
+            tap(emojiKey, clock: &clock)
+            if let query = scene.searchQuery {
+                controller.openEmojiSearch()
+                type(query, clock: &clock)
+                // Search's keys can be held too, to show a key's popup over the results.
+                if let label = scene.heldLabel, let key = controller.frames.first(where: { $0.key.label == label }) {
+                    hold(key, at: clock)
+                }
+            }
             if let emoji = scene.heldEmoji { keyboardView.showEmojiHoldForPreview(emoji) }
         } else if let label = scene.heldLabel {
             if let key = controller.frames.first(where: { $0.key.label == label }) { hold(key, at: clock) }
@@ -158,12 +172,26 @@ final class KeyboardPreviewHost: UIView {
             }
             guard let next = unseen.first(where: { $0.pageID == id }) ?? unseen.first else { return }
             seen.insert(next.pageID)
-            let centre = Self.centre(of: next.frame)
-            controller.touchDown(Self.scriptedTouch, at: centre, time: clock)
-            clock += Self.tapDuration
-            controller.touchUp(Self.scriptedTouch, at: centre, time: clock)
-            clock += Self.tapDuration
+            tap(next.frame, clock: &clock)
         }
+    }
+
+    /// Taps the key for each character of `text`: space for a space, else the key that types it.
+    private func type(_ text: String, clock: inout Double) {
+        for character in text {
+            let key = controller.frames.first { frame in
+                character == " " ? frame.key.action == .space : frame.key.output == String(character)
+            }
+            if let key { tap(key, clock: &clock) }
+        }
+    }
+
+    private func tap(_ frame: KeyFrame, clock: inout Double) {
+        let centre = Self.centre(of: frame)
+        controller.touchDown(Self.scriptedTouch, at: centre, time: clock)
+        clock += Self.tapDuration
+        controller.touchUp(Self.scriptedTouch, at: centre, time: clock)
+        clock += Self.tapDuration
     }
 
     private func hold(_ frame: KeyFrame, at time: Double) {

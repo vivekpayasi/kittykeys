@@ -78,11 +78,13 @@ final class KeyboardViewController: UIInputViewController {
                 "keyDown", "latencyMs=\(latency, format: .fixed(precision: 2)) bottomRow=\(bottomRow)")
         }
         // "touch": each batch of touches through the touch processor and the controller; "render": each redraw;
-        // "emojiInsert": each emoji the panel types.
+        // "emojiInsert": each emoji the panel or search's results type.
         keyboardView.measure = { name, work in
             signposter.withIntervalSignpost(name, around: work)
         }
         // "emojiPanelOpen": the emoji panel opening, to its first frame committed with the emoji drawn.
+        // "emojiSearchOpen": a touch on the search field, to search's first frame committed with its keys and results.
+        // "emojiSearchQuery": a change to the search query, to the frame committed with its results drawn.
         keyboardView.startMeasure = { name in
             let state = signposter.beginInterval(name)
             return { signposter.endInterval(name, state) }
@@ -163,7 +165,8 @@ final class KeyboardViewController: UIInputViewController {
         controller?.documentDidChange()
     }
 
-    /// Frees the emoji panel and its decoded emoji while the keys show; the layouts and the key layers are in use.
+    /// Frees what the emoji panel and search keep while they are closed: search's keywords and results unless search
+    /// shows, and the panel and its decoded emoji while the keys show. The layouts and the key layers are in use.
     override func didReceiveMemoryWarning() {
         super.didReceiveMemoryWarning()
         Self.logger.notice("Memory warning")

@@ -10,10 +10,12 @@ import UIKit
 /// - **List:** a `UICollectionView` with reused cells, so only the emoji on screen are drawn. Columns are about
 ///   `minimumCellWidth` wide. Section titles come from the emoji data. Recent is hidden while empty.
 /// - **Tap** an emoji to type it in the skin tone picked for it before. **Hold** one with skin tones for the long-press
-///   delay to pick another from a `SkinTonePopup`, sliding along it; the lift types the choice and remembers it. The
-///   popup opens on the tone the cell shows, under the finger (ruling M3-R10), so a hold lifted without sliding types it.
+///   delay to pick another from a `SkinTonePopup`, sliding along it (`EmojiSkinHold`); the lift types the choice and
+///   remembers it. The popup opens on the tone the cell shows, under the finger (ruling M3-R10), so a hold lifted without
+///   sliding types it.
 /// - **Recent** is refreshed lazily, never during a tap: when the panel opens, before a jump to it, and while it is
-///   scrolled off the top, with the list moved by the change so nothing on screen shifts.
+///   scrolled off the top, with the list moved by the change so nothing on screen shifts. Emoji typed from search's
+///   results mark Recent and the skin tones for a fresh read at the next open.
 /// - **Data:** the catalog comes from `EmojiCatalogStore.shared`, decoded the first time any panel opens and kept for
 ///   the keyboard process (ruling M3-R11). If it can't be loaded the list stays empty, and ABC and ⌫ still work.
 /// - Nothing types while the controller has the keys showing: a lift that arrives after the panel closed does nothing.
@@ -27,8 +29,6 @@ final class EmojiPanelView: UIView, UICollectionViewDataSource, UICollectionView
     private static let headerHeight: CGFloat = 26
     /// Space beside the list, as beside the keys, and below each section.
     private static let sideInset: CGFloat = 3, sectionBottomInset: CGFloat = 6
-    /// The skin popup's widest cell.
-    private static let preferredPopupCellWidth = 40.0
 
     /// Runs a stretch of work for timing ("emojiInsert"); the keyboard view passes its own `measure` through.
     var measure: ((_ name: StaticString, _ work: () -> Void) -> Void)?
@@ -45,9 +45,7 @@ final class EmojiPanelView: UIView, UICollectionViewDataSource, UICollectionView
     private let layout = UICollectionViewFlowLayout()
     private let collectionView: UICollectionView
     private let tabBar: EmojiTabBar
-    private let popup = SkinTonePopup()
-    private let hold = UILongPressGestureRecognizer()
-    private let holdGate = HoldGate()
+    private let skinHold = EmojiSkinHold()
 
     /// The emoji data, from the shared store; nil before the first open or after a failed load.
     private var catalog: EmojiCatalogStore.Catalog?
@@ -59,12 +57,12 @@ final class EmojiPanelView: UIView, UICollectionViewDataSource, UICollectionView
     private var recentRefreshScheduled = false
     /// The skin choices, read once per load and kept up to date here, so cells never read the defaults.
     private var skins = EmojiSkinChoices()
+    /// A skin tone may have been picked elsewhere (in search's results), so the next open reads the choices again.
+    private var skinsAreStale = false
     /// Emoji per row, from the width.
     private var columns = 1
     /// Each section's top in the list, worked out when first needed after a change to the list.
     private var sectionTops: [CGFloat]?
-    /// The emoji held with its skin popup showing, its options (the base, then its skins) and what the finger has picked.
-    private var holding: (item: EmojiItem, options: [String], pick: SkinTonePick)?
 
     init(
         controller: KeyboardController, feedback: any FeedbackSink, preferences: EmojiPreferences, lettersLabel: String,
@@ -100,15 +98,15 @@ final class EmojiPanelView: UIView, UICollectionViewDataSource, UICollectionView
         collectionView.dataSource = self
         collectionView.delegate = self
 
-        hold.addTarget(self, action: #selector(holdChanged(_:)))
-        holdGate.shouldBegin = { [weak self] in self?.holdShouldBegin($0) ?? false }
-        hold.delegate = holdGate
-        collectionView.addGestureRecognizer(hold)
-
         tabBar.onAction = { [weak self] action in self?.perform(action) }
         addSubview(collectionView)
         addSubview(tabBar)
-        addSubview(popup)
+        // The skin popup goes on top, over the list and the tab bar.
+        skinHold.attach(to: self, list: collectionView)
+        skinHold.target = { [weak self] point in self?.holdTarget(at: point) }
+        // A haptic only, without the key click.
+        skinHold.onShow = { [weak self] in self?.feedback.cursorTick() }
+        skinHold.onPick = { [weak self] variant, item in self?.typePicked(variant, of: item) }
         applyTheme()
     }
 
@@ -129,23 +127,28 @@ final class EmojiPanelView: UIView, UICollectionViewDataSource, UICollectionView
     func open() {
         // The list needs its size before it can place sections.
         layoutIfNeeded()
-        hold.minimumPressDuration = controller.settings.longPressDelay
+        skinHold.delay = controller.settings.longPressDelay
         if catalog == nil && !loadFailed {
             load()
-        } else if recentIsStale {
+            return updateSelectedTab()
+        }
+        if skinsAreStale { refreshSkins() }
+        if recentIsStale {
             // At the very top, Recent shows as it now is; scrolled down, the visible emoji stay where they are.
             refreshRecent(keepingVisibleContent: collectionView.contentOffset.y > 0)
         }
         updateSelectedTab()
     }
 
+    /// Emoji were typed from search's results: Recent and the skin tones may have changed, so the next open reads them.
+    func emojiTypedElsewhere() {
+        recentIsStale = true
+        skinsAreStale = true
+    }
+
     /// The panel is hidden, or the keyboard leaves the screen: a hold, a held ⌫ and a scroll in progress all end.
     func endInteractions() {
-        // Disabling a recognizer cancels it, which hides the popup.
-        hold.isEnabled = false
-        hold.isEnabled = true
-        holding = nil
-        popup.hide()
+        skinHold.cancel()
         tabBar.cancelTouches()
         // Stopped inside the list's range, so a rubber-band past an end doesn't stay frozen there.
         let maxOffset = max(collectionView.contentSize.height - collectionView.bounds.height, 0)
@@ -166,7 +169,8 @@ final class EmojiPanelView: UIView, UICollectionViewDataSource, UICollectionView
                 let cell = collectionView.layoutAttributesForItem(at: indexPath)
             {
                 let rect = convert(cell.frame, from: collectionView)
-                showPopup(for: found.item, showing: shown, above: rect, fingerX: Double(rect.midX))
+                skinHold.showForPreview(
+                    EmojiSkinHold.Target(item: found.item, shown: shown, cell: rect), fingerX: Double(rect.midX))
             }
             return
         }
@@ -177,6 +181,7 @@ final class EmojiPanelView: UIView, UICollectionViewDataSource, UICollectionView
             let catalog = try EmojiCatalogStore.shared.catalog()
             self.catalog = catalog
             skins = preferences.skinChoices
+            skinsAreStale = false
             recent = resolvedRecent()
             recentIsStale = false
             tabBar.setTabs([catalog.data.recentIcon] + catalog.data.categories.map(\.icon))
@@ -316,75 +321,44 @@ final class EmojiPanelView: UIView, UICollectionViewDataSource, UICollectionView
 
     // MARK: Skin tones
 
-    /// Only an emoji with skin tones can be held. Holding another one and lifting types it, as a tap does.
-    private func holdShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
-        let point = gestureRecognizer.location(in: collectionView)
-        guard isOpen, let indexPath = collectionView.indexPathForItem(at: point) else { return false }
-        return !(emoji(at: indexPath)?.item.skins.isEmpty ?? true)
+    /// The emoji under `point`, in this view's coordinates, for a hold; nil unless the panel is open.
+    private func holdTarget(at point: CGPoint) -> EmojiSkinHold.Target? {
+        guard isOpen, let indexPath = collectionView.indexPathForItem(at: convert(point, to: collectionView)),
+            let (shown, item) = emoji(at: indexPath), let cell = collectionView.layoutAttributesForItem(at: indexPath)
+        else { return nil }
+        return EmojiSkinHold.Target(item: item, shown: shown, cell: convert(cell.frame, from: collectionView))
     }
 
-    @objc private func holdChanged(_ recognizer: UILongPressGestureRecognizer) {
-        let x = Double(recognizer.location(in: self).x)
-        switch recognizer.state {
-        case .began:
-            let point = recognizer.location(in: collectionView)
-            guard isOpen, let indexPath = collectionView.indexPathForItem(at: point),
-                let (shown, item) = emoji(at: indexPath), !item.skins.isEmpty,
-                let cell = collectionView.layoutAttributesForItem(at: indexPath)
-            else { return }
-            showPopup(for: item, showing: shown, above: convert(cell.frame, from: collectionView), fingerX: x)
-            // A haptic only, without the key click.
-            if holding != nil { feedback.cursorTick() }
-        case .changed:
-            guard var holding else { return }
-            holding.pick.move(toX: x)
-            self.holding = holding
-            popup.select(holding.pick.selected)
-        case .ended:
-            guard var holding else { return }
-            self.holding = nil
-            popup.hide()
-            holding.pick.move(toX: x)
-            let option = holding.pick.selected
-            guard isOpen, holding.options.indices.contains(option) else { return }
-            let variant = holding.options[option]
-            let base = holding.item.base
-            measuring("emojiInsert") {
-                controller.insertEmoji(variant)
-                preferences.setPreferredVariant(variant, for: base)
-                preferences.recordUse(variant, base: base)
-            }
-            skins.setPreferredVariant(variant, for: base)
-            showPickedSkin(of: base)
-            recentIsStale = true
-        default:
-            holding = nil
-            popup.hide()
+    /// A hold's lift: types the picked variant and remembers it, unless the panel closed meanwhile.
+    private func typePicked(_ variant: String, of item: EmojiItem) {
+        guard isOpen else { return }
+        let base = item.base
+        measuring("emojiInsert") {
+            controller.insertEmoji(variant)
+            preferences.setPreferredVariant(variant, for: base)
+            preferences.recordUse(variant, base: base)
         }
-    }
-
-    /// Shows `item`'s base and skins above `cell` (in this view's coordinates), inside the keyboard view, with `shown`
-    /// (the variant the cell shows) under `fingerX` and highlighted.
-    private func showPopup(for item: EmojiItem, showing shown: String, above cell: CGRect, fingerX: Double) {
-        let options = [item.base] + item.skins
-        let keyboard = superview.map { convert($0.bounds, from: $0) } ?? bounds
-        let minX = Double(keyboard.minX + SkinTonePopup.padding), maxX = Double(keyboard.maxX - SkinTonePopup.padding)
-        let cellWidth = SkinTonePopupLayout.cellWidth(
-            count: options.count, available: maxX - minX, preferred: Self.preferredPopupCellWidth)
-        let layout = SkinTonePopupLayout(
-            count: options.count, anchor: options.firstIndex(of: shown) ?? 0, cellWidth: cellWidth, fingerX: fingerX,
-            minX: minX, maxX: maxX)
-        popup.show(options, layout: layout, above: cell, minY: keyboard.minY, theme: theme)
-        guard !popup.isHidden else { return }
-        let pick = SkinTonePick(layout: layout, fingerX: fingerX)
-        popup.select(pick.selected)
-        holding = (item, options, pick)
+        skins.setPreferredVariant(variant, for: base)
+        showPickedSkin(of: base)
+        recentIsStale = true
     }
 
     /// Redraws the category cells on screen that show `base`, after a new skin tone was picked for it.
     private func showPickedSkin(of base: String) {
         for indexPath in collectionView.indexPathsForVisibleItems where indexPath.section > 0 {
             guard let shown = emoji(at: indexPath), shown.item.base == base else { continue }
+            (collectionView.cellForItem(at: indexPath) as? EmojiCell)?.show(shown.variant, theme: theme)
+        }
+    }
+
+    /// Reads the skin choices again, and redraws the category cells on screen if any changed.
+    private func refreshSkins() {
+        skinsAreStale = false
+        let fresh = preferences.skinChoices
+        guard fresh != skins else { return }
+        skins = fresh
+        for indexPath in collectionView.indexPathsForVisibleItems where indexPath.section > 0 {
+            guard let shown = emoji(at: indexPath) else { continue }
             (collectionView.cellForItem(at: indexPath) as? EmojiCell)?.show(shown.variant, theme: theme)
         }
     }
@@ -498,6 +472,7 @@ final class EmojiPanelView: UIView, UICollectionViewDataSource, UICollectionView
 
     private func applyTheme() {
         tabBar.theme = theme
+        skinHold.theme = theme
         for case let cell as EmojiCell in collectionView.visibleCells {
             guard let indexPath = collectionView.indexPath(for: cell), let shown = emoji(at: indexPath) else { continue }
             cell.show(shown.variant, theme: theme)
@@ -515,14 +490,6 @@ final class EmojiPanelView: UIView, UICollectionViewDataSource, UICollectionView
         } else {
             work()
         }
-    }
-}
-/// The hold gesture's delegate. A separate object, because `UIView` has a `gestureRecognizerShouldBegin(_:)` of its own.
-private final class HoldGate: NSObject, UIGestureRecognizerDelegate {
-    var shouldBegin: ((UIGestureRecognizer) -> Bool)?
-
-    func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
-        shouldBegin?(gestureRecognizer) ?? false
     }
 }
 #endif

@@ -31,6 +31,10 @@ SCENES=(
   "emoji-hold-right|-catkeysPreview -catkeysPreviewEmojiHold 👈"
   # The Symbols section around ❓, where bare symbols such as ➕ ❓ ✅ ❌ must draw as colour emoji.
   "emoji-symbols|-catkeysPreview -catkeysPreviewEmojiHold ❓"
+  # Emoji search: just opened (Recent in the results), after typing "lau", and holding 👋 among the results for "hand".
+  "emoji-search-empty|-catkeysPreview -catkeysPreviewEmojiSearch"
+  "emoji-search-lau|-catkeysPreview -catkeysPreviewEmojiSearch lau"
+  "emoji-search-hold|-catkeysPreview -catkeysPreviewEmojiSearch hand -catkeysPreviewEmojiHold 👋"
   "app-setup|-catkeysTab setup"
   "app-settings|-catkeysTab settings"
   "app-tryit|-catkeysTab tryit"

@@ -34,7 +34,11 @@ public enum ReturnKeyLabel {
 ///   and when a new touch begins while UIKit no longer reports it.
 /// - The suggestion row is an empty band at the top in milestone 1.
 /// - While the controller's `state.panel` is `.emoji`, an `EmojiPanelView` covers the keys below the suggestion row,
-///   at the same height. It is made the first time it opens and kept, unless a memory warning frees it while closed.
+///   at the same height, with an `EmojiSearchField` in the suggestion row's band. The panel is made the first time it
+///   opens and kept, unless a memory warning frees it while closed.
+/// - In `.emojiSearch` (ruling M3-R15) the keys show again without their number row, the field shows the query, and an
+///   `EmojiSearchResultsView` fills the number row's band. It is made the first time search opens and kept, unless a
+///   memory warning frees it, with the search keywords, while search is closed.
 /// - The view looks clear, so the system's keyboard backdrop shows around and between the keys (ruling R42). Its fill
 ///   is `UIColor.touchableClear`, not `.clear`, so taps between the keys still reach it (ruling M3-R8).
 @MainActor public final class KeyboardView: UIView {
@@ -52,6 +56,8 @@ public enum ReturnKeyLabel {
         didSet {
             guard theme != oldValue else { return }
             emojiPanel?.theme = theme
+            searchField?.theme = theme
+            searchResults?.theme = theme
             rebuild()
         }
     }
@@ -61,11 +67,16 @@ public enum ReturnKeyLabel {
     public var onTouchDown: ((_ timestamp: TimeInterval, _ isBottomRow: Bool) -> Void)?
     /// Runs a stretch of the view's work, for timing: "touch" for each batch of touches handed to the controller
     /// (the touch processor and the controller's whole response), "render" for each `render()`, and "emojiInsert" for
-    /// each emoji the panel types. The keyboard extension wraps `work` in a signpost interval. Without it the work just runs.
+    /// each emoji the panel or search's results type. The keyboard extension wraps `work` in a signpost interval.
+    /// Without it the work just runs.
     public var measure: ((_ name: StaticString, _ work: () -> Void) -> Void)?
     /// Starts timing a stretch that ends only once Core Animation has committed and drawn it, and returns the call that
-    /// ends it: "emojiPanelOpen", from the emoji panel opening to its first frame with emoji drawn. The keyboard
-    /// extension begins a signpost interval here. Without it nothing is timed.
+    /// ends it:
+    /// - "emojiPanelOpen", from the emoji panel opening to its first frame with emoji drawn;
+    /// - "emojiSearchOpen", from search opening (a touch on the search field) to its first frame with the keys and the
+    ///   results drawn, including the first search's keyword load;
+    /// - "emojiSearchQuery", from a change to the query to the frame with its results drawn.
+    /// The keyboard extension begins a signpost interval here. Without it nothing is timed.
     public var startMeasure: ((_ name: StaticString) -> @MainActor @Sendable () -> Void)?
     /// Called once, after the first render that drew keys. The keyboard extension ends its startup measurement with it.
     public var onFirstKeysDrawn: (() -> Void)?
@@ -76,6 +87,10 @@ public enum ReturnKeyLabel {
     private let emojiPreferences: EmojiPreferences
     /// The emoji panel, once it has opened.
     private var emojiPanel: EmojiPanelView?
+    /// The search field above the panel and above search's results, once the panel has opened.
+    private var searchField: EmojiSearchField?
+    /// Search's results, once search has opened.
+    private var searchResults: EmojiSearchResultsView?
     /// What shows below the suggestion row now.
     private var shownPanel = KeyboardPanel.keys
     /// Whether this view has asked for the emoji font warm-up, which it does once, after its keys are first drawn.
@@ -144,7 +159,7 @@ public enum ReturnKeyLabel {
         // setWidth redraws through onChange only when the width changed. Frames the controller already had,
         // such as before this view existed, still need drawing.
         if controller.frames != builtFrames { render() }
-        layOutEmojiPanel()
+        layOutEmojiViews()
     }
 
     public override func didMoveToWindow() {
@@ -155,6 +170,7 @@ public enum ReturnKeyLabel {
         liveTouchIDs.removeAll(keepingCapacity: true)
         controller.cancelAllTouches()
         emojiPanel?.endInteractions()
+        searchResults?.endInteractions()
         if window == nil {
             displayLink?.invalidate()
             displayLink = nil
@@ -180,7 +196,7 @@ public enum ReturnKeyLabel {
         updateKeys(to: state)
         updatePreview(state)
         updateAlternates(state)
-        updatePanel(state.panel)
+        updatePanel(state)
         CATransaction.commit()
         renderedState = state
         updateTimer()
@@ -226,14 +242,17 @@ public enum ReturnKeyLabel {
         }
     }
 
-    /// Labels follow shift, cursor mode and the return key type; highlights follow the pressed keys.
+    /// Labels follow the shift shown (none in emoji search), cursor mode and the return key type; highlights follow the
+    /// pressed keys.
     private func updateKeys(to state: KeyboardState) {
         let old = renderedState
-        if old?.shift != state.shift || old?.cursorMode != state.cursorMode || old?.returnKey != state.returnKey {
+        if old?.shownShift != state.shownShift || old?.cursorMode != state.cursorMode
+            || old?.returnKey != state.returnKey || old?.panel != state.panel
+        {
             for (frame, keyLayer) in zip(controller.frames, keyLayers) {
                 keyLayer.setLabel(Self.label(of: frame.key, in: state))
                 keyLayer.setLabelsHidden(state.cursorMode)
-                keyLayer.setActive(frame.key.action == .shift && state.shift != .off)
+                keyLayer.setActive(frame.key.action == .shift && state.shownShift != .off)
             }
         }
         let changed = old.map { $0.pressedKeyIDs.symmetricDifference(state.pressedKeyIDs) } ?? state.pressedKeyIDs
@@ -283,35 +302,65 @@ public enum ReturnKeyLabel {
         max(traitCollection.displayScale, 1)
     }
 
-    // MARK: Emoji panel
+    // MARK: Emoji panel and search
 
-    /// Frees the emoji panel and its cells, and the decoded emoji kept for the process, unless the panel is showing.
-    /// The next open makes the panel and decodes the emoji again, and the next appearance warms the emoji font again.
+    /// Frees what the emoji panel and search keep while they are closed: search's results and the search keywords
+    /// unless search shows, and the panel, its cells and the decoded emoji kept for the process while the keys show.
+    /// The next open makes them and loads the data again, and the next appearance warms the emoji font again.
     /// The keyboard extension calls this on a memory warning.
     public func didReceiveMemoryWarning() {
         EmojiFontWarmup.forget()
+        if shownPanel != .emojiSearch {
+            searchResults?.removeFromSuperview()
+            searchResults = nil
+            EmojiSearchStore.shared.release()
+        }
         guard shownPanel == .keys else { return }
         emojiPanel?.removeFromSuperview()
         emojiPanel = nil
         EmojiCatalogStore.shared.release()
     }
 
-    /// For the app's preview: shows the emoji panel's skin popup for `emoji` as if a finger held it, once the panel is open.
+    /// For the app's preview: shows the skin popup for `emoji` as if a finger held it, in search's results while search
+    /// shows, else in the emoji panel once it is open.
     public func showEmojiHoldForPreview(_ emoji: String) {
-        emojiPanel?.showHoldForPreview(emoji)
+        if shownPanel == .emojiSearch {
+            searchResults?.showHoldForPreview(emoji)
+        } else {
+            emojiPanel?.showHoldForPreview(emoji)
+        }
     }
 
-    /// Shows the emoji panel in place of the keys, or the keys again. Opening is timed as "emojiPanelOpen", until Core
-    /// Animation has committed the frame, so the emoji's first drawing counts.
-    private func updatePanel(_ panel: KeyboardPanel) {
-        guard panel != shownPanel else { return }
-        shownPanel = panel
-        guard panel == .emoji else {
-            emojiPanel?.endInteractions()
-            emojiPanel?.isHidden = true
-            keysLayer.isHidden = false
+    /// Shows what the controller's `state.panel` asks for below the suggestion row (the keys, the emoji panel or search),
+    /// and in search the results for its query.
+    private func updatePanel(_ state: KeyboardState) {
+        guard state.panel != shownPanel else {
+            if state.panel == .emojiSearch { updateSearch(query: state.searchQuery) }
             return
         }
+        shownPanel = state.panel
+        switch state.panel {
+        case .keys:
+            emojiPanel?.endInteractions()
+            emojiPanel?.isHidden = true
+            searchResults?.endInteractions()
+            searchResults?.isHidden = true
+            // As a button it has no caret, so nothing blinks while it is hidden.
+            searchField?.show(.button)
+            searchField?.isHidden = true
+            keysLayer.isHidden = false
+        case .emoji:
+            openEmojiPanel()
+        case .emojiSearch:
+            openEmojiSearch(query: state.searchQuery)
+        }
+    }
+
+    /// Shows the emoji panel in place of the keys or search, with the search field above it as a button. Timed as
+    /// "emojiPanelOpen", until Core Animation has committed the frame, so the emoji's first drawing counts.
+    private func openEmojiPanel() {
+        searchResults?.endInteractions()
+        searchResults?.isHidden = true
         let endMeasure = startMeasure?("emojiPanelOpen")
         CATransaction.begin()
         // Called once the outermost transaction has committed, after the new cells' text was drawn.
@@ -319,9 +368,47 @@ public enum ReturnKeyLabel {
         let emojiPanel = self.emojiPanel ?? makeEmojiPanel()
         keysLayer.isHidden = true
         emojiPanel.isHidden = false
-        layOutEmojiPanel()
+        layOutEmojiViews()
         emojiPanel.open()
+        // The field's data comes with the catalog, which the panel has just loaded.
+        let searchField = self.searchField ?? makeSearchField()
+        searchField.show(.button)
+        searchField.isHidden = false
         emojiPanel.layoutIfNeeded()
+        CATransaction.commit()
+    }
+
+    /// Shows search: the keys again (the controller has laid them out without their number row), the field with the
+    /// query and the results below it. The first search in the process loads the keywords here. Timed as
+    /// "emojiSearchOpen", until Core Animation has committed the frame.
+    private func openEmojiSearch(query: String) {
+        emojiPanel?.endInteractions()
+        emojiPanel?.isHidden = true
+        let searchField = self.searchField ?? makeSearchField()
+        // Before the timed transaction: the caret's endless blink, added in it, would hold back its completion.
+        searchField.show(.editing(query: query))
+        let endMeasure = startMeasure?("emojiSearchOpen")
+        CATransaction.begin()
+        CATransaction.setCompletionBlock(endMeasure.map { end in { MainActor.assumeIsolated { end() } } })
+        keysLayer.isHidden = false
+        searchField.isHidden = false
+        let searchResults = self.searchResults ?? makeSearchResults()
+        searchResults.isHidden = false
+        layOutEmojiViews()
+        searchResults.open()
+        CATransaction.commit()
+    }
+
+    /// The query changed in search: the field shows it, and the results follow. Timed as "emojiSearchQuery", until Core
+    /// Animation has committed the frame with the new results drawn.
+    private func updateSearch(query: String) {
+        // Before the timed transaction, for the caret's blink as in `openEmojiSearch(query:)`.
+        searchField?.show(.editing(query: query))
+        guard let searchResults, searchResults.query != query else { return }
+        let endMeasure = startMeasure?("emojiSearchQuery")
+        CATransaction.begin()
+        CATransaction.setCompletionBlock(endMeasure.map { end in { MainActor.assumeIsolated { end() } } })
+        searchResults.show(query: query)
         CATransaction.commit()
     }
 
@@ -338,26 +425,87 @@ public enum ReturnKeyLabel {
         }
         addSubview(emojiPanel)
         self.emojiPanel = emojiPanel
+        restack()
         return emojiPanel
     }
 
-    /// The panel fills the view below the suggestion row, so the keyboard keeps its height.
-    private func layOutEmojiPanel() {
-        guard let emojiPanel else { return }
-        let top = min(CGFloat(controller.metrics.suggestionRowHeight), bounds.height)
-        let frame = CGRect(x: 0, y: top, width: bounds.width, height: bounds.height - top)
-        if emojiPanel.frame != frame { emojiPanel.frame = frame }
+    /// The field, with its placeholder and icons from the emoji data. If the data can't be loaded, it shows none.
+    private func makeSearchField() -> EmojiSearchField {
+        let data = try? EmojiCatalogStore.shared.catalog().data
+        let searchField = EmojiSearchField(
+            placeholder: data?.searchPlaceholder ?? "", icon: data?.searchIcon ?? "",
+            clearIcon: data?.searchClearIcon ?? "")
+        searchField.theme = theme
+        searchField.onOpen = { [weak self] in
+            guard let self, controller.state.panel == .emoji else { return }
+            feedback.keyDown()
+            controller.openEmojiSearch()
+        }
+        searchField.onClear = { [weak self] in
+            guard let self, controller.state.panel == .emojiSearch, !controller.state.searchQuery.isEmpty else { return }
+            feedback.keyDown()
+            controller.clearEmojiSearch()
+        }
+        addSubview(searchField)
+        self.searchField = searchField
+        restack()
+        return searchField
     }
 
-    /// What `key` shows: letters in capitals while shift is on, ⇪ for caps lock, and the field's return label.
+    private func makeSearchResults() -> EmojiSearchResultsView {
+        let searchResults = EmojiSearchResultsView(controller: controller, feedback: feedback, preferences: emojiPreferences)
+        searchResults.theme = theme
+        searchResults.measure = { [weak self] name, work in
+            guard let self else { return work() }
+            measuring(name, work)
+        }
+        searchResults.onTyped = { [weak self] in self?.emojiPanel?.emojiTypedElsewhere() }
+        addSubview(searchResults)
+        self.searchResults = searchResults
+        restack()
+        return searchResults
+    }
+
+    /// Orders what overlaps, bottom to top: the search field; search's results, whose skin popup reaches up over the
+    /// field; the emoji panel, whose skin popup does too; then the key preview and the long-press popup, which reach up
+    /// from the top letter row over the results.
+    private func restack() {
+        for view in [searchField, searchResults, emojiPanel] {
+            if let view { bringSubviewToFront(view) }
+        }
+        layer.addSublayer(previewLayer)
+        layer.addSublayer(alternatesLayer)
+    }
+
+    /// The panel fills the view below the suggestion row, so the keyboard keeps its height. The field fills the
+    /// suggestion row's band, and the results the number row's, down to the middle of the gap above the letters, where
+    /// the top letter row's touch band begins.
+    private func layOutEmojiViews() {
+        let metrics = controller.metrics
+        let top = min(CGFloat(metrics.suggestionRowHeight), bounds.height)
+        let resultsBottom = min(
+            CGFloat(metrics.suggestionRowHeight + metrics.numberRowHeight + metrics.rowGap / 2), bounds.height)
+        let frames: [(UIView?, CGRect)] = [
+            (emojiPanel, CGRect(x: 0, y: top, width: bounds.width, height: bounds.height - top)),
+            (searchField, CGRect(x: 0, y: 0, width: bounds.width, height: top)),
+            (searchResults, CGRect(x: 0, y: top, width: bounds.width, height: max(resultsBottom - top, 0))),
+        ]
+        for case let (view?, frame) in frames where view.frame != frame {
+            view.frame = frame
+        }
+    }
+
+    /// What `key` shows: letters in capitals while shift shows as on, ⇪ for caps lock, and the field's return label.
+    /// In emoji search no shift shows, and return reads as a plain return key: it goes back to the panel, not to the
+    /// field's action, such as Send.
     private static func label(of key: KeySpec, in state: KeyboardState) -> String {
         switch key.action {
-        case .character where state.shift != .off && key.output.count == 1:
+        case .character where state.shownShift != .off && key.output.count == 1:
             key.label.uppercased()
-        case .shift where state.shift == .locked:
+        case .shift where state.shownShift == .locked:
             capsLockLabel
         case .returnKey:
-            ReturnKeyLabel.text(for: state.returnKey)
+            ReturnKeyLabel.text(for: state.panel == .emojiSearch ? .standard : state.returnKey)
         default:
             key.label
         }

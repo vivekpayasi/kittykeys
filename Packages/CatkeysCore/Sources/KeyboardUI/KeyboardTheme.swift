@@ -23,17 +23,20 @@ public struct KeyboardTheme: Equatable, Sendable {
     /// The long-press option that a lift would type, and its label.
     public let selection: UIColor
     public let selectedLabel: UIColor
+    /// The emoji search field. Its caret takes `selection`.
+    public let searchField: UIColor
 
     public static let light = KeyboardTheme(
         backdrop: UIColor(rgb: 0xE2E4E8), key: UIColor(rgb: 0xFFFFFF), specialKey: UIColor(rgb: 0xABB0BA),
         label: UIColor(rgb: 0x111111), hint: UIColor(rgb: 0x7A7F88), popup: UIColor(rgb: 0xFFFFFF),
-        selection: UIColor(rgb: 0x0A84FF), selectedLabel: UIColor(rgb: 0xFFFFFF))
+        selection: UIColor(rgb: 0x0A84FF), selectedLabel: UIColor(rgb: 0xFFFFFF), searchField: UIColor(rgb: 0xFFFFFF))
 
-    /// The popup is a shade lighter than the keys, so it stands apart from the keys it covers.
+    /// The popup is a shade lighter than the keys, so it stands apart from the keys it covers. The search field is as
+    /// dark as the special keys, so its grey placeholder stays readable.
     public static let dark = KeyboardTheme(
         backdrop: UIColor(rgb: 0x171717), key: UIColor(rgb: 0x6B6B6E), specialKey: UIColor(rgb: 0x454548),
         label: UIColor(rgb: 0xFFFFFF), hint: UIColor(rgb: 0xC4C4C8), popup: UIColor(rgb: 0x828286),
-        selection: UIColor(rgb: 0x0A84FF), selectedLabel: UIColor(rgb: 0xFFFFFF))
+        selection: UIColor(rgb: 0x0A84FF), selectedLabel: UIColor(rgb: 0xFFFFFF), searchField: UIColor(rgb: 0x454548))
 }
 
 extension UIColor {
