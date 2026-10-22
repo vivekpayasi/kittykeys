@@ -282,7 +282,7 @@ public struct TypingRunStore { public init(defaults: UserDefaults); public func 
 - Hinglish keywords come later, as data only.
 - Keyword data loads only when search opens.
 
-**Files:** modify `scripts/make-emoji-data.py`. Create `Packages/CatkeysCore/Sources/KeyboardCore/Emoji/emoji-keywords.json` (generated, committed), `Emoji/EmojiSearch.swift` and `Tests/KeyboardCoreTests/EmojiSearchTests.swift`. Modify `Controller/KeyboardController.swift`, `Controller/KeyboardState.swift` and `Package.swift`.
+**Files:** modify `scripts/make-emoji-data.py`. Create `Packages/CatkeysCore/Sources/KeyboardCore/Emoji/EmojiKeywords/` (generated per-language files such as `en.json`, plus `popular.json`; committed; see M3-R16 and M3-R17), `Emoji/EmojiSearch.swift` and `Tests/KeyboardCoreTests/EmojiSearchTests.swift`. Modify `Controller/KeyboardController.swift`, `Controller/KeyboardState.swift` and `Package.swift`.
 
 **Data:** `emoji-keywords.json` is `{"source": "...", "language": "en", "keywords": {"<base emoji>": ["grinning", "face", ...]}}`.
 - Each list is the Emojibase `label` words plus `tags`, lowercased, de-duplicated, with words under 2 letters dropped. The label words come first.
@@ -394,6 +394,15 @@ public struct EmojiSearch {
 - M3-R12: 0.3 s after the keys first draw, once per process and at utility priority, catkeys draws Recent plus the first category's first 64 emoji into a tiny offscreen bitmap. Tab icons render on the main thread, one per run-loop turn. This avoids a slow first open: 172 ms becomes 35 ms on the simulator.
 - M3-R13: the warm-up decodes the catalog, reads its emoji list and drops it, so the panel still decodes on first open. This keeps the plan's memory rule.
 - M3-R15: emoji search, approved by the user (Tasks 4c and 4d). The keyboard height stays the same: the search field takes the suggestion-row band and the results strip takes the number-row band. Hinglish keywords come later, as data.
+- M3-R16: search ranking.
+  - **Tiers:** name word matches exactly, then name word starts with the query, then tag matches exactly, then tag starts with the query.
+  - **Within a tier:** recent emoji first, then a small hand-curated popularity list (data), then a shorter matched keyword, then fewer name words, then catalog order.
+  - **Keyword data:** one file per language in `Emoji/EmojiKeywords/`, merged on load, so adding Hinglish is data-only. English stopwords are dropped from names.
+- M3-R17: refines the M3-R16 tiers.
+  - **Tiers:** exact (a name word or tag equals the query word), then name word starts with the query, then tag starts with the query.
+  - **Within a tier:** recent, popular, a name match before a tag match, shorter keyword, fewer name words, catalog order.
+  - **Stopwords** (merged across languages) never exclude a result; they only raise the emoji that match them. A query of only stopwords uses them as required. A last word that begins a stopword is treated as one while the query still ends in it; after a space, the word counts as finished.
+- M3-R18: in search, the bottom-left page key reads `ABC` (label from layout data) and returns to the emoji panel, as the user approved. The 😊 key does the same. From the panel, `ABC` returns to the letters.
 - Data: `emoji.json` also carries `recentIcon` (`clock`), so no SF Symbol name is hard-coded in Swift.
 
 ## Progress
