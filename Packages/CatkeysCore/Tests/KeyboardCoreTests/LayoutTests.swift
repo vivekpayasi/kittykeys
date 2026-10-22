@@ -45,4 +45,23 @@ import KeyboardCore
 @Test func decodingDefaults() throws {
     let k = try JSONDecoder().decode(KeySpec.self, from: Data(#"{"label":"a","extra":1}"#.utf8))
     #expect(k.output == "a" && k.width == 1 && k.longPress.isEmpty && k.action == .character)
+    #expect(k.icon == nil)
+}
+
+@Test func decodingIcon() throws {
+    let k = try JSONDecoder().decode(
+        KeySpec.self, from: Data(#"{"label":"x","action":"emoji","icon":"some.symbol"}"#.utf8))
+    #expect(k.icon == "some.symbol" && k.label == "x" && k.action == .emoji)
+}
+
+@Test func everyEmojiKeyHasTheSmileyIcon() throws {
+    let set = try LayoutSet.bundled()
+    for id in ["latin-qwerty", "symbols-1", "symbols-2"] {
+        let page = try #require(set.page(id))
+        for variant in BottomVariant.allCases {
+            let emoji = page.bottomRow(variant).filter { $0.action == .emoji }
+            #expect(emoji.count == 1, "\(id) \(variant)")
+            #expect(emoji.allSatisfy { $0.icon == "face.smiling" && $0.label == "😊" }, "\(id) \(variant)")
+        }
+    }
 }

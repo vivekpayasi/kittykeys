@@ -33,6 +33,7 @@ public enum ReturnKeyLabel {
 /// - A touch whose lift never arrives is ended for it (ruling R33): when the view leaves or rejoins a window,
 ///   and when a new touch begins while UIKit no longer reports it.
 /// - The suggestion row is an empty band at the top in milestone 1.
+/// - The view itself is clear, so the system's keyboard backdrop shows around and between the keys (ruling R42).
 @MainActor public final class KeyboardView: UIView {
     /// The width of a long-press option's cell, the touch processor's own.
     private static let alternateWidth = CGFloat(TouchTiming().alternateWidth)
@@ -47,7 +48,6 @@ public enum ReturnKeyLabel {
     public var theme: KeyboardTheme = .light {
         didSet {
             guard theme != oldValue else { return }
-            backgroundColor = theme.background
             rebuild()
         }
     }
@@ -92,7 +92,7 @@ public enum ReturnKeyLabel {
         super.init(frame: .zero)
         isMultipleTouchEnabled = true
         liveTouchIDs.reserveCapacity(Self.touchCapacity)
-        backgroundColor = theme.background
+        backgroundColor = .clear
         layer.addSublayer(keysLayer)
         layer.addSublayer(previewLayer)
         layer.addSublayer(alternatesLayer)
@@ -277,7 +277,7 @@ public enum ReturnKeyLabel {
         } else {
             fontSize = characterFontSize
         }
-        return KeyStyle(isSpecial: isSpecial, dimsLabel: isSpace, fontSize: fontSize)
+        return KeyStyle(isSpecial: isSpecial, dimsLabel: isSpace, fontSize: fontSize, icon: key.icon)
     }
 
     /// Corner hints go only on the letter and symbol rows between the number row (row 0) and the bottom row

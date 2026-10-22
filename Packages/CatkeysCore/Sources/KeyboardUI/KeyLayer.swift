@@ -10,6 +10,8 @@ struct KeyStyle {
     var dimsLabel: Bool
     /// The label's size; a label too wide for the key shrinks to fit.
     var fontSize: CGFloat
+    /// An SF Symbol drawn in place of the label, sized to match it. A name the system lacks leaves the label.
+    var icon: String?
 }
 
 /// A corner radius that fits a rounded rectangle of `size`: at most half of either side, and never negative.
@@ -24,7 +26,7 @@ func hasArea(_ size: CGSize) -> Bool {
     size.width > 0 && size.height > 0
 }
 
-/// One key: a rounded rectangle with a centred label and, on letter rows, a symbol in its top-right corner.
+/// One key: a rounded rectangle with a centred label or icon and, on letter rows, a symbol in its top-right corner.
 ///
 /// Each setter changes Core Animation properties only when its value changes. The caller wraps changes
 /// in a `CATransaction` with actions disabled.
@@ -35,9 +37,15 @@ final class KeyLayer: CALayer {
     private static let hintInset = CGSize(width: 4, height: 1)
     /// The least space kept between a label and the key's sides.
     private static let labelInset: CGFloat = 4
+    /// An icon's point size, in cap heights of the key's label font. Apple's emoji key icon is about 1.2 cap heights
+    /// tall beside its letters, and an SF Symbol such as the smiley is about as tall as its point size.
+    private static let iconSizeInCapHeights: CGFloat = 1.2
 
     private let labelLayer = CATextLayer()
     private var hintLayer: CATextLayer?
+    /// The key's icon, drawn once in the label colour; nil for a key that shows its label.
+    private var iconLayer: CALayer?
+    private var labelsHidden = false
     private var keyStyle = KeyStyle(isSpecial: false, dimsLabel: false, fontSize: 0)
     private var theme = KeyboardTheme.light
     private var label = ""
@@ -65,10 +73,28 @@ final class KeyLayer: CALayer {
         }
         updateFill()
 
-        labelLayer.contentsScale = scale
-        labelLayer.alignmentMode = .center
-        labelLayer.foregroundColor = (style.dimsLabel ? theme.hint : theme.label).cgColor
-        addSublayer(labelLayer)
+        let labelColor = style.dimsLabel ? theme.hint : theme.label
+        if let icon = style.icon,
+            let image = Self.iconImage(named: icon, fontSize: style.fontSize, color: labelColor, scale: scale)
+        {
+            let iconLayer = CALayer()
+            let size = CGSize(width: CGFloat(image.width) / scale, height: CGFloat(image.height) / scale)
+            // Centred on whole pixels, so the icon stays sharp.
+            iconLayer.frame = CGRect(
+                origin: CGPoint(
+                    x: ((bounds.width - size.width) / 2 * scale).rounded() / scale,
+                    y: ((bounds.height - size.height) / 2 * scale).rounded() / scale),
+                size: size)
+            iconLayer.contents = image
+            iconLayer.contentsScale = scale
+            addSublayer(iconLayer)
+            self.iconLayer = iconLayer
+        } else {
+            labelLayer.contentsScale = scale
+            labelLayer.alignmentMode = .center
+            labelLayer.foregroundColor = labelColor.cgColor
+            addSublayer(labelLayer)
+        }
 
         if let hint {
             let hintLayer = CATextLayer()
@@ -96,8 +122,9 @@ final class KeyLayer: CALayer {
         fatalError("init(coder:) is not supported")
     }
 
+    /// Sets the label a key without an icon shows.
     func setLabel(_ text: String) {
-        guard text != label else { return }
+        guard iconLayer == nil, text != label else { return }
         label = text
         labelLayer.string = text
         let font = UIFont.systemFont(ofSize: fittedFontSize(for: text))
@@ -107,10 +134,12 @@ final class KeyLayer: CALayer {
         labelLayer.frame = CGRect(x: 0, y: ((bounds.height - height) / 2).rounded(), width: bounds.width, height: height)
     }
 
-    /// Hides the label and the corner hint, as cursor mode does.
+    /// Hides the label or icon and the corner hint, as cursor mode does.
     func setLabelsHidden(_ hidden: Bool) {
-        guard hidden != labelLayer.isHidden else { return }
+        guard hidden != labelsHidden else { return }
+        labelsHidden = hidden
         labelLayer.isHidden = hidden
+        iconLayer?.isHidden = hidden
         hintLayer?.isHidden = hidden
     }
 
@@ -130,6 +159,22 @@ final class KeyLayer: CALayer {
     private func updateFill() {
         let lit = isPressed || isActive
         backgroundColor = (keyStyle.isSpecial == lit ? theme.key : theme.specialKey).cgColor
+    }
+
+    /// The SF Symbol `name` in `color`, drawn at `scale` beside labels of `fontSize`; nil when the system lacks it.
+    ///
+    /// The symbol's shape is always the light appearance's; the theme gives the colour. In dark mode iOS 26 swaps
+    /// the smiley for a filled one, and the trait collection current while keys are built would pick that.
+    private static func iconImage(named name: String, fontSize: CGFloat, color: UIColor, scale: CGFloat) -> CGImage? {
+        let pointSize = UIFont.systemFont(ofSize: fontSize).capHeight * iconSizeInCapHeights
+        let configuration = UIImage.SymbolConfiguration(pointSize: pointSize, weight: .regular)
+            .withTraitCollection(UITraitCollection(userInterfaceStyle: .light))
+        guard let symbol = UIImage(systemName: name, withConfiguration: configuration) else { return nil }
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = scale
+        format.opaque = false
+        let tinted = symbol.withTintColor(color, renderingMode: .alwaysOriginal)
+        return UIGraphicsImageRenderer(size: symbol.size, format: format).image { _ in tinted.draw(at: .zero) }.cgImage
     }
 
     /// `keyStyle.fontSize`, shrunk so that `text` fits across the key.

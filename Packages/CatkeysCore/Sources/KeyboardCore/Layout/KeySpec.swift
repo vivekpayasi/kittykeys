@@ -39,6 +39,7 @@ public enum KeyAction: Equatable, Sendable, Decodable {
 
 /// One key as a layout file describes it.
 public struct KeySpec: Equatable, Sendable, Decodable {
+    /// The text the key shows, and its fallback and accessibility text when it has an `icon`.
     public var label: String
     /// The text a character key types. Defaults to `label`.
     public var output: String
@@ -47,6 +48,8 @@ public struct KeySpec: Equatable, Sendable, Decodable {
     /// Width in key units. Defaults to 1; 0 fills the space left in the row.
     public var width: Double
     public var action: KeyAction
+    /// An SF Symbol the key shows in place of `label`, such as the emoji key's smiley. Defaults to none.
+    public var icon: String?
 
     /// The symbol drawn in the key's corner: its first long-press option, for character keys only.
     public var cornerHint: String? {
@@ -56,7 +59,7 @@ public struct KeySpec: Equatable, Sendable, Decodable {
 
 extension KeySpec {
     private enum CodingKeys: String, CodingKey {
-        case label, output, longPress, width, action
+        case label, output, longPress, width, action, icon
     }
 
     public init(from decoder: any Decoder) throws {
@@ -66,5 +69,6 @@ extension KeySpec {
         longPress = try container.decodeIfPresent([String].self, forKey: .longPress) ?? []
         width = try container.decodeIfPresent(Double.self, forKey: .width) ?? 1
         action = try container.decodeIfPresent(KeyAction.self, forKey: .action) ?? .character
+        icon = try container.decodeIfPresent(String.self, forKey: .icon)
     }
 }

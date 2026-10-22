@@ -4,9 +4,13 @@ import UIKit
 
 /// The keyboard's colours. The host picks `.light` or `.dark` from the trait collection or the field's `keyboardAppearance`.
 /// Close to Apple's keyboard, as in the approved mockups.
+///
+/// The keyboard view has no background of its own: the system's keyboard backdrop (Liquid Glass on iOS 26) shows
+/// around and between the keys and in the suggestion row (ruling R42). The key colours read well on it.
 public struct KeyboardTheme: Equatable, Sendable {
-    /// Behind the keys, including the suggestion row.
-    public let background: UIColor
+    /// A grey like the system's keyboard backdrop, for a host that has none behind the keys, such as the app's preview.
+    /// The keyboard view never draws it.
+    public let backdrop: UIColor
     /// Letter, number and symbol keys, and space.
     public let key: UIColor
     /// Shift, backspace, the page keys, return and the bottom row's other keys. Pressing a key swaps it with `key`.
@@ -21,13 +25,13 @@ public struct KeyboardTheme: Equatable, Sendable {
     public let selectedLabel: UIColor
 
     public static let light = KeyboardTheme(
-        background: UIColor(rgb: 0xD1D3D9), key: UIColor(rgb: 0xFFFFFF), specialKey: UIColor(rgb: 0xABB0BA),
+        backdrop: UIColor(rgb: 0xE2E4E8), key: UIColor(rgb: 0xFFFFFF), specialKey: UIColor(rgb: 0xABB0BA),
         label: UIColor(rgb: 0x111111), hint: UIColor(rgb: 0x7A7F88), popup: UIColor(rgb: 0xFFFFFF),
         selection: UIColor(rgb: 0x0A84FF), selectedLabel: UIColor(rgb: 0xFFFFFF))
 
     /// The popup is a shade lighter than the keys, so it stands apart from the keys it covers.
     public static let dark = KeyboardTheme(
-        background: UIColor(rgb: 0x2C2C2E), key: UIColor(rgb: 0x6B6B6E), specialKey: UIColor(rgb: 0x454548),
+        backdrop: UIColor(rgb: 0x171717), key: UIColor(rgb: 0x6B6B6E), specialKey: UIColor(rgb: 0x454548),
         label: UIColor(rgb: 0xFFFFFF), hint: UIColor(rgb: 0xC4C4C8), popup: UIColor(rgb: 0x828286),
         selection: UIColor(rgb: 0x0A84FF), selectedLabel: UIColor(rgb: 0xFFFFFF))
 }

@@ -35,7 +35,7 @@
   "bottom": {
     "default": [
       {"label": "ABC", "action": "page:letters", "width": 1.5},
-      {"label": "😊", "action": "emoji"},
+      {"label": "😊", "action": "emoji", "icon": "face.smiling"},
       {"label": ","},
       {"label": "space", "output": " ", "action": "space", "width": 0},
       {"label": ".", "longPress": [".", "?", "!", "…", ":", "/"]},
@@ -43,7 +43,7 @@
     ],
     "email": [
       {"label": "ABC", "action": "page:letters", "width": 1.5},
-      {"label": "😊", "action": "emoji"},
+      {"label": "😊", "action": "emoji", "icon": "face.smiling"},
       {"label": "@"},
       {"label": "space", "output": " ", "action": "space", "width": 0},
       {"label": ".", "longPress": [".", "?", "!", "…", ":", "/"]},
@@ -51,7 +51,7 @@
     ],
     "url": [
       {"label": "ABC", "action": "page:letters", "width": 1.5},
-      {"label": "😊", "action": "emoji"},
+      {"label": "😊", "action": "emoji", "icon": "face.smiling"},
       {"label": "/"},
       {"label": "space", "output": " ", "action": "space", "width": 0},
       {"label": ".com", "width": 1.5},

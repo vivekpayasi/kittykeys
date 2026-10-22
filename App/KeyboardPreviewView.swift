@@ -44,6 +44,7 @@ struct PreviewScene {
 }
 
 /// A text view at the top and the keyboard at the bottom, sharing one controller.
+/// The keyboard view is clear, so a grey like the system's keyboard backdrop goes behind it and below it.
 final class KeyboardPreviewHost: UIView {
     /// Invented text, so the keyboard starts mid-sentence with shift off.
     private static let startingText = "Typing in the catkeys preview"
@@ -55,7 +56,7 @@ final class KeyboardPreviewHost: UIView {
     var theme: KeyboardTheme = .light {
         didSet {
             keyboardView.theme = theme
-            belowKeyboard.backgroundColor = theme.background
+            backdrop.backgroundColor = theme.backdrop
         }
     }
 
@@ -63,8 +64,8 @@ final class KeyboardPreviewHost: UIView {
     private let controller: KeyboardController
     private let keyboardView: KeyboardView
     private let textView = UITextView()
-    /// Fills the home-indicator area under the keyboard, as the system does under a real one.
-    private let belowKeyboard = UIView()
+    /// Behind the keyboard and the home-indicator area under it, as the system's backdrop is under a real one.
+    private let backdrop = UIView()
     /// The scene still to play; it plays once the keyboard has laid out its keys.
     private var scene: PreviewScene?
 
@@ -81,9 +82,10 @@ final class KeyboardPreviewHost: UIView {
         keyboardView = KeyboardView(controller: controller)
         super.init(frame: .zero)
         backgroundColor = .systemBackground
-        belowKeyboard.backgroundColor = theme.background
+        backdrop.backgroundColor = theme.backdrop
 
-        for view in [textView, keyboardView, belowKeyboard] {
+        // The backdrop goes in first, so it sits behind the keyboard.
+        for view in [backdrop, textView, keyboardView] {
             view.translatesAutoresizingMaskIntoConstraints = false
             addSubview(view)
         }
@@ -95,10 +97,10 @@ final class KeyboardPreviewHost: UIView {
             keyboardView.leadingAnchor.constraint(equalTo: leadingAnchor),
             keyboardView.trailingAnchor.constraint(equalTo: trailingAnchor),
             keyboardView.bottomAnchor.constraint(equalTo: safeAreaLayoutGuide.bottomAnchor),
-            belowKeyboard.topAnchor.constraint(equalTo: keyboardView.bottomAnchor),
-            belowKeyboard.leadingAnchor.constraint(equalTo: leadingAnchor),
-            belowKeyboard.trailingAnchor.constraint(equalTo: trailingAnchor),
-            belowKeyboard.bottomAnchor.constraint(equalTo: bottomAnchor),
+            backdrop.topAnchor.constraint(equalTo: keyboardView.topAnchor),
+            backdrop.leadingAnchor.constraint(equalTo: leadingAnchor),
+            backdrop.trailingAnchor.constraint(equalTo: trailingAnchor),
+            backdrop.bottomAnchor.constraint(equalTo: bottomAnchor),
         ])
     }
 
