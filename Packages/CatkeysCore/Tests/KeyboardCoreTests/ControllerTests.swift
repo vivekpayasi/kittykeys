@@ -455,9 +455,9 @@ import KeyboardCore
         #expect(bottomRow() == [.switchPage(.named("symbols-1")), .globe, .emoji, .character, .space, .character, .returnKey])
         try k.tap("🌐")
         #expect(globes == 1 && k.doc.text == "")
-        // The emoji key does nothing yet.
+        // The emoji key types nothing and isn't the globe: it opens the emoji panel (EmojiControllerTests).
         try k.tap("😊")
-        #expect(globes == 1 && k.doc.text == "")
+        #expect(globes == 1 && k.doc.text == "" && k.controller.state.panel == .emoji)
         k.controller.needsGlobeKey = false
         #expect(!bottomRow().contains(.globe))
     }

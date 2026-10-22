@@ -2,7 +2,8 @@
 /// to a `TextDocument`, and keeps the `state` and `frames` the keyboard view draws.
 ///
 /// It applies the typing rules: shift and caps lock, automatic capitals, the double-space full stop,
-/// the field's bottom row and first page, and the globe key.
+/// the field's bottom row and first page, and the globe key. It opens and closes the emoji panel, and types and
+/// deletes the panel's emoji as typing.
 ///
 /// Times are the host's touch timestamps in seconds. The host calls `advance(to:)` before forwarding each touch,
 /// and whenever `nextDeadline` passes.
@@ -127,11 +128,12 @@
     }
 
     /// The keyboard is about to show. It starts afresh: no touch left from before (as `cancelAllTouches()`),
-    /// the field's first page and bottom row even for the same traits, shift unlocked, and no earlier shift tap
-    /// or space to pair with. Then automatic capitals are checked.
+    /// the keys rather than the emoji panel, the field's first page and bottom row even for the same traits,
+    /// shift unlocked, and no earlier shift tap or space to pair with. Then automatic capitals are checked.
     public func keyboardWillAppear(_ traits: FieldTraits) {
         notifying {
             apply(processor.cancelAll())
+            state.panel = .keys
             adopt(traits)
             forgetPreviousKey()
             state.shift = .off
@@ -146,17 +148,22 @@
         notifying { updateAutoShiftIfTextMoved() }
     }
 
+    /// Touches on the keys. While the emoji panel shows, the keys under it take none: the view sends the panel's
+    /// touches to the panel, and these three do nothing.
     public func touchDown(_ id: TouchID, at p: Point, time: Double) {
+        guard state.panel == .keys else { return }
         now = time
         notifying { apply(processor.touchDown(id, at: p, time: time)) }
     }
 
     public func touchMoved(_ id: TouchID, to p: Point, time: Double) {
+        guard state.panel == .keys else { return }
         now = time
         notifying { apply(processor.touchMoved(id, to: p, time: time)) }
     }
 
     public func touchUp(_ id: TouchID, at p: Point, time: Double) {
+        guard state.panel == .keys else { return }
         now = time
         notifying { apply(processor.touchUp(id, at: p, time: time)) }
     }
@@ -178,10 +185,41 @@
         notifying { apply(processor.advance(to: time)) }
     }
 
+    // MARK: Emoji panel
+
+    /// Types `emoji` as a key would: the shift taps and space before it stop pairing up, and automatic capitals
+    /// are checked again. An emoji has no case, so a shift the user tapped stays on for the next letter.
+    public func insertEmoji(_ emoji: String) {
+        notifying { insert(emoji) }
+    }
+
+    /// The panel's ⌫: deletes one grapheme, so one whole emoji, flags, skin tones and joined sequences included,
+    /// with the same bookkeeping as backspace. Does nothing while the keys show, so a late repeat deletes nothing.
+    public func deleteFromPanel() {
+        guard state.panel == .emoji else { return }
+        notifying { delete(1) }
+    }
+
+    /// ABC in the panel: the keys show again, on the page and with the shift the panel left them. Like opening it,
+    /// closing ends any touch on the keys. Does nothing while the keys show.
+    public func closePanel() {
+        guard state.panel == .emoji else { return }
+        notifying {
+            apply(processor.cancelAll())
+            state.panel = .keys
+        }
+    }
+
     // MARK: Events
 
     private func apply(_ events: [TouchEvent]) {
         for event in events { apply(event) }
+        // The emoji panel covers the keys, so no touch on them outlives its opening: their highlights, the preview,
+        // the popup, cursor mode and backspace repeats end here. Ending them after the whole batch, not at the emoji
+        // key's activation, also ends a touch that came in the same batch, as when a lost lift opens the panel.
+        if state.panel == .emoji {
+            for event in processor.cancelAll() { apply(event) }
+        }
         // The popup shows exactly while the processor has a finger choosing from it. A second finger on the same key
         // lifting leaves it, and the chooser's lift or cancel ends it.
         if state.alternates != nil && !processor.isShowingAlternates { state.alternates = nil }
@@ -239,8 +277,11 @@
             show(page: layouts.resolve(ref), bottom: bottomVariant)
         case .globe:
             onGlobe?()
-        case .backspace, .emoji:
-            // Backspace deletes through its own events; the emoji key does nothing in this milestone.
+        case .emoji:
+            // The touches still on the keys end once this batch of events is applied (see `apply(_:)`).
+            state.panel = .emoji
+        case .backspace:
+            // Backspace deletes through its own events.
             break
         }
     }

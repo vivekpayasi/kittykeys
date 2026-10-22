@@ -13,9 +13,14 @@ public struct AlternatesPopup: Equatable, Sendable {
     public var originX: Double
 }
 
+/// What fills the keyboard below the suggestion row: the keys, or the emoji panel in their place.
+public enum KeyboardPanel: Equatable, Sendable { case keys, emoji }
+
 /// Everything the keyboard view draws apart from the key frames.
 /// Key ids index the controller's current `frames`; a page or width change clears every one of them.
 public struct KeyboardState: Equatable, Sendable {
+    /// The emoji panel covers the keys without changing their page or frames, so closing it shows the same keys.
+    public var panel: KeyboardPanel = .keys
     public var pageID: String
     public var shift: ShiftState
     public var returnKey: ReturnKeyKind
