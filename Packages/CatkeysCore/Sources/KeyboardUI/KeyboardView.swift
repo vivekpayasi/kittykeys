@@ -68,6 +68,8 @@ public enum ReturnKeyLabel {
     private let alternatesLayer = AlternatesLayer()
     /// One layer per key, indexed by key id.
     private var keyLayers: [KeyLayer] = []
+    /// The key icons, rendered once for the theme and scale and reused by every rebuild of the keys.
+    private let iconCache = KeyIconCache()
     /// The frames `keyLayers` were built from; nil forces a rebuild.
     private var builtFrames: [KeyFrame]?
     /// The keyboard height when the keys were last built, to tell Auto Layout when a page changes it.
@@ -162,8 +164,9 @@ public enum ReturnKeyLabel {
         }
     }
 
-    /// Throws away every key layer and draws again, for a new theme or screen scale.
+    /// Throws away every key layer and icon and draws again, for a new theme or screen scale.
     private func rebuild() {
+        iconCache.removeAll()
         builtFrames = nil
         render()
     }
@@ -176,7 +179,7 @@ public enum ReturnKeyLabel {
         keyLayers = frames.map { frame in
             let keyLayer = KeyLayer(
                 rect: CGRect(frame.rect), style: Self.style(of: frame, lastRow: lastRow),
-                hint: Self.cornerHint(of: frame, lastRow: lastRow), theme: theme, scale: scale)
+                hint: Self.cornerHint(of: frame, lastRow: lastRow), theme: theme, scale: scale, icons: iconCache)
             keysLayer.addSublayer(keyLayer)
             return keyLayer
         }

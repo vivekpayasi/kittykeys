@@ -37,9 +37,6 @@ final class KeyLayer: CALayer {
     private static let hintInset = CGSize(width: 4, height: 1)
     /// The least space kept between a label and the key's sides.
     private static let labelInset: CGFloat = 4
-    /// An icon's point size, in cap heights of the key's label font. Apple's emoji key icon is about 1.2 cap heights
-    /// tall beside its letters, and an SF Symbol such as the smiley is about as tall as its point size.
-    private static let iconSizeInCapHeights: CGFloat = 1.2
 
     private let labelLayer = CATextLayer()
     private var hintLayer: CATextLayer?
@@ -54,7 +51,8 @@ final class KeyLayer: CALayer {
     private var isActive = false
 
     /// A key at `rect` in its parent layer. `scale` is the screen's, so text stays sharp.
-    init(rect: CGRect, style: KeyStyle, hint: String?, theme: KeyboardTheme, scale: CGFloat) {
+    /// A key with an icon takes its image from `icons`, which renders it only the first time.
+    init(rect: CGRect, style: KeyStyle, hint: String?, theme: KeyboardTheme, scale: CGFloat, icons: KeyIconCache) {
         self.keyStyle = style
         self.theme = theme
         super.init()
@@ -75,7 +73,7 @@ final class KeyLayer: CALayer {
 
         let labelColor = style.dimsLabel ? theme.hint : theme.label
         if let icon = style.icon,
-            let image = Self.iconImage(named: icon, fontSize: style.fontSize, color: labelColor, scale: scale)
+            let image = icons.image(named: icon, fontSize: style.fontSize, color: labelColor, scale: scale)
         {
             let iconLayer = CALayer()
             let size = CGSize(width: CGFloat(image.width) / scale, height: CGFloat(image.height) / scale)
@@ -161,28 +159,58 @@ final class KeyLayer: CALayer {
         backgroundColor = (keyStyle.isSpecial == lit ? theme.key : theme.specialKey).cgColor
     }
 
-    /// The SF Symbol `name` in `color`, drawn at `scale` beside labels of `fontSize`; nil when the system lacks it.
-    ///
-    /// The symbol's shape is always the light appearance's; the theme gives the colour. In dark mode iOS 26 swaps
-    /// the smiley for a filled one, and the trait collection current while keys are built would pick that.
-    private static func iconImage(named name: String, fontSize: CGFloat, color: UIColor, scale: CGFloat) -> CGImage? {
-        let pointSize = UIFont.systemFont(ofSize: fontSize).capHeight * iconSizeInCapHeights
-        let configuration = UIImage.SymbolConfiguration(pointSize: pointSize, weight: .regular)
-            .withTraitCollection(UITraitCollection(userInterfaceStyle: .light))
-        guard let symbol = UIImage(systemName: name, withConfiguration: configuration) else { return nil }
-        let format = UIGraphicsImageRendererFormat()
-        format.scale = scale
-        format.opaque = false
-        let tinted = symbol.withTintColor(color, renderingMode: .alwaysOriginal)
-        return UIGraphicsImageRenderer(size: symbol.size, format: format).image { _ in tinted.draw(at: .zero) }.cgImage
-    }
-
     /// `keyStyle.fontSize`, shrunk so that `text` fits across the key.
     private func fittedFontSize(for text: String) -> CGFloat {
         let width = (text as NSString).size(withAttributes: [.font: UIFont.systemFont(ofSize: keyStyle.fontSize)]).width
         let available = bounds.width - 2 * Self.labelInset
         guard width > available, width > 0 else { return keyStyle.fontSize }
         return (keyStyle.fontSize * available / width).rounded(.down)
+    }
+}
+
+/// Key icons, each rendered once. Every page switch rebuilds the key layers, and they take their icons from here
+/// rather than drawing them again. The owner empties it when the theme or screen scale changes.
+final class KeyIconCache {
+    /// An icon's point size, in cap heights of the key's label font. Apple's emoji key icon is about 1.2 cap heights
+    /// tall beside its letters, and an SF Symbol such as the smiley is about as tall as its point size.
+    private static let sizeInCapHeights: CGFloat = 1.2
+
+    private struct Key: Hashable {
+        var name: String
+        var fontSize: CGFloat
+        var color: UIColor
+        var scale: CGFloat
+    }
+
+    /// Rendered icons, and nil for a name the system lacks, so a missing symbol is looked up only once too.
+    private var images: [Key: CGImage?] = [:]
+
+    /// The SF Symbol `name` in `color`, drawn at `scale` beside labels of `fontSize`; nil when the system lacks it.
+    func image(named name: String, fontSize: CGFloat, color: UIColor, scale: CGFloat) -> CGImage? {
+        let key = Key(name: name, fontSize: fontSize, color: color, scale: scale)
+        if let cached = images[key] { return cached }
+        let image = Self.render(key)
+        images[key] = image
+        return image
+    }
+
+    func removeAll() {
+        images.removeAll()
+    }
+
+    /// The symbol's shape is always the light appearance's; the theme gives the colour. In dark mode iOS 26 swaps
+    /// the smiley for a filled one, and the trait collection current while keys are built would pick that.
+    private static func render(_ key: Key) -> CGImage? {
+        let pointSize = UIFont.systemFont(ofSize: key.fontSize).capHeight * sizeInCapHeights
+        let configuration = UIImage.SymbolConfiguration(pointSize: pointSize, weight: .regular)
+            // Only the appearance is pinned; the size and weight come from this configuration, the scale from `key`.
+            .withTraitCollection(UITraitCollection(userInterfaceStyle: .light))
+        guard let symbol = UIImage(systemName: key.name, withConfiguration: configuration) else { return nil }
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = key.scale
+        format.opaque = false
+        let tinted = symbol.withTintColor(key.color, renderingMode: .alwaysOriginal)
+        return UIGraphicsImageRenderer(size: symbol.size, format: format).image { _ in tinted.draw(at: .zero) }.cgImage
     }
 }
 #endif
