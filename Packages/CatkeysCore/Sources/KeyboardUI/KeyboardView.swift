@@ -78,6 +78,8 @@ public enum ReturnKeyLabel {
     private var emojiPanel: EmojiPanelView?
     /// What shows below the suggestion row now.
     private var shownPanel = KeyboardPanel.keys
+    /// Whether this view has asked for the emoji font warm-up, which it does once, after its keys are first drawn.
+    private var hasScheduledFontWarmup = false
     private let keysLayer = CALayer()
     private let previewLayer = KeyPreviewLayer()
     private let alternatesLayer = AlternatesLayer()
@@ -186,6 +188,11 @@ public enum ReturnKeyLabel {
             self.onFirstKeysDrawn = nil
             onFirstKeysDrawn()
         }
+        // After startup is measured and the keys are drawn, the emoji font loads in the background (ruling M3-R12).
+        if !keyLayers.isEmpty && !hasScheduledFontWarmup {
+            hasScheduledFontWarmup = true
+            EmojiFontWarmup.scheduleIfNeeded(scale: displayScale) { [weak self] in self?.emojiPreferences.recents ?? [] }
+        }
     }
 
     /// Throws away every key layer and icon and draws again, for a new theme or screen scale.
@@ -279,8 +286,10 @@ public enum ReturnKeyLabel {
     // MARK: Emoji panel
 
     /// Frees the emoji panel and its cells, and the decoded emoji kept for the process, unless the panel is showing.
-    /// The next open makes the panel and decodes the emoji again. The keyboard extension calls this on a memory warning.
+    /// The next open makes the panel and decodes the emoji again, and the next appearance warms the emoji font again.
+    /// The keyboard extension calls this on a memory warning.
     public func didReceiveMemoryWarning() {
+        EmojiFontWarmup.forget()
         guard shownPanel == .keys else { return }
         emojiPanel?.removeFromSuperview()
         emojiPanel = nil

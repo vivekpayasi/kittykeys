@@ -7,7 +7,8 @@ import UIKit
 /// A pressed cell shows a rounded highlight behind its emoji.
 final class EmojiCell: UICollectionViewCell {
     static let reuseIdentifier = "emoji"
-    private static let fontSize: CGFloat = 30
+    /// Also the size `EmojiFontWarmup` draws at, off the main thread.
+    nonisolated static let fontSize: CGFloat = 30
     /// The label is only as big as one emoji, so its backing store stays small.
     private static let labelSize = CGSize(width: 40, height: 38)
     private static let highlightCornerRadius: CGFloat = 8

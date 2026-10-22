@@ -22,8 +22,8 @@ final class EmojiTabBar: UIView {
     private static let sideShare: CGFloat = 0.13, minimumSideWidth: CGFloat = 44
     /// ABC's text size and ⌫'s, as on the keys.
     private static let lettersFontSize: CGFloat = 15, deleteFontSize: CGFloat = 21
-    /// Tab icons are drawn to sit beside text of this size (see `KeyIconCache`).
-    private static let iconFontSize: CGFloat = 19
+    /// Tab icons are drawn to sit beside text of this size (see `KeyIconCache`). `EmojiFontWarmup` draws them so too.
+    static let iconFontSize: CGFloat = 19
     /// The rounded highlight behind the current tab and behind ⌫ while it is held.
     private static let highlightSize = CGSize(width: 32, height: 30), highlightCornerRadius: CGFloat = 8
 
