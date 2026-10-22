@@ -8,16 +8,22 @@ import KeyboardCore
     @Test func emojiKeyOpensPanel() throws {
         let k = try Harness("hi")
         #expect(k.controller.state.panel == .keys)
-        try k.tap("😊")
-        #expect(k.controller.state.panel == .emoji && k.doc.text == "hi")
+        let p = try k.down("😊")
+        #expect(k.changes == 1)
+        k.now += 0.1
+        // The lift opens the panel and lets go of the key: one notice.
+        k.up(at: p)
+        k.now += 0.1
+        #expect(k.controller.state.panel == .emoji && k.doc.text == "hi" && k.changes == 2)
         // The keys stay as they were under the panel, with nothing held.
         #expect(k.controller.state.pageID == "latin-qwerty" && k.controller.state.pressedKeyIDs.isEmpty)
         // While the panel shows, the keys under it take no touches.
         try k.tap("a")
-        let p = try k.down("⌫")
+        let pDelete = try k.down("⌫")
         k.wait(1)
-        k.up(at: p)
+        k.up(at: pDelete)
         #expect(k.doc.text == "hi" && k.controller.state.pressedKeyIDs.isEmpty && k.controller.nextDeadline == nil)
+        #expect(k.changes == 2)
     }
 
     @Test func insertEmojiTypesIt() throws {
@@ -128,6 +134,61 @@ import KeyboardCore
         #expect(k.doc.text == "")
     }
 
+    @Test func lostLiftActsOnNothingUnderThePanel() throws {
+        // As above, but the finger lands on a key that acts on touch-down. The panel opens first, so the key does nothing.
+        let delete = try Harness("hello")
+        try delete.down("😊", id: 1)
+        delete.now += 0.1
+        let p = try delete.down("⌫", id: 1)
+        #expect(delete.controller.state.panel == .emoji && delete.doc.text == "hello")
+        #expect(delete.controller.state.pressedKeyIDs.isEmpty && delete.controller.nextDeadline == nil)
+        delete.wait(1)
+        delete.up(at: p, id: 1)
+        #expect(delete.doc.text == "hello")
+
+        let page = try Harness()
+        try page.down("😊", id: 1)
+        page.now += 0.1
+        try page.down("123", id: 1)
+        page.controller.closePanel()
+        #expect(page.controller.state.pageID == "latin-qwerty")
+
+        let shift = try Harness()
+        try shift.down("😊", id: 1)
+        shift.now += 0.1
+        try shift.down("⇧", id: 1)
+        #expect(shift.controller.state.shift == .off && shift.controller.state.pressedKeyIDs.isEmpty)
+    }
+
+    @Test func panelEndsAHeldKeyWithoutTypingIt() throws {
+        // Ruling M3-R7: a letter held when 😊 lifts goes without being typed, as with any key touch the panel ends.
+        let k = try Harness()
+        let pEmoji = try k.down("😊", id: 1)
+        k.now += 0.05
+        let pa = try k.down("a", id: 2)
+        k.now += 0.05
+        k.up(at: pEmoji, id: 1)
+        #expect(k.controller.state.panel == .emoji && k.doc.text == "")
+        #expect(k.controller.state.pressedKeyIDs.isEmpty && k.controller.state.previewKeyID == nil)
+        #expect(k.controller.nextDeadline == nil)
+        k.now += 0.05
+        k.up(at: pa, id: 2)
+        #expect(k.doc.text == "")
+    }
+
+    @Test func panelEndsCursorMode() throws {
+        // 😊 is held while space goes into cursor mode; lifting 😊 still opens the panel, which ends cursor mode.
+        let k = try Harness("abc")
+        let pEmoji = try k.down("😊", id: 1)
+        k.now += 0.05
+        try k.down("space", id: 2)
+        k.wait(0.4)
+        #expect(k.controller.state.cursorMode)
+        k.up(at: pEmoji, id: 1)
+        #expect(k.controller.state.panel == .emoji && !k.controller.state.cursorMode)
+        #expect(k.controller.state.pressedKeyIDs.isEmpty && k.controller.nextDeadline == nil && k.doc.text == "abc")
+    }
+
     @Test func emojiThenDoubleSpace() throws {
         let k = try Harness("ok")
         try k.tap("😊")
@@ -149,14 +210,14 @@ import KeyboardCore
         k.controller.deleteFromPanel()
         #expect(k.doc.text == "Hi. " && k.controller.state.shift == .once && k.changes == changes + 2)
 
-        // An emoji between two quick shift taps stops them locking caps.
-        // It has no case, so the shift tapped before it is still on for the next letter.
+        // An emoji uses up a one-letter shift as a letter does (ruling M3-R6), and a quick shift tap after it is
+        // a first tap, not caps lock.
         let shift = try Harness()
         try shift.tap("⇧")
         shift.controller.insertEmoji("👋")
-        #expect(shift.controller.state.shift == .once)
+        #expect(shift.controller.state.shift == .off)
         try shift.tap("⇧")
-        #expect(shift.doc.text == "👋" && shift.controller.state.shift == .off)
+        #expect(shift.doc.text == "👋" && shift.controller.state.shift == .once)
     }
 
     @Test func hostNoticeOfAnEmojiKeepsShiftTappedOff() throws {

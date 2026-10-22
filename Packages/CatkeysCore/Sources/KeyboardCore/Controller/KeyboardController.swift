@@ -187,10 +187,10 @@
 
     // MARK: Emoji panel
 
-    /// Types `emoji` as a key would: the shift taps and space before it stop pairing up, and automatic capitals
-    /// are checked again. An emoji has no case, so a shift the user tapped stays on for the next letter.
+    /// Types `emoji` as a character key would: it uses up a one-letter shift (caps lock stays; ruling M3-R6),
+    /// the shift taps and space before it stop pairing up, and automatic capitals are checked again.
     public func insertEmoji(_ emoji: String) {
-        notifying { insert(emoji) }
+        notifying { typeText(emoji) }
     }
 
     /// The panel's ⌫: deletes one grapheme, so one whole emoji, flags, skin tones and joined sequences included,
@@ -213,10 +213,21 @@
     // MARK: Events
 
     private func apply(_ events: [TouchEvent]) {
-        for event in events { apply(event) }
+        let panelWasOpen = state.panel == .emoji
+        for event in events {
+            if !panelWasOpen && state.panel == .emoji {
+                // The emoji key opened the panel, and nothing acts under it: the rest of the batch only lets go of
+                // keys. A key whose press is skipped has no count, so the cancel below lets go of it quietly.
+                switch event {
+                case .keyUp, .cursorModeEnded: break
+                default: continue
+                }
+            }
+            apply(event)
+        }
         // The emoji panel covers the keys, so no touch on them outlives its opening: their highlights, the preview,
-        // the popup, cursor mode and backspace repeats end here. Ending them after the whole batch, not at the emoji
-        // key's activation, also ends a touch that came in the same batch, as when a lost lift opens the panel.
+        // the popup, cursor mode and backspace repeats end here, held keys untyped (ruling M3-R7). Ending them after
+        // the batch, not at the emoji key's activation, also ends a touch that came in it, as when a lost lift opens the panel.
         if state.panel == .emoji {
             for event in processor.cancelAll() { apply(event) }
         }
