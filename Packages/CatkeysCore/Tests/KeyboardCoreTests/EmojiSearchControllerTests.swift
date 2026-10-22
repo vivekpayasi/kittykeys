@@ -159,6 +159,17 @@ import KeyboardCore
         #expect(k.controller.state.searchQuery == "red h" && k.doc.text == "")
     }
 
+    @Test func queryStopsAt64Characters() throws {
+        let k = try searching()
+        try type(String(repeating: "ab ", count: 23), into: k)
+        #expect(k.controller.state.searchQuery.count == 64 && k.controller.state.searchQuery.hasPrefix("ab ab"))
+        try type("c", into: k)
+        #expect(k.controller.state.searchQuery.count == 64 && k.doc.text == "")
+        try k.tap("⌫")
+        try type("z", into: k)
+        #expect(k.controller.state.searchQuery.count == 64 && k.controller.state.searchQuery.hasSuffix("z"))
+    }
+
     @Test func spaceHoldTypesASpace() throws {
         let k = try searching()
         try type("a", into: k)

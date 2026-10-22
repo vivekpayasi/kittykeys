@@ -9,6 +9,8 @@ import Foundation
 
     private let loader: () throws -> EmojiSearch
     private var loaded: EmojiSearch?
+    /// The search tied to the catalog last asked for.
+    private var prepared: EmojiSearch.Prepared?
     /// The first load's error. A broken data file stays broken for the process, so it is never read again.
     private var failure: (any Error)?
 
@@ -36,8 +38,20 @@ import Foundation
         }
     }
 
+    /// The search tied to `catalog`, made once and kept while the same catalog is asked for, so each keystroke reuses
+    /// it. Passing the catalog value the catalog store holds keeps the check cheap: equal arrays that share storage
+    /// compare at once.
+    public func prepared(for catalog: EmojiData) throws -> EmojiSearch.Prepared {
+        let search = try search()
+        if let prepared, prepared.catalog == catalog { return prepared }
+        let made = search.prepared(for: catalog)
+        prepared = made
+        return made
+    }
+
     /// Lets go of the keywords. A search view still holding them keeps them until it goes.
     public func release() {
         loaded = nil
+        prepared = nil
     }
 }

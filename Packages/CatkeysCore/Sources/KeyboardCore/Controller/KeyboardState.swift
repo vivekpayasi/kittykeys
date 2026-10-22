@@ -35,8 +35,8 @@ public struct KeyboardState: Equatable, Sendable {
     public var alternates: AlternatesPopup?
     /// Whether space is moving the cursor; the view hides the key labels meanwhile.
     public var cursorMode: Bool
-    /// What the user typed into emoji search: lowercase, never starting with a space or holding two in a row.
-    /// Empty outside search.
+    /// What the user typed into emoji search: lowercase, at most 64 characters, never starting with a space or holding
+    /// two in a row. Empty outside search.
     public var searchQuery = ""
 
     /// The shift the keys show: off in emoji search, whose query takes no capitals, and `shift` otherwise.

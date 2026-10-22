@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Builds the emoji panel's data files from Emojibase (MIT).
 
-Downloads emojibase-data@17.0.0 into build/emoji-src/ (gitignored) and writes two files into
-Packages/CatkeysCore/Sources/KeyboardCore/Emoji/, both committed: emoji.json (the panel's emoji)
-and emoji-keywords.json (the English search words for each of them).
+Downloads emojibase-data@17.0.0 into build/emoji-src/ (gitignored) and writes, under
+Packages/CatkeysCore/Sources/KeyboardCore/Emoji/, these committed files: emoji.json (the panel's emoji),
+EmojiKeywords/en.json (the English search words for each of them) and EmojiKeywords/popular.json (a short,
+hand-curated list of commonly used emoji that search ranks first among equal matches). The keyboard reads every
+file in EmojiKeywords/, so another language's words (Hinglish next) can be added there as data alone.
 
 The downloaded files are untrusted data: they are only ever parsed with json.load and
 every field used is type-checked. Standard library only. Run from anywhere:
@@ -15,9 +17,11 @@ Output (UTF-8, one emoji per line so diffs stay readable, otherwise compact):
     emoji.json:
     {"source": "emojibase-data 17.0.0", "recentName": "Recent", "recentIcon": "clock",
      "categories": [{"id", "name", "icon", "emoji": [{"e", "v", "s"?}]}]}
-    emoji-keywords.json, keyed by the same base strings as emoji.json, in the same order:
-    {"source": "emojibase-data 17.0.0", "language": "en",
+    EmojiKeywords/en.json, keyed by the same base strings as emoji.json, in the same order:
+    {"source": "emojibase-data 17.0.0", "language": "en", "stopwords": [...],
      "keywords": {"<base emoji>": [[label words], [tag words not among the label words]]}}
+    EmojiKeywords/popular.json, most used first:
+    {"source": "catkeys, hand-curated", "popular": ["<base emoji>", ...]}
 """
 
 import json
@@ -44,12 +48,28 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC_DIR = os.path.join(ROOT, "build", "emoji-src")
 OUT_DIR = os.path.join(ROOT, "Packages", "CatkeysCore", "Sources", "KeyboardCore", "Emoji")
 OUT_PATH = os.path.join(OUT_DIR, "emoji.json")
-KEYWORDS_PATH = os.path.join(OUT_DIR, "emoji-keywords.json")
+KEYWORDS_DIR = os.path.join(OUT_DIR, "EmojiKeywords")
+KEYWORDS_PATH = os.path.join(KEYWORDS_DIR, "en.json")
+POPULAR_PATH = os.path.join(KEYWORDS_DIR, "popular.json")
 
 # The language of Emojibase's en/data.json labels and tags. Other languages (Hinglish first) come later as more data.
 KEYWORDS_LANGUAGE = "en"
 # Shorter words, such as the "a" in "a+" or the "t" in "T-Rex", match nearly everything as a prefix, so they are left out.
 MIN_KEYWORD_LENGTH = 2
+# English words that carry no meaning of their own in a name such as "face with tears of joy". They are left out of
+# the label words, so they never make a name match (a tag that holds one keeps it), and en.json lists them so that
+# search skips them in a query too.
+EN_STOPWORDS = {"with", "of", "on", "the", "a", "an", "and", "in", "at", "for", "to", "from", "by"}
+
+# Commonly used emoji, most used first: catkeys' own curation, not a copy of any dataset. Search ranks them first among
+# otherwise equal matches. Each is matched to emoji.json ignoring U+FE0F and skin tones, so this list is written without
+# variation selectors (nothing invisible), and popular.json gets emoji.json's own spelling.
+POPULAR = (
+    "😂 ❤ 🤣 👍 😭 🙏 😘 🥰 😍 😊 🎉 😁 💕 🥺 😅 🔥 ☺ 🤦 🤷 🙄 "
+    "😆 🤗 😉 🤔 👏 🙂 😳 🥳 😎 👌 😔 💪 ✨ 👀 😋 😏 😢 💯 🌹 💙 "
+    "😀 💜 😇 😜 😡 😱 🙌 🎂 👋 💔"
+).split()
+POPULAR_SOURCE = "catkeys, hand-curated"
 
 # How many single-character emoji lose a redundant U+FE0F in `unicode_form` for emojibase-data 17.0.0. A different
 # count means the source changed: check the result against Unicode's emoji-test.txt again before updating it.
@@ -253,14 +273,15 @@ def search_words(text):
 
 
 def keywords(item, where):
-    """The emoji's search words: its label's words, then its tags' words that the label lacks, each without repeats."""
+    """The emoji's search words: its label's words other than stopwords, then its tags' words that those lack, each
+    without repeats."""
     label = item.get("label")
     tags = item.get("tags", [])
     if not isinstance(label, str) or not label.strip():
         fail(f"bad label {label!r} in {where}")
     if not isinstance(tags, list) or not all(isinstance(tag, str) for tag in tags):
         fail(f"bad tags in {where}")
-    label_words = list(dict.fromkeys(search_words(label)))
+    label_words = list(dict.fromkeys(word for word in search_words(label) if word not in EN_STOPWORDS))
     if not label_words:
         fail(f"label {label!r} gives no search words in {where}")
     taken = set(label_words)
@@ -346,11 +367,44 @@ def render_keywords(search):
     """Compact JSON with one emoji per line, in the panel's order; deterministic for the same input."""
     lines = ["{" + dumps("source") + ":" + dumps(f"{PACKAGE} {VERSION}") + ","
              + dumps("language") + ":" + dumps(KEYWORDS_LANGUAGE) + ","
+             + dumps("stopwords") + ":" + dumps(sorted(EN_STOPWORDS)) + ","
              + dumps("keywords") + ":{"]
     items = list(search.items())
     for index, (emoji, words) in enumerate(items):
         lines.append(dumps(emoji) + ":" + dumps(words) + ("," if index < len(items) - 1 else ""))
     lines.append("}}")
+    return "\n".join(lines) + "\n"
+
+
+def base_key(emoji):
+    """The base emoji a spelling stands for: U+FE0F and the skin-tone modifiers removed, as EmojiPreferences.key."""
+    key = "".join(ch for ch in emoji if ch != "\ufe0f" and not 0x1F3FB <= ord(ch) <= 0x1F3FF)
+    return key or emoji
+
+
+def popular_emoji(categories):
+    """POPULAR in emoji.json's spelling. Fails unless each entry is exactly one of its emoji, listed once."""
+    by_key = {}
+    for category in categories:
+        for entry in category["emoji"]:
+            by_key.setdefault(base_key(entry["e"]), []).append(entry["e"])
+    found = []
+    for emoji in POPULAR:
+        matches = by_key.get(base_key(emoji), [])
+        if len(matches) != 1:
+            fail(f"popular emoji {emoji!r} matches {len(matches)} emoji in emoji.json, expected 1")
+        if matches[0] in found:
+            fail(f"popular emoji {emoji!r} is listed twice")
+        found.append(matches[0])
+    return found
+
+
+def render_popular(popular):
+    """Compact JSON with one emoji per line, most used first."""
+    lines = ["{" + dumps("source") + ":" + dumps(POPULAR_SOURCE) + "," + dumps("popular") + ":["]
+    for index, emoji in enumerate(popular):
+        lines.append(dumps(emoji) + ("," if index < len(popular) - 1 else ""))
+    lines.append("]}")
     return "\n".join(lines) + "\n"
 
 
@@ -374,12 +428,18 @@ def main():
     if json.loads(text) != expected:
         fail("rendered JSON does not round-trip")
     keywords_text = render_keywords(search)
-    expected_keywords = {"source": f"{PACKAGE} {VERSION}", "language": KEYWORDS_LANGUAGE, "keywords": search}
+    expected_keywords = {"source": f"{PACKAGE} {VERSION}", "language": KEYWORDS_LANGUAGE,
+                         "stopwords": sorted(EN_STOPWORDS), "keywords": search}
     if json.loads(keywords_text) != expected_keywords:
         fail("rendered keywords JSON does not round-trip")
+    popular = popular_emoji(categories)
+    popular_text = render_popular(popular)
+    if json.loads(popular_text) != {"source": POPULAR_SOURCE, "popular": popular}:
+        fail("rendered popular JSON does not round-trip")
 
     write(OUT_PATH, text)
     write(KEYWORDS_PATH, keywords_text)
+    write(POPULAR_PATH, popular_text)
 
     total = 0
     with_skins = 0
@@ -397,6 +457,8 @@ def main():
     distinct = len({word for words in search.values() for part in words for word in part})
     print(f"keywords: {len(search)} emoji, {label_words} label words and {tag_words} tag words, {distinct} distinct")
     print(f"wrote {os.path.relpath(KEYWORDS_PATH, ROOT)}: {len(keywords_text.encode('utf-8'))} bytes")
+    print(f"wrote {os.path.relpath(POPULAR_PATH, ROOT)}: {len(popular)} emoji, "
+          f"{len(popular_text.encode('utf-8'))} bytes")
 
 
 if __name__ == "__main__":

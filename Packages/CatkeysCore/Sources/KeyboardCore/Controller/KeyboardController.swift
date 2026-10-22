@@ -16,6 +16,8 @@
     private static let doubleSpaceText = ". "
     /// The page a number field opens on.
     private static let numberPageID = "symbols-1"
+    /// The longest emoji search query, in characters.
+    private static let maxSearchQueryLength = 64
 
     public var settings: KeyboardSettings {
         didSet {
@@ -282,15 +284,18 @@
         }
     }
 
-    /// Adds `text` to the query, lowercased. A space at its start, or after another space, adds nothing.
+    /// Adds `text` to the query, lowercased. A space at its start, or after another space, adds nothing, and nothing
+    /// goes past `maxSearchQueryLength` characters.
     private func appendToQuery(_ text: String) {
-        for character in text.lowercased() {
+        var length = state.searchQuery.count
+        for character in text.lowercased() where length < Self.maxSearchQueryLength {
             if character.isWhitespace {
                 guard let last = state.searchQuery.last, !last.isWhitespace else { continue }
                 state.searchQuery.append(" ")
             } else {
                 state.searchQuery.append(character)
             }
+            length += 1
         }
     }
 
@@ -371,6 +376,9 @@
         case .cursorModeEnded:
             state.cursorMode = false
             updateAutoShift()
+        case .cursorMoved where searching, .cursorMovedLines where searching:
+            // Search has no cursor mode, and its keys never move the document's cursor.
+            break
         case .cursorMoved(let characters):
             moveCursor(by: characters, ticks: abs(characters))
         case .cursorMovedLines(let lines):

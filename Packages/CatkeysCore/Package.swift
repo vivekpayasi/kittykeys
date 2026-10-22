@@ -12,7 +12,7 @@ let package = Package(
         .target(
             name: "KeyboardCore",
             resources: [
-                .copy("Layouts"), .copy("Emoji/emoji.json"), .copy("Emoji/emoji-keywords.json"),
+                .copy("Layouts"), .copy("Emoji/emoji.json"), .copy("Emoji/EmojiKeywords"),
                 .copy("TypingTest/sentences.json"),
             ]
         ),
