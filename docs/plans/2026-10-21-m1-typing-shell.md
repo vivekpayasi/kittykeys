@@ -730,6 +730,47 @@ Implement this before Task 7, or alongside it, because the controller takes `Key
 - [x] **Step 2: Build and screenshot each tab on the simulator,** light and dark, into `build/screenshots/app-*.png`. Expected: the text matches the spec above.
 - [x] **Step 3: Commit.** "Add container app setup, settings and try-it screens"
 
+### Task 11a: SideStore install path (ruling R39)
+
+The user installs catkeys through SideStore, as with their other sideloaded app, not from Xcode. SideStore re-signs an unsigned IPA with the user's free Apple ID and refreshes it daily. It also rewrites bundle IDs and renames App Groups. This task makes catkeys work under that path.
+
+**Files:**
+- Create: `Packages/CatkeysCore/Sources/KeyboardCore/Settings/AppGroupResolver.swift`, `Tests/KeyboardCoreTests/AppGroupResolverTests.swift`, `scripts/build-ipa.sh`
+- Modify: `Packages/CatkeysCore/Sources/KeyboardCore/Settings/SettingsStore.swift`, plus the callers of `appGroup(id:)` in `Keyboard/` and `App/` if their call changes
+
+**Interfaces:**
+- Produces:
+  ```swift
+  public enum AppGroupResolver {
+      /// The App Group usable in this process, or nil: the canonical id if its container exists,
+      /// otherwise the first group from this bundle's embedded.mobileprovision whose container exists.
+      public static func resolve(canonical: String?, bundle: Bundle = .main,
+                                 containerExists: (String) -> Bool = { FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: $0) != nil }) -> String?
+      /// `com.apple.security.application-groups` from a raw .mobileprovision (CMS envelope around an XML plist);
+      /// groups containing the canonical id's last component come first.
+      public static func groups(fromProvisioningProfile data: Data, canonical: String?) -> [String]
+  }
+  ```
+  `SettingsStore.appGroup(id:)` uses `AppGroupResolver.resolve(canonical: id)`. The rest of its contract is unchanged, including nil when nothing resolves.
+- `scripts/build-ipa.sh` writes `build/catkeys.ipa`:
+  1. Builds a Release archive for `generic/platform=iOS` with `CODE_SIGNING_ALLOWED=NO`.
+  2. Writes entitlements files with the build settings expanded. `$(CATKEYS_APP_GROUP)` must become the real group id, read via `xcodebuild -showBuildSettings`.
+  3. Ad-hoc signs the appex first, then the app, each with its entitlements (`codesign -f -s - --entitlements …`).
+  4. Zips `Payload/`.
+  5. Verifies with `codesign -d --entitlements :-` that both bundles carry the App Group.
+- The parsing approach follows the user's own Sahaja app (`Shared/AppGroup.swift`): scan for `<?xml` … `</plist>`, then `PropertyListSerialization`.
+
+- [ ] **Step 1: Write failing tests.**
+  - Parsing a synthetic profile blob (junk bytes + XML plist + junk) returns its groups, with the renamed group carrying the canonical name ordered first.
+  - Garbage gives `[]`.
+  - `resolve` with an injected `containerExists`:
+    - prefers the canonical id;
+    - falls back to the profile group;
+    - returns nil when nothing exists.
+- [ ] **Step 2: Implement it, and switch `SettingsStore.appGroup(id:)` over.** Run `swift test`. Expected: all pass.
+- [ ] **Step 3: Write `scripts/build-ipa.sh` and run it with `Config/Local.xcconfig`** (`CATKEYS_BUNDLE_PREFIX = com.vivek`). Expected: `build/catkeys.ipa`, with both bundles' entitlements showing `group.com.vivek.catkeys`.
+- [ ] **Step 4: Commit.** "SideStore path: resolve renamed App Group; IPA build script"
+
 ### Task 12: Device check, measurements and milestone close (with the user)
 
 **Files:**
