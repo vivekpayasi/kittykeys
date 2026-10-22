@@ -152,7 +152,7 @@ public enum KeyboardPanel: Equatable, Sendable { case keys, emoji }
 // KeyboardState
 public var panel: KeyboardPanel            // .keys by default
 // KeyboardController
-public func insertEmoji(_ emoji: String)   // inserts as typed text: clears shift-tap history and the double-space record, re-evaluates auto-shift
+public func insertEmoji(_ emoji: String)   // inserts as typed text: uses up a one-shot shift (M3-R6), clears shift-tap history and the double-space record, re-evaluates auto-shift
 public func deleteFromPanel()              // deletes 1 grapheme (whole emoji); same bookkeeping as backspace
 public func closePanel()                   // back to the page that was showing before; cancels in-flight key touches
 ```
@@ -242,6 +242,16 @@ public func closePanel()                   // back to the page that was showing 
 - [ ] **Step 4:** Record the results in Progress and clear `build/DerivedData`. Commit, then merge to `main` with `--no-ff`.
 
 ---
+
+## Rulings
+
+- M3-R1: catkeys builds its own panel; ISEmojiView has had no release since February 2023.
+- M3-R2: emoji with multi-tone skins get no skin picker in M3.
+- M3-R3: `emoji.json` carries `recentName`, and `EmojiCatalog.load` returns `EmojiData`.
+- M3-R4: the panel scrolls vertically with section headers, as in the approved mockup.
+- M3-R5: process only.
+- M3-R6: an emoji uses up a one-shot shift; caps lock stays.
+- M3-R7: when 😊 lifts while another key is held, the panel opens and that key is dropped. Nothing else in that touch batch acts under the panel.
 
 ## Progress
 
