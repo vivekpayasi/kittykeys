@@ -37,7 +37,7 @@ import KeyboardCore
         #expect(k.controller.state.panel == .emojiSearch && k.controller.state.searchQuery == "")
         #expect(k.controller.state.pageID == "latin-qwerty" && k.controller.state.pressedKeyIDs.isEmpty)
         // The number row's band is left for the results; the other rows stay where they were, so the height too.
-        #expect(!hasKey("1", k) && hasKey("q", k) && hasKey("123", k))
+        #expect(!hasKey("1", k) && hasKey("q", k))
         #expect(try k.key("q").rect == qRect && k.controller.height == height)
     }
 
@@ -188,26 +188,76 @@ import KeyboardCore
         #expect(k.controller.state.cursorMode)
     }
 
-    @Test func symbolsAndLongPressOptionsGoIntoTheQuery() throws {
+    @Test func longPressOptionsGoIntoTheQuery() throws {
         let k = try searching()
-        try k.tap("123")
-        #expect(k.controller.state.pageID == "symbols-1" && !hasKey("1", k))
-        try k.tap("#")
-        try k.tap("ABC")
-        #expect(k.controller.state.pageID == "latin-qwerty")
+        try type("a", into: k)
         // Holding d offers ₹ $ €, ₹ first.
         let p = try k.down("d")
         k.wait(0.3)
         #expect(k.controller.state.alternates != nil)
         k.up(at: p)
-        #expect(k.controller.state.searchQuery == "#₹" && k.doc.text == "")
+        #expect(k.controller.state.searchQuery == "a₹" && k.doc.text == "")
     }
 
-    @Test func emojiKeyDoesNothingInSearch() throws {
-        let k = try searching()
+    // MARK: The way back (ruling M3-R18)
+
+    @Test func pageKeyReadsABCAndGoesBackToThePanel() throws {
+        // The letters' 123 key reads ABC in search, as the symbols page's ABC key does, keeping its place and width.
+        let k = try Harness()
+        let pageKey = try k.key("123")
+        try k.tap("😊")
+        k.controller.openEmojiSearch()
+        #expect(!hasKey("123", k))
+        let abc = try k.key("ABC")
+        #expect(abc.rect == pageKey.rect && abc.row == pageKey.row)
+        try type("ok", into: k)
+        // It acts at once, on touch-down, like any page key: back to the panel, its own touch ended.
+        let changes = k.changes
+        let p = try k.down("ABC")
+        #expect(k.controller.state.panel == .emoji && k.controller.state.searchQuery == "" && k.changes > changes)
+        #expect(k.controller.state.pressedKeyIDs.isEmpty && k.controller.nextDeadline == nil)
+        k.up(at: p)
+        #expect(k.doc.text == "" && hasKey("1", k))
+        // The panel's keys are the letters with 123 again.
+        k.controller.closePanel()
+        #expect(k.controller.state.panel == .keys && k.controller.state.pageID == "latin-qwerty" && hasKey("123", k))
+    }
+
+    @Test func pageKeyInSearchKeepsTheEmailRowsWayBack() throws {
+        // An email field on the symbols page: search shows the letters with the standard row, whose 123 reads ABC;
+        // ABC goes back to the panel, and the panel's ABC to the symbols page with the email row.
+        let k = try Harness()
+        k.controller.fieldDidChange(FieldTraits(kind: .email, autoCap: .none))
+        try k.tap("123")
+        try k.tap("😊")
+        k.controller.openEmojiSearch()
+        let bottom = { k.controller.frames.filter { $0.row == k.controller.frames.last?.row }.map(\.key.label) }
+        #expect(bottom() == ["ABC", "😊", ",", "space", ".", "return"])
+        try k.tap("ABC")
+        #expect(k.controller.state.panel == .emoji)
+        k.controller.closePanel()
+        #expect(k.controller.state.pageID == "symbols-1" && bottom().contains("@") && hasKey("1", k))
+    }
+
+    @Test func emojiKeyGoesBackToThePanel() throws {
+        let k = try searching("ok")
         try type("a", into: k)
         try k.tap("😊")
-        #expect(k.controller.state.panel == .emojiSearch && k.controller.state.searchQuery == "a")
+        #expect(k.controller.state.panel == .emoji && k.controller.state.searchQuery == "" && k.doc.text == "ok")
+        #expect(k.controller.state.pressedKeyIDs.isEmpty && hasKey("1", k))
+    }
+
+    @Test func emojiKeyLeavingEndsOtherTouches() throws {
+        // Finger 2 holds d's long-press while finger 1 taps 😊: search closes, and d types nothing on its lift.
+        let k = try searching()
+        let pd = try k.down("d", id: 2)
+        k.wait(0.3)
+        #expect(k.controller.state.alternates != nil)
+        try k.tap("😊", id: 1)
+        #expect(k.controller.state.panel == .emoji && k.controller.state.alternates == nil)
+        #expect(k.controller.state.pressedKeyIDs.isEmpty && k.controller.nextDeadline == nil)
+        k.up(at: pd, id: 2)
+        #expect(k.controller.state.searchQuery == "" && k.doc.text == "")
     }
 
     // MARK: Backspace and return

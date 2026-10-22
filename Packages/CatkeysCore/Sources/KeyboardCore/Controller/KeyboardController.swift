@@ -229,7 +229,8 @@
     /// "Search emoji" in the panel (ruling M3-R15): the letter keys come back, on the letters page with the standard
     /// bottom row and without the number row, whose band the results take. They type into `state.searchQuery`, which
     /// starts empty: lowercase, with no shift, automatic capitals, double-space full stop or cursor mode.
-    /// Return, or ⌫ landing on an empty query, goes back to the panel. Does nothing unless the panel shows.
+    /// The bottom row's page key reads the layout's ABC label (ruling M3-R18). It, the emoji key, return, and ⌫
+    /// landing on an empty query go back to the panel. Does nothing unless the panel shows.
     public func openEmojiSearch() {
         guard state.panel == .emoji else { return }
         notifying {
@@ -267,19 +268,17 @@
         show(page: keys.pageID, bottom: keys.bottom)
     }
 
-    /// A key typed in search. Characters and long-press options go into the query lowercased, and space as one space;
-    /// return goes back to the panel and the page keys switch pages. Shift and the emoji key do nothing.
+    /// A key typed in search. Characters and long-press options go into the query lowercased, and space as one space.
+    /// Return, the page key (reading ABC) and the emoji key go back to the panel (ruling M3-R18). Shift does nothing.
     private func activateInSearch(_ key: KeySpec) {
         switch key.action {
         case .character, .space:
             appendToQuery(key.output)
-        case .returnKey:
+        case .returnKey, .switchPage, .emoji:
             leaveSearch()
-        case .switchPage(let ref):
-            show(page: layouts.resolve(ref), bottom: bottomVariant)
         case .globe:
             onGlobe?()
-        case .shift, .emoji, .backspace:
+        case .shift, .backspace:
             break
         }
     }
@@ -492,11 +491,18 @@
     }
 
     /// The page's bottom row for the field, with the globe key just left of the emoji key when needed
-    /// (second in a row without one).
+    /// (second in a row without one). In search, the row's first page key reads as the layout's way back to the
+    /// letters, ABC, since it goes back to the emoji panel (ruling M3-R18); it keeps its place and width.
     private func bottomRow(of page: LayoutPage) -> [KeySpec] {
         var row = page.bottomRow(bottomVariant)
         if needsGlobeKey, let globe = layouts.globeKey {
             row.insert(globe, at: row.firstIndex { $0.action == .emoji } ?? min(1, row.count))
+        }
+        if framesAreForSearch, let index = row.firstIndex(where: \.isPageKey),
+            let letters = layouts.firstKey(where: { $0.action == .switchPage(.letters) })
+        {
+            row[index].label = letters.label
+            row[index].icon = letters.icon
         }
         return row
     }

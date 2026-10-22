@@ -55,6 +55,11 @@ public struct KeySpec: Equatable, Sendable, Decodable {
     public var cornerHint: String? {
         action == .character ? longPress.first : nil
     }
+
+    /// Whether the key switches pages, as 123 and ABC do.
+    var isPageKey: Bool {
+        if case .switchPage = action { true } else { false }
+    }
 }
 
 extension KeySpec {
