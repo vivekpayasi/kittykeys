@@ -34,6 +34,7 @@ targets:
         CODE_SIGN_ENTITLEMENTS: $(CATKEYS_APP_ENTITLEMENTS)
         # iPhone only, as the design says.
         TARGETED_DEVICE_FAMILY: "1"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
     dependencies:
       - target: CatkeysKeyboard
       - package: CatkeysCore
