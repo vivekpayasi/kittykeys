@@ -1,20 +1,22 @@
 import Foundation
 
-/// Finds emoji by the words of their names and tags, for the emoji panel's search (rulings M3-R15, M3-R16).
+/// Finds emoji by the words of their names and tags, for the emoji panel's search (rulings M3-R15, M3-R17).
 ///
 /// - **Data:** every `.json` file in the bundled `EmojiKeywords` folder, read in name order and merged. A file may hold
 ///   `keywords`, `{"<emoji>": [[name words], [tag words]]}`; `popular`, emoji most used first; and `stopwords`, its
 ///   language's words that no name holds. An emoji's words from every file are put together, matched without U+FE0F
-///   or skin tones, and the popular lists follow one another. `scripts/make-emoji-data.py` writes `en.json` from
-///   Emojibase and `popular.json`; another language's words need only another file there.
+///   or skin tones, and the popular and stopword lists are joined. `scripts/make-emoji-data.py` writes `en.json` from
+///   Emojibase and `popular.json`; another language's words need only another file there. Joining the stopword lists is
+///   safe because a stopword only ever lifts an emoji: English's "to" can be a Hinglish word and still find it.
 /// - **Words:** the query is lowercased and split into words at every character that isn't a letter or a digit, as the
-///   keywords were. A repeated word counts once, and stopwords are skipped unless the query has nothing else, so a
-///   whole name typed out ("face with tears of joy") still matches. An emoji matches when every query word begins one
-///   of its keywords.
-/// - **Ranking:** a query word matches an emoji by a name word exactly, by the beginning of a name word, by a tag
-///   exactly, or by the beginning of a tag, best first, and an emoji ranks by its weakest word. Within each of those:
-///   Recent first, most recent first; then the popular list, in its order; then shorter matched keywords; then fewer
-///   name words; then the catalog's order.
+///   keywords were; a repeated word counts once. Every word must begin one of an emoji's keywords, except optional
+///   ones: stopwords, and a last word still being typed that begins one ("face wi"). Those exclude nothing, so a whole
+///   name typed out ("face with tears of joy") still matches, but an emoji that matches them ranks higher. A query of
+///   nothing but optional words needs them all.
+/// - **Ranking:** a needed word matches an emoji exactly (a name word or a tag is the word), by the beginning of a name
+///   word, or by the beginning of a tag, best first, and an emoji ranks by its weakest needed word. Within each of
+///   those: more optional words matched; Recent, most recent first; the popular list, in its order; fewer needed words
+///   matched by a tag than by a name word; shorter matched keywords; fewer name words; the catalog's order.
 /// - **Speed:** it runs on every keystroke. The keywords sit in one byte buffer, compared as UTF-8 with no per-keyword
 ///   strings, and `Prepared` ties a catalog's emoji to their keywords once, so a query looks nothing up per emoji.
 ///
@@ -49,11 +51,33 @@ public struct EmojiSearch: Sendable {
         }
     }
 
-    /// How one query word matches an emoji: `tier` 0 to 3 is a name word exactly, the beginning of a name word, a tag
-    /// exactly and the beginning of a tag; `length` is the matched keyword's, in UTF-8 bytes.
+    /// How one query word matches an emoji's best keyword: `tier` 0 to 2 is exactly, the beginning of a name word and
+    /// the beginning of a tag; `isTag` says whether the keyword is a tag, and `length` is its length in UTF-8 bytes.
     private struct WordMatch {
         var tier: UInt8
+        var isTag: Bool
         var length: Int
+
+        /// Whether this is a better match than `other`: a better tier, a name word over a tag, then a shorter keyword.
+        func isBetter(than other: WordMatch) -> Bool {
+            (tier, isTag ? 1 : 0, length) < (other.tier, other.isTag ? 1 : 0, other.length)
+        }
+    }
+
+    /// How an emoji matches the whole query.
+    private struct QueryMatch {
+        /// Its weakest needed word's tier.
+        var tier: UInt8 = 0
+        /// How many optional words it matches, and how many needed words only a tag matches.
+        var optionalWords = 0, tagWords = 0
+        /// The matched keywords' total length.
+        var length = 0
+    }
+
+    /// A query word, and whether it is optional: it then excludes nothing but ranks the emoji it matches higher.
+    private struct QueryWord {
+        var bytes: [UInt8]
+        var isOptional: Bool
     }
 
     /// Every keyword's UTF-8, one after another. Keyword k is `bytes[keywordStarts[k]..<keywordStarts[k + 1]]`.
@@ -66,8 +90,8 @@ public struct EmojiSearch: Sendable {
     private let popularity: [Int32]
     /// Each entry by `EmojiPreferences.key` of its emoji, so any spelling finds it: a skin tone, or U+FE0F or not.
     private let indexByKey: [String: Int32]
-    /// Words a query skips, as UTF-8.
-    private let stopwords: Set<[UInt8]>
+    /// Stopwords and every beginning of one, as UTF-8.
+    private let stopwords: Set<[UInt8]>, stopwordBeginnings: Set<[UInt8]>
 
     private init(words list: [Words], popular: [String], stopwords: [String]) {
         var bytes: [UInt8] = []
@@ -102,7 +126,9 @@ public struct EmojiSearch: Sendable {
         self.bases = bases
         self.popularity = popularity
         self.indexByKey = indexByKey
-        self.stopwords = Set(stopwords.map { Array($0.utf8) })
+        let stopwordBytes = stopwords.map { Array($0.utf8) }
+        self.stopwords = Set(stopwordBytes)
+        stopwordBeginnings = Set(stopwordBytes.flatMap { word in word.indices.map { Array(word[...$0]) } })
     }
 
     /// A search over `keywords`, keyed by emoji, each with its name's words and its tags' other words, lowercase;
@@ -193,15 +219,20 @@ public struct EmojiSearch: Sendable {
         prepared(for: catalog).results(for: query, recents: recents, limit: limit)
     }
 
-    /// One emoji that matches, with what ranks it. Smaller ranks first.
+    /// One emoji that matches, with what ranks it.
     private struct Found {
-        var tier: UInt8
-        var recent: Int, popular: Int32, length: Int, nameWords: Int32
+        var match: QueryMatch
+        var recent: Int, popular: Int32, nameWords: Int32
         /// Its place in the catalog.
         var position: Int
 
-        var rank: (UInt8, Int, Int32, Int, Int32, Int) {
-            (tier, recent, popular, length, nameWords, position)
+        /// Whether this ranks before `other`, as the ranking in `EmojiSearch`'s description says.
+        func precedes(_ other: Found) -> Bool {
+            let a = match, b = other.match
+            if a.tier != b.tier { return a.tier < b.tier }
+            if a.optionalWords != b.optionalWords { return a.optionalWords > b.optionalWords }
+            return (recent, popular, a.tagWords, a.length, nameWords, position)
+                < (other.recent, other.popular, b.tagWords, b.length, other.nameWords, other.position)
         }
     }
 
@@ -221,47 +252,61 @@ public struct EmojiSearch: Sendable {
                     let entry = entries[Int(index)]
                     guard let match = Self.match(words, entry, bytes: bytes, starts: starts) else { continue }
                     found.append(Found(
-                        tier: match.tier, recent: recentRanks.isEmpty ? .max : recentRanks[index] ?? .max,
-                        popular: popularity[Int(index)], length: match.length, nameWords: entry.labelEnd - entry.first,
-                        position: position))
+                        match: match, recent: recentRanks.isEmpty ? .max : recentRanks[index] ?? .max,
+                        popular: popularity[Int(index)], nameWords: entry.labelEnd - entry.first, position: position))
                 }
             }
         }
-        found.sort { $0.rank < $1.rank }
+        found.sort { $0.precedes($1) }
         return found.prefix(limit).map { items[$0.position] }
     }
 
     // MARK: Matching
 
     /// The query's distinct words as UTF-8: lowercased, NFC like the keywords, split at every character that isn't a
-    /// letter or a digit (so "t-rex" is "t" and "rex", and "heart," is "heart"), without stopwords unless that leaves none.
-    private func words(in query: String) -> [[UInt8]] {
-        var seen: Set<[UInt8]> = []
-        let words = query.lowercased().precomposedStringWithCanonicalMapping
+    /// letter or a digit (so "t-rex" is "t" and "rex", and "heart," is "heart"). Stopwords are optional, and so is the
+    /// last word while it is still being typed (the query ends in it) and begins a stopword; unless every word is.
+    private func words(in query: String) -> [QueryWord] {
+        let split = query.lowercased().precomposedStringWithCanonicalMapping
             .split { !($0.isLetter || $0.isNumber) }
             .map { Array($0.utf8) }
-            .filter { seen.insert($0).inserted }
-        let kept = words.filter { !stopwords.contains($0) }
-        return kept.isEmpty ? words : kept
+        let typingLast = query.last.map { $0.isLetter || $0.isNumber } ?? false
+        var seen: Set<[UInt8]> = []
+        var words: [QueryWord] = []
+        for (index, word) in split.enumerated() where seen.insert(word).inserted {
+            let isTyping = typingLast && index == split.count - 1
+            words.append(QueryWord(
+                bytes: word, isOptional: stopwords.contains(word) || (isTyping && stopwordBeginnings.contains(word))))
+        }
+        if words.allSatisfy(\.isOptional) {
+            for index in words.indices { words[index].isOptional = false }
+        }
+        return words
     }
 
-    /// How `entry` matches every word of the query: its weakest word's tier, and the matched keywords' total length.
-    /// nil when a word matches nothing.
+    /// How `entry` matches the query: nil when a needed word matches none of its keywords.
     private static func match(
-        _ words: [[UInt8]], _ entry: Entry, bytes: UnsafeBufferPointer<UInt8>, starts: UnsafeBufferPointer<Int32>
-    ) -> WordMatch? {
-        var total = WordMatch(tier: 0, length: 0)
+        _ words: [QueryWord], _ entry: Entry, bytes: UnsafeBufferPointer<UInt8>, starts: UnsafeBufferPointer<Int32>
+    ) -> QueryMatch? {
+        var total = QueryMatch()
         for word in words {
-            guard let match = word.withUnsafeBufferPointer({ Self.match($0, entry, bytes: bytes, starts: starts) }) else {
+            let match = word.bytes.withUnsafeBufferPointer { Self.match($0, entry, bytes: bytes, starts: starts) }
+            guard let match else {
+                if word.isOptional { continue }
                 return nil
             }
-            total.tier = max(total.tier, match.tier)
             total.length += match.length
+            if word.isOptional {
+                total.optionalWords += 1
+            } else {
+                total.tier = max(total.tier, match.tier)
+                if match.isTag { total.tagWords += 1 }
+            }
         }
         return total
     }
 
-    /// How `word` matches `entry`: its best keyword, the shorter of two in the same tier.
+    /// How `word` matches `entry`: its best keyword.
     private static func match(
         _ word: UnsafeBufferPointer<UInt8>, _ entry: Entry, bytes: UnsafeBufferPointer<UInt8>,
         starts: UnsafeBufferPointer<Int32>
@@ -270,12 +315,12 @@ public struct EmojiSearch: Sendable {
         for k in Int(entry.first)..<Int(entry.end) {
             let start = Int(starts[k]), length = Int(starts[k + 1]) - start
             guard length >= word.count, hasPrefix(word, in: bytes, at: start) else { continue }
-            let isName = k < Int(entry.labelEnd), isExact = length == word.count
+            let isTag = k >= Int(entry.labelEnd), isExact = length == word.count
+            let match = WordMatch(tier: isExact ? 0 : isTag ? 2 : 1, isTag: isTag, length: length)
             // An exact name word can't be beaten.
-            if isName && isExact { return WordMatch(tier: 0, length: length) }
-            let tier: UInt8 = isName ? 1 : isExact ? 2 : 3
-            if let current = best, (current.tier, current.length) <= (tier, length) { continue }
-            best = WordMatch(tier: tier, length: length)
+            if isExact && !isTag { return match }
+            if let best, !match.isBetter(than: best) { continue }
+            best = match
         }
         return best
     }

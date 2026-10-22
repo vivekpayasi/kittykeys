@@ -2,9 +2,10 @@ import Foundation
 import Testing
 @testable import KeyboardCore
 
-// Emoji search (rulings M3-R15, M3-R16): every word of the query begins one of an emoji's keywords, its name's words or
-// its tags. Tiers: a name word exactly, the beginning of a name word, a tag exactly, the beginning of a tag; a query ranks
-// by its weakest word. Within a tier: Recent, the popular list, shorter matched keywords, fewer name words, the catalog.
+// Emoji search (rulings M3-R15, M3-R17): every word of the query begins one of an emoji's keywords, its name's words or
+// its tags. Tiers: a keyword exactly, the beginning of a name word, the beginning of a tag; a query ranks by its weakest
+// word. Stopwords are optional and only lift the emoji they match. Within a tier: more optional words matched, Recent,
+// the popular list, name matches before tag matches, shorter matched keywords, fewer name words, the catalog.
 
 struct EmojiSearchTests {
     /// The bundled keywords, and the bundled catalog for an iOS that draws up to `maxVersion`.
@@ -43,6 +44,13 @@ struct EmojiSearchTests {
         #expect(Self.bases(search, "fire", catalog).first == "🔥")
         let cats: Set = ["🐈", "🐱", "😺", "😸", "😹", "😻", "😼", "😽", "🙀", "😿", "😾", "🐈‍⬛"]
         #expect(Self.bases(search, "cat", catalog).prefix(3).allSatisfy { cats.contains($0) })
+        // A tag that is the word counts as exactly as a name word does.
+        #expect(Self.bases(search, "thumb", catalog).prefix(2).contains("👍"))
+        #expect(Self.bases(search, "pray", catalog).first == "🙏")
+        #expect(Self.bases(search, "lol", catalog).first == "😂")
+        #expect(Self.bases(search, "love", catalog).first == "❤️")
+        let smiles: Set = ["😊", "🙂", "😀", "😄"]
+        #expect(Self.bases(search, "smile", catalog).prefix(3).contains { smiles.contains($0) })
     }
 
     @Test func redHeartComesFirst() throws {
@@ -61,13 +69,34 @@ struct EmojiSearchTests {
         #expect(!Self.bases(search, "eart", catalog).contains("❤️"))
     }
 
-    @Test func stopwordsInTheQueryAreSkipped() throws {
+    @Test func stopwordsAreOptional() throws {
         let (search, catalog) = try Self.bundled()
-        // The data's stopwords are in no name, so a query skips them: a whole name typed out still finds its emoji.
+        // The data's stopwords are in no name, so they exclude nothing: a whole name typed out still finds its emoji.
         #expect(Self.bases(search, "face with tears of joy", catalog).first == "😂")
         #expect(Self.bases(search, "heart on fire", catalog).first == "❤️‍🔥")
-        // A query of nothing but stopwords keeps them: 🔛 has the tag "on".
-        #expect(Self.bases(search, "on", catalog).contains("🔛"))
+        // Nor does a last word that may be a stopword still being typed.
+        #expect(Self.bases(search, "face with tears o", catalog).contains("😂"))
+        #expect(Self.bases(search, "face wi", catalog).contains("😂"))
+        // An emoji that matches one ranks higher: 🇮🇳 has the tag "in".
+        #expect(Self.bases(search, "flag in", catalog).prefix(3).contains("🇮🇳"))
+        // A query of nothing but stopwords needs them: 🔛 has the tag "on".
+        #expect(Self.bases(search, "on", catalog).prefix(3).contains("🔛"))
+        #expect(!Self.bases(search, "the", catalog).isEmpty)
+    }
+
+    @Test func optionalWordsRankJustAfterTheTier() {
+        let search = EmojiSearch(
+            keywords: [
+                "🅰️": (label: ["cat"], tags: []),
+                "🅱️": (label: ["cat"], tags: ["in"]),
+                "🆎": (label: ["catalog"], tags: ["in"]),
+            ],
+            stopwords: ["in"])
+        let catalog = Self.catalog(["🅰️", "🅱️", "🆎"])
+        // A matched stopword lifts 🅱️ above Recent's 🅰️, but not 🆎 above the better tier.
+        #expect(Self.bases(search, "cat in", catalog, recents: ["🅰️"]) == ["🅱️", "🅰️", "🆎"])
+        // Alone, a stopword is needed.
+        #expect(Self.bases(search, "in", catalog) == ["🅱️", "🆎"])
     }
 
     @Test(arguments: ["zzzz", "", "   ", "!?", "red zzzz"])
@@ -89,7 +118,7 @@ struct EmojiSearchTests {
 
     // MARK: Ranking
 
-    @Test func nameExactThenNamePrefixThenTagExactThenTagPrefix() {
+    @Test func exactThenNamePrefixThenTagPrefix() {
         let search = EmojiSearch(keywords: [
             "🅰️": (label: ["catalog"], tags: []),
             "🅱️": (label: ["dog"], tags: ["cats"]),
@@ -98,7 +127,8 @@ struct EmojiSearchTests {
             "🆑": (label: ["dog"], tags: []),
         ])
         let catalog = Self.catalog(["🅰️", "🅱️", "🆎", "🅾️", "🆑"])
-        #expect(Self.bases(search, "cat", catalog) == ["🅾️", "🅰️", "🆎", "🅱️"])
+        // Exact, a name word before a tag; then the beginning of a name word; then the beginning of a tag.
+        #expect(Self.bases(search, "cat", catalog) == ["🅾️", "🆎", "🅰️", "🅱️"])
         #expect(Self.bases(search, "CATS", catalog) == ["🅱️"])
         // A repeated word counts once.
         #expect(Self.bases(search, "cat cat", catalog) == Self.bases(search, "cat", catalog))
@@ -124,6 +154,9 @@ struct EmojiSearchTests {
         // Equal on every count: the catalog's order.
         let twins = EmojiSearch(keywords: ["🅰️": (label: ["cat"], tags: []), "🅱️": (label: ["cat"], tags: [])])
         #expect(Self.bases(twins, "cat", Self.catalog(["🅱️", "🅰️"])) == ["🅱️", "🅰️"])
+        // Both exact: the name match first, though the catalog has the tag match first.
+        let exact = EmojiSearch(keywords: ["🅰️": (label: ["dog"], tags: ["cat"]), "🅱️": (label: ["cat"], tags: [])])
+        #expect(Self.bases(exact, "cat", Self.catalog(["🅰️", "🅱️"])) == ["🅱️", "🅰️"])
     }
 
     @Test func aQueryRanksByItsWeakestWord() {
@@ -139,10 +172,11 @@ struct EmojiSearchTests {
 
     @Test func recentGoesFirstWithinItsTier() throws {
         let (search, catalog) = try Self.bundled()
-        // 🤣's name begins "laugh"; the rest have the tag "laugh": popular 😂 😆 😀, then 😹 (three name words), 😄 (four).
-        #expect(Self.bases(search, "laugh", catalog) == ["🤣", "😂", "😆", "😀", "😹", "😄"])
-        // Recent ones lead their tier, most recent first; 👍 matches nothing here. 🤣's better tier stays first.
-        #expect(Self.bases(search, "laugh", catalog, recents: ["😹", "👍", "😆"]) == ["🤣", "😹", "😆", "😂", "😀", "😄"])
+        // All six have the tag "laugh": popular 😂 🤣 😆 😀 first, then 😹 (three name words) and 😄 (four).
+        #expect(Self.bases(search, "laugh", catalog) == ["😂", "🤣", "😆", "😀", "😹", "😄"])
+        // Recent ones lead their tier, most recent first; 👍 matches nothing here.
+        #expect(Self.bases(search, "laugh", catalog, recents: ["😹", "👍", "😆"]) == ["😹", "😆", "😂", "🤣", "😀", "😄"])
+        // But not a better tier: 🤣's name begins "lau", the others' tags do.
         #expect(Self.bases(search, "lau", catalog, recents: ["🧺"]).prefix(3) == ["🤣", "🧺", "😂"])
         // Recent keeps the exact variant typed, with a skin tone or without U+FE0F; it counts for its emoji.
         #expect(Self.bases(search, "thumbs", catalog) == ["👍", "👎"])
@@ -207,17 +241,20 @@ struct EmojiSearchTests {
     @Test func filesMergeByEmoji() throws {
         // A later language file adds words to an emoji, spelled with or without U+FE0F, and a shared file adds the
         // popular list.
-        let en = #"{"language":"en","stopwords":["of"],"keywords":{"❤️":[["red","heart"],["love"]],"😂":[["face","joy"],["laugh"]]}}"#
-        let hi = #"{"language":"hi-Latn","keywords":{"❤":[["dil","heart"],["pyaar","love","red"]],"🙏":[["namaste"],[]]}}"#
+        let en = #"{"language":"en","stopwords":["of","to"],"keywords":{"❤️":[["red","heart"],["love"]],"😂":[["face","joy"],["laugh"]],"👅":[["tongue"],[]]}}"#
+        let hi = #"{"language":"hi-Latn","keywords":{"❤":[["dil","heart"],["pyaar","love","red"]],"🙏":[["namaste"],[]],"🤷":[["to","kya"],[]]}}"#
         let popular = #"{"popular":["🙏","❤️"]}"#
         let search = try EmojiSearch.merged([en, hi, popular].map { Data($0.utf8) })
-        #expect(search.emojiCount == 3)
+        #expect(search.emojiCount == 5)
         let heart = try #require(search.keywords(for: "❤️"))
         #expect(heart.label == ["red", "heart", "dil"] && heart.tags == ["love", "pyaar"])
         #expect(search.popularEmoji == ["🙏", "❤️"])
-        let catalog = Self.catalog(["❤️", "😂", "🙏"])
+        let catalog = Self.catalog(["❤️", "😂", "👅", "🙏", "🤷"])
         #expect(Self.bases(search, "dil", catalog) == ["❤️"] && Self.bases(search, "namaste", catalog) == ["🙏"])
         #expect(Self.bases(search, "face of joy", catalog) == ["😂"])
+        // English's stopword "to" is a Hinglish word: alone it is needed and finds 🤷 first; after "kya" it only lifts.
+        #expect(Self.bases(search, "to", catalog) == ["🤷", "👅"])
+        #expect(Self.bases(search, "kya to", catalog) == ["🤷"])
         // A value that isn't two lists is refused.
         #expect(throws: EmojiSearch.LoadError.self) {
             try EmojiSearch.merged([Data(#"{"keywords":{"😂":[["face"]]}}"#.utf8)])

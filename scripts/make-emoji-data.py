@@ -3,8 +3,9 @@
 
 Downloads emojibase-data@17.0.0 into build/emoji-src/ (gitignored) and writes, under
 Packages/CatkeysCore/Sources/KeyboardCore/Emoji/, these committed files: emoji.json (the panel's emoji),
-EmojiKeywords/en.json (the English search words for each of them) and EmojiKeywords/popular.json (a short,
-hand-curated list of commonly used emoji that search ranks first among equal matches). The keyboard reads every
+EmojiKeywords/en.json (the English search words for each of them) and EmojiKeywords/popular.json (catkeys'
+hand-curated choice of commonly used emoji, informed by Unicode's published emoji frequency ranking, which search
+ranks first among equal matches). The keyboard reads every
 file in EmojiKeywords/, so another language's words (Hinglish next) can be added there as data alone.
 
 The downloaded files are untrusted data: they are only ever parsed with json.load and
@@ -21,7 +22,7 @@ Output (UTF-8, one emoji per line so diffs stay readable, otherwise compact):
     {"source": "emojibase-data 17.0.0", "language": "en", "stopwords": [...],
      "keywords": {"<base emoji>": [[label words], [tag words not among the label words]]}}
     EmojiKeywords/popular.json, most used first:
-    {"source": "catkeys, hand-curated", "popular": ["<base emoji>", ...]}
+    {"source": "catkeys' hand-curated choice of ...", "popular": ["<base emoji>", ...]}
 """
 
 import json
@@ -58,18 +59,19 @@ KEYWORDS_LANGUAGE = "en"
 MIN_KEYWORD_LENGTH = 2
 # English words that carry no meaning of their own in a name such as "face with tears of joy". They are left out of
 # the label words, so they never make a name match (a tag that holds one keeps it), and en.json lists them so that
-# search skips them in a query too.
+# search treats them as optional in a query: they exclude nothing and only lift the emoji that match them.
 EN_STOPWORDS = {"with", "of", "on", "the", "a", "an", "and", "in", "at", "for", "to", "from", "by"}
 
-# Commonly used emoji, most used first: catkeys' own curation, not a copy of any dataset. Search ranks them first among
-# otherwise equal matches. Each is matched to emoji.json ignoring U+FE0F and skin tones, so this list is written without
+# Commonly used emoji, most used first: catkeys' hand-curated choice of commonly used emoji, informed by Unicode's
+# published emoji frequency ranking (not a copy of it). Search ranks them first among otherwise equal matches. Each is matched to emoji.json ignoring U+FE0F and skin tones, so this list is written without
 # variation selectors (nothing invisible), and popular.json gets emoji.json's own spelling.
 POPULAR = (
     "😂 ❤ 🤣 👍 😭 🙏 😘 🥰 😍 😊 🎉 😁 💕 🥺 😅 🔥 ☺ 🤦 🤷 🙄 "
     "😆 🤗 😉 🤔 👏 🙂 😳 🥳 😎 👌 😔 💪 ✨ 👀 😋 😏 😢 💯 🌹 💙 "
     "😀 💜 😇 😜 😡 😱 🙌 🎂 👋 💔"
 ).split()
-POPULAR_SOURCE = "catkeys, hand-curated"
+POPULAR_SOURCE = ("catkeys' hand-curated choice of commonly used emoji, "
+                  "informed by Unicode's published emoji frequency ranking")
 
 # How many single-character emoji lose a redundant U+FE0F in `unicode_form` for emojibase-data 17.0.0. A different
 # count means the source changed: check the result against Unicode's emoji-test.txt again before updating it.
