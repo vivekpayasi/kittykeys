@@ -87,6 +87,10 @@ final class EmojiPanelView: UIView, UICollectionViewDataSource, UICollectionView
         collectionView.backgroundColor = .touchableClear
         collectionView.contentInsetAdjustmentBehavior = .never
         collectionView.showsVerticalScrollIndicator = false
+        // No scroll edge effects: on iOS 27 the top one fades the top half of the first section title (seen on the
+        // iPhone). The suggestion row above and the tab bar below need no blur to stay readable.
+        collectionView.topEdgeEffect.isHidden = true
+        collectionView.bottomEdgeEffect.isHidden = true
         // Highlight a pressed emoji at once; a drag still scrolls, and cancels the press.
         collectionView.delaysContentTouches = false
         collectionView.register(EmojiCell.self, forCellWithReuseIdentifier: EmojiCell.reuseIdentifier)
