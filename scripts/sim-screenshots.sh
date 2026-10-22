@@ -34,10 +34,12 @@ SCENES=(
   "app-setup|-catkeysTab setup"
   "app-settings|-catkeysTab settings"
   "app-tryit|-catkeysTab tryit"
-  # The typing test before a run, mid-run, and its summary over invented sample history (debug builds only).
+  # The typing test before a run, mid-run, its summary over invented sample history, and the summary offering to
+  # relabel a run as catkeys (all but the first need a debug build).
   "app-typingtest|-catkeysTab typingtest"
   "app-typingtest-run|-catkeysTab typingtest -catkeysTypingTestScene run"
   "app-typingtest-summary|-catkeysTab typingtest -catkeysTypingTestScene summary"
+  "app-typingtest-relabel|-catkeysTab typingtest -catkeysTypingTestScene relabel"
 )
 
 xcodegen generate

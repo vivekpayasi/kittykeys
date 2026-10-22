@@ -28,11 +28,13 @@ public enum TypingMetrics {
         return Double(characters) / 5 / (seconds / 60)
     }
 
-    /// What the test compares with the target: `typed` without spaces or new lines at either end, and with curly
-    /// quotes and apostrophes made straight. Some keyboards add a space after a word, and iOS's Smart Punctuation
-    /// may curl a typed `'`, so neither counts as an error. The bundled sentences are already in this form.
+    /// What the test compares with the target: `typed` without spaces or new lines at its end, and with curly quotes
+    /// and apostrophes made straight. Some keyboards add a space after a word, and iOS's Smart Punctuation may curl a
+    /// typed `'`, so neither counts as an error. A space at the start was tapped by mistake, so it stays and counts.
+    /// The bundled sentences are already in this form.
     public static func normalized(_ typed: String) -> String {
-        String(typed.trimmingCharacters(in: .whitespacesAndNewlines).map { straightQuotes[$0] ?? $0 })
+        let end = typed.lastIndex { !$0.isWhitespace }.map(typed.index(after:)) ?? typed.startIndex
+        return String(typed[..<end].map { straightQuotes[$0] ?? $0 })
     }
 
     private static let straightQuotes: [Character: Character] = [

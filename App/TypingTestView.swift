@@ -17,10 +17,12 @@ struct RunProgress {
 
     var sentences: [TypingSentence]
     var index = 0
-    /// When the current sentence's first edit came, in `ProcessInfo.systemUptime` seconds, which only go forward.
-    var startedAt: TimeInterval?
-    var seconds = 0.0
+    /// When Start was tapped, to tell whether the catkeys keyboard opened during the run.
+    var startedAt = Date.now
+    /// Times each sentence from its first edit to Done, stopped while the app isn't active.
+    var stopwatch = TypingStopwatch()
     var targetCharacters = 0
+    var typedCharacters = 0
     var errorsLeft = 0
     var corrections = 0
 
@@ -37,12 +39,15 @@ struct TypingTestView: View {
 
     @Environment(\.scenePhase) private var scenePhase
     @State private var keyboard = TestKeyboard.apple
-    /// Set once the user picks a keyboard, so the heartbeat's suggestion no longer replaces their choice.
+    /// Set once the user picks a keyboard on the ready screen, so the heartbeat's suggestion no longer replaces
+    /// their choice there. Cleared each time the ready screen appears.
     @State private var keyboardPicked = false
     @State private var history: [TypingRun] = []
     @State private var progress: RunProgress?
     @State private var typed = ""
     @State private var lastRun: TypingRun?
+    /// Whether the catkeys keyboard opened after the last run's Start, which offers to relabel it as catkeys.
+    @State private var catkeysOpenedDuringLastRun = false
     @State private var sentencesMissing = false
     @FocusState private var fieldFocused: Bool
 
@@ -59,6 +64,7 @@ struct TypingTestView: View {
             _progress = State(initialValue: scene.progress)
             _typed = State(initialValue: scene.typed)
             _lastRun = State(initialValue: scene.lastRun)
+            _catkeysOpenedDuringLastRun = State(initialValue: scene.catkeysOpenedDuringLastRun)
             return
         }
         #endif
@@ -78,12 +84,15 @@ struct TypingTestView: View {
             }
             .navigationTitle("Typing test")
         }
-        .onAppear {
-            history = runStore.load()
-            suggestKeyboard()
-        }
+        .onAppear { history = runStore.load() }
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active { suggestKeyboard() }
+            let now = ProcessInfo.processInfo.systemUptime
+            if phase == .active {
+                progress?.stopwatch.resume(at: now)
+                suggestKeyboard()
+            } else {
+                progress?.stopwatch.pause(at: now)
+            }
         }
     }
 
@@ -113,6 +122,12 @@ struct TypingTestView: View {
                 }
             }
             historySection
+        }
+        // Each time: on first show, after New run and after Stop. A pick from before a run says nothing about the
+        // keyboard in use now.
+        .onAppear {
+            keyboardPicked = false
+            suggestKeyboard()
         }
     }
 
@@ -152,8 +167,14 @@ struct TypingTestView: View {
                 Text("""
                     Errors left: characters still wrong or missing when you tapped Done.
                     Corrections: characters you deleted while typing.
-                    Speed: words per minute, counting 5 characters as a word.
+                    Speed: words per minute of what you typed, counting 5 characters as a word.
                     """)
+            }
+            if catkeysOpenedDuringLastRun && run.keyboard != TestKeyboard.catkeys.rawValue {
+                Section {
+                    Text("Looks like you used catkeys — relabel?")
+                    Button("Relabel as catkeys", action: relabelLastRunAsCatkeys)
+                }
             }
             Section {
                 Button("New run") { lastRun = nil }
@@ -165,16 +186,17 @@ struct TypingTestView: View {
     @ViewBuilder private var historySection: some View {
         if !history.isEmpty {
             Section("History") {
-                ForEach(history.indices, id: \.self) { index in
-                    HistoryRow(run: history[index])
+                ForEach(history) { run in
+                    HistoryRow(run: run)
                 }
+                .onDelete(perform: deleteRuns)
             }
         }
     }
 
     // MARK: - Actions
 
-    /// The picker's binding: a pick by the user sticks.
+    /// The picker's binding: a pick by the user sticks while the ready screen shows.
     private var pickedKeyboard: Binding<TestKeyboard> {
         Binding(
             get: { keyboard },
@@ -184,47 +206,57 @@ struct TypingTestView: View {
             })
     }
 
-    /// The field's binding. The first edit starts the sentence's timer, and each edit that shortens the text adds
-    /// the characters it removed to the corrections. Clearing the field between sentences doesn't come through here.
+    /// The field's binding. Each edit tells the stopwatch, which starts the sentence's clock on the first one, and
+    /// each edit that shortens the text adds the characters it removed to the corrections. Clearing the field
+    /// between sentences doesn't come through here.
     private var typedText: Binding<String> {
         Binding(
             get: { typed },
             set: { newValue in
                 guard newValue != typed, var run = progress else { return }
-                if run.startedAt == nil { run.startedAt = ProcessInfo.processInfo.systemUptime }
+                run.stopwatch.edit(at: ProcessInfo.processInfo.systemUptime)
                 run.corrections += max(0, typed.count - newValue.count)
                 progress = run
                 typed = newValue
             })
     }
 
-    /// catkeys if the keyboard opened in the last minute, else Apple's, until the user picks.
+    /// catkeys if its keyboard opened in the last minute, else Apple's, unless the user has picked. Only on the
+    /// ready screen: a run's label is settled when it starts.
     private func suggestKeyboard() {
-        guard progress == nil, !keyboardPicked else { return }
+        guard progress == nil, lastRun == nil, !keyboardPicked else { return }
         let opened = heartbeat?.lastKeyboardOpen
         keyboard = opened.map { Date.now.timeIntervalSince($0) < 60 } == true ? .catkeys : .apple
     }
 
+    /// Draws 5 sentences, 3 in one language and 2 in the other, interleaved. The language with 3 takes turns from
+    /// run to run.
     private func start() {
-        guard let sentences = try? TypingSentences.bundled(), sentences.count >= RunProgress.sentenceCount else {
+        guard let sentences = try? TypingSentences.bundled(), sentences.count >= RunProgress.sentenceCount,
+              let majority = TypingSentences.nextMajority(after: runStore.lastMajorityLanguage, in: sentences)
+        else {
             sentencesMissing = true
             return
         }
+        runStore.lastMajorityLanguage = majority
+        var generator = SystemRandomNumberGenerator()
+        let drawn = TypingSentences.balancedDraw(
+            sentences, count: RunProgress.sentenceCount, majority: majority, using: &generator)
         sentencesMissing = false
         typed = ""
         lastRun = nil
-        progress = RunProgress(sentences: Array(sentences.shuffled().prefix(RunProgress.sentenceCount)))
+        catkeysOpenedDuringLastRun = false
+        progress = RunProgress(sentences: drawn)
     }
 
     private func submit() {
         guard var run = progress else { return }
         let target = run.sentence.text
-        run.errorsLeft += TypingMetrics.editDistance(target, TypingMetrics.normalized(typed))
+        let submitted = TypingMetrics.normalized(typed)
+        run.errorsLeft += TypingMetrics.editDistance(target, submitted)
         run.targetCharacters += target.count
-        if let startedAt = run.startedAt {
-            run.seconds += ProcessInfo.processInfo.systemUptime - startedAt
-        }
-        run.startedAt = nil
+        run.typedCharacters += submitted.count
+        run.stopwatch.finishSentence(at: ProcessInfo.processInfo.systemUptime)
         run.index += 1
         typed = ""
         guard run.index == run.sentences.count else {
@@ -233,9 +265,12 @@ struct TypingTestView: View {
         }
         let finished = TypingRun(
             date: .now, keyboard: keyboard.rawValue, targetCharacters: run.targetCharacters,
-            errorsLeft: run.errorsLeft, corrections: run.corrections, seconds: run.seconds)
+            typedCharacters: run.typedCharacters, errorsLeft: run.errorsLeft, corrections: run.corrections,
+            seconds: run.stopwatch.seconds)
         runStore.append(finished)
         history = runStore.load()
+        // The keyboard writes its heartbeat each time it appears, which for a run is just after Start.
+        catkeysOpenedDuringLastRun = heartbeat?.lastKeyboardOpen.map { $0 > run.startedAt } ?? false
         fieldFocused = false
         progress = nil
         lastRun = finished
@@ -246,6 +281,21 @@ struct TypingTestView: View {
         fieldFocused = false
         progress = nil
         typed = ""
+    }
+
+    private func relabelLastRunAsCatkeys() {
+        guard var run = lastRun else { return }
+        run.keyboard = TestKeyboard.catkeys.rawValue
+        runStore.replace(run)
+        history = runStore.load()
+        lastRun = run
+    }
+
+    private func deleteRuns(at offsets: IndexSet) {
+        for id in offsets.map({ history[$0].id }) {
+            runStore.remove(id: id)
+        }
+        history = runStore.load()
     }
 }
 
@@ -307,6 +357,7 @@ private extension TypingRun {
 /// `scripts/sim-screenshots.sh` opens the tab in a set state with `-catkeysTypingTestScene <scene>`:
 /// - `run`: a run at sentence 2 of 5, partly typed.
 /// - `summary`: a finished run, with invented sample runs as history.
+/// - `relabel`: the same, but the run is labelled Apple while the catkeys keyboard opened during it.
 /// The sample runs live in their own defaults suite, emptied at each launch, so they never mix with real history.
 private struct ScreenshotScene {
     private static let suite = "catkeys.screenshots.typingTest"
@@ -315,6 +366,7 @@ private struct ScreenshotScene {
     var progress: RunProgress?
     var typed = ""
     var lastRun: TypingRun?
+    var catkeysOpenedDuringLastRun = false
 
     init?(_ name: String?) {
         guard let name else { return nil }
@@ -323,27 +375,38 @@ private struct ScreenshotScene {
         runStore = TypingRunStore(defaults: defaults)
         switch name {
         case "run":
-            guard let sentences = try? TypingSentences.bundled(), sentences.count >= RunProgress.sentenceCount else {
-                return nil
-            }
-            let picked = Array(sentences.suffix(RunProgress.sentenceCount))
+            guard let sentences = try? TypingSentences.bundled() else { return nil }
+            let english = sentences.filter { $0.language == "en" }
+            let hinglish = sentences.filter { $0.language == "hi-Latn" }
+            guard english.count >= 3, hinglish.count >= 4 else { return nil }
+            let picked = [english[0], hinglish[2], english[1], hinglish[3], english[2]]
+            let now = ProcessInfo.processInfo.systemUptime
+            var stopwatch = TypingStopwatch()
+            stopwatch.edit(at: now - 14)
+            stopwatch.finishSentence(at: now - 5)
+            stopwatch.edit(at: now - 4)
             progress = RunProgress(
-                sentences: picked, index: 1, startedAt: ProcessInfo.processInfo.systemUptime - 4,
-                seconds: 9.5, targetCharacters: picked[0].text.count, errorsLeft: 1, corrections: 2)
+                sentences: picked, index: 1, startedAt: .now.addingTimeInterval(-16), stopwatch: stopwatch,
+                targetCharacters: picked[0].text.count, typedCharacters: picked[0].text.count, errorsLeft: 1,
+                corrections: 2)
             typed = String(picked[1].text.prefix(22))
-        case "summary":
+        case "summary", "relabel":
             // Invented numbers, oldest first so the newest ends up on top.
             let now = Date.now
-            let samples = [
-                TypingRun(date: now.addingTimeInterval(-86_400 - 600), keyboard: "Apple",
-                          targetCharacters: 188, errorsLeft: 2, corrections: 6, seconds: 43.1),
-                TypingRun(date: now.addingTimeInterval(-86_400), keyboard: "catkeys",
-                          targetCharacters: 192, errorsLeft: 7, corrections: 15, seconds: 58.2),
-                TypingRun(date: now.addingTimeInterval(-1_500), keyboard: "Apple",
-                          targetCharacters: 204, errorsLeft: 1, corrections: 5, seconds: 44.0),
-                TypingRun(date: now.addingTimeInterval(-90), keyboard: "catkeys",
-                          targetCharacters: 199, errorsLeft: 2, corrections: 8, seconds: 49.6),
+            var samples = [
+                TypingRun(date: now.addingTimeInterval(-86_400 - 600), keyboard: "Apple", targetCharacters: 188,
+                          typedCharacters: 187, errorsLeft: 2, corrections: 6, seconds: 43.1),
+                TypingRun(date: now.addingTimeInterval(-86_400), keyboard: "catkeys", targetCharacters: 192,
+                          typedCharacters: 194, errorsLeft: 7, corrections: 15, seconds: 58.2),
+                TypingRun(date: now.addingTimeInterval(-1_500), keyboard: "Apple", targetCharacters: 204,
+                          typedCharacters: 204, errorsLeft: 1, corrections: 5, seconds: 44.0),
+                TypingRun(date: now.addingTimeInterval(-90), keyboard: "catkeys", targetCharacters: 199,
+                          typedCharacters: 198, errorsLeft: 2, corrections: 8, seconds: 49.6),
             ]
+            if name == "relabel" {
+                samples[samples.count - 1].keyboard = "Apple"
+                catkeysOpenedDuringLastRun = true
+            }
             samples.forEach(runStore.append)
             lastRun = samples.last
         default:

@@ -31,4 +31,28 @@ public enum TypingSentences {
         let entries = try JSONDecoder().decode([Entry].self, from: try Data(contentsOf: url))
         return entries.map { TypingSentence(text: $0.text, language: $0.language) }
     }
+
+    /// `count` different sentences drawn at random, alternating languages: `majority` first, then the others, so 5
+    /// gives 3 in `majority` and 2 in the others. When one side runs out, the other fills in.
+    public static func balancedDraw<G: RandomNumberGenerator>(
+        _ sentences: [TypingSentence], count: Int, majority: String, using generator: inout G
+    ) -> [TypingSentence] {
+        var major = sentences.filter { $0.language == majority }.shuffled(using: &generator)
+        var minor = sentences.filter { $0.language != majority }.shuffled(using: &generator)
+        var drawn: [TypingSentence] = []
+        for slot in 0..<min(max(count, 0), sentences.count) {
+            let fromMajor = slot.isMultiple(of: 2) ? !major.isEmpty : minor.isEmpty
+            drawn.append(fromMajor ? major.removeLast() : minor.removeLast())
+        }
+        return drawn
+    }
+
+    /// The language to get the extra sentence in the next draw: the one after `last` among the languages of
+    /// `sentences`, in alphabetical order and wrapping round, so runs take turns. The first language if `last` is
+    /// nil or not among them; nil if there are no sentences.
+    public static func nextMajority(after last: String?, in sentences: [TypingSentence]) -> String? {
+        let languages = Set(sentences.map(\.language)).sorted()
+        guard let last, let index = languages.firstIndex(of: last) else { return languages.first }
+        return languages[(index + 1) % languages.count]
+    }
 }
