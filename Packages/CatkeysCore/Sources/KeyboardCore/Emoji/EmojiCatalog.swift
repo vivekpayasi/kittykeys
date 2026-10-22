@@ -30,14 +30,16 @@ public struct EmojiCategory: Equatable, Sendable {
     }
 }
 
-/// What `EmojiCatalog.load` returns: the categories in panel order, and the display name of the Recent
-/// section, which also comes from data so no user-facing text lives in Swift.
+/// What `EmojiCatalog.load` returns: the categories in panel order, and the Recent section's display name and
+/// tab icon (an SF Symbol name), which also come from data so no user-facing text or symbol lives in Swift.
 public struct EmojiData: Equatable, Sendable {
     public var recentName: String
+    public var recentIcon: String
     public var categories: [EmojiCategory]
 
-    public init(recentName: String, categories: [EmojiCategory]) {
+    public init(recentName: String, recentIcon: String, categories: [EmojiCategory]) {
         self.recentName = recentName
+        self.recentIcon = recentIcon
         self.categories = categories
     }
 }
@@ -51,6 +53,7 @@ public enum EmojiCatalog {
 
     private struct File: Decodable {
         var recentName: String
+        var recentIcon: String
         var categories: [Category]
     }
 
@@ -86,7 +89,7 @@ public enum EmojiCatalog {
                 }
             )
         }
-        return EmojiData(recentName: file.recentName, categories: categories)
+        return EmojiData(recentName: file.recentName, recentIcon: file.recentIcon, categories: categories)
     }
 
     /// The newest Emoji version the given iOS version can draw: 17.0 from iOS 26.4, else 16.0.

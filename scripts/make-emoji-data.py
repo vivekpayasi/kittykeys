@@ -11,7 +11,7 @@ every field used is type-checked. Standard library only. Run from anywhere:
     python3 -I scripts/make-emoji-data.py --refresh  # downloads them again
 
 Output (UTF-8, one emoji per line so diffs stay readable, otherwise compact):
-    {"source": "emojibase-data 17.0.0", "recentName": "Recent",
+    {"source": "emojibase-data 17.0.0", "recentName": "Recent", "recentIcon": "clock",
      "categories": [{"id", "name", "icon", "emoji": [{"e", "v", "s"?}]}]}
 """
 
@@ -38,7 +38,9 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC_DIR = os.path.join(ROOT, "build", "emoji-src")
 OUT_PATH = os.path.join(ROOT, "Packages", "CatkeysCore", "Sources", "KeyboardCore", "Emoji", "emoji.json")
 
+# The Recent section: its display name and the SF Symbol for its tab.
 RECENT_NAME = "Recent"
+RECENT_ICON = "clock"
 
 # Apple's category order. Each entry: id, display name, SF Symbol for the tab, Emojibase groups.
 # Group 2 (component: skin-tone swatches, hair parts) is left out on purpose.
@@ -153,7 +155,7 @@ def unicode_form(emoji, presentation, where):
     """
     if presentation not in (0, 1):
         fail(f"bad type {presentation!r} in {where}")
-    if presentation == 1 and len(emoji) == 2 and emoji[1] == "️":
+    if presentation == 1 and len(emoji) == 2 and emoji[1] == "\ufe0f":
         return emoji[0]
     return emoji
 
@@ -232,6 +234,7 @@ def render(categories):
     """Compact JSON with one emoji per line; deterministic for the same input."""
     lines = ["{" + dumps("source") + ":" + dumps(f"{PACKAGE} {VERSION}") + ","
              + dumps("recentName") + ":" + dumps(RECENT_NAME) + ","
+             + dumps("recentIcon") + ":" + dumps(RECENT_ICON) + ","
              + dumps("categories") + ":["]
     for c_index, category in enumerate(categories):
         head = {k: category[k] for k in ("id", "name", "icon")}
@@ -253,7 +256,8 @@ def main():
 
     categories, skipped_no_group, components = build(load_json(paths["data.json"]))
     text = render(categories)
-    expected = {"source": f"{PACKAGE} {VERSION}", "recentName": RECENT_NAME, "categories": categories}
+    expected = {"source": f"{PACKAGE} {VERSION}", "recentName": RECENT_NAME, "recentIcon": RECENT_ICON,
+                "categories": categories}
     if json.loads(text) != expected:
         fail("rendered JSON does not round-trip")
 

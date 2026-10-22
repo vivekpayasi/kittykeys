@@ -17,6 +17,10 @@ import KeyboardCore
     #expect(try EmojiCatalog.load(maxVersion: 17.0).recentName == "Recent")
 }
 
+@Test func recentIconComesFromData() throws {
+    #expect(try EmojiCatalog.load(maxVersion: 17.0).recentIcon == "clock")
+}
+
 @Test func versionFilterDropsNewer() throws {
     let v16 = try EmojiCatalog.load(maxVersion: 16.0).categories.flatMap(\.items)
     let v17 = try EmojiCatalog.load(maxVersion: 17.0).categories.flatMap(\.items)
