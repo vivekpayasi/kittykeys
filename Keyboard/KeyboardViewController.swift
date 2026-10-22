@@ -66,7 +66,9 @@ final class KeyboardViewController: UIInputViewController {
             document: document, layouts: layouts, settings: settingsStore?.load() ?? KeyboardSettings(),
             feedback: feedback)
         controller.onGlobe = { [weak self] in self?.advanceToNextInputMode() }
-        let keyboardView = KeyboardView(controller: controller)
+        // Recent and the skin tones live in the extension's own defaults, which need no Full Access.
+        let keyboardView = KeyboardView(
+            controller: controller, feedback: feedback, emojiPreferences: EmojiPreferences(defaults: .standard))
         // How long iOS took to deliver the touch: the bottom-row delay shows up here, so the bottom row is marked
         // (only a 0 or 1, never where the touch was or which key).
         keyboardView.onTouchDown = { timestamp, isBottomRow in
@@ -75,7 +77,8 @@ final class KeyboardViewController: UIInputViewController {
             signposter.emitEvent(
                 "keyDown", "latencyMs=\(latency, format: .fixed(precision: 2)) bottomRow=\(bottomRow)")
         }
-        // "touch": each batch of touches through the touch processor and the controller; "render": each redraw.
+        // "touch": each batch of touches through the touch processor and the controller; "render": each redraw;
+        // "emojiPanelOpen": the emoji panel opening, to its first layout with emoji; "emojiInsert": each emoji it types.
         keyboardView.measure = { name, work in
             signposter.withIntervalSignpost(name, around: work)
         }
@@ -155,9 +158,11 @@ final class KeyboardViewController: UIInputViewController {
         controller?.documentDidChange()
     }
 
-    /// Nothing to free in milestone 1: the layouts and the key layers are all in use.
+    /// Frees the emoji panel and its decoded emoji while the keys show; the layouts and the key layers are in use.
     override func didReceiveMemoryWarning() {
         super.didReceiveMemoryWarning()
+        Self.logger.notice("Memory warning")
+        keyboardView?.didReceiveMemoryWarning()
     }
 
     /// Dark for a field that asks for a dark keyboard, and in dark mode.

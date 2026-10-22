@@ -23,6 +23,13 @@ SCENES=(
   "hold-d|-catkeysPreview -catkeysPreviewHold d"
   "hold-period|-catkeysPreview -catkeysPreviewHold ."
   "cursor|-catkeysPreview -catkeysPreviewCursor"
+  "emoji|-catkeysPreview -catkeysPreviewEmoji"
+  # Skin-tone popups at a middle column, the left-most column and the right-most column (8 columns at 402 points).
+  "emoji-hold|-catkeysPreview -catkeysPreviewEmojiHold 👋"
+  "emoji-hold-left|-catkeysPreview -catkeysPreviewEmojiHold 👉"
+  "emoji-hold-right|-catkeysPreview -catkeysPreviewEmojiHold 👈"
+  # The Symbols section around ❓, where bare symbols such as ➕ ❓ ✅ ❌ must draw as colour emoji.
+  "emoji-symbols|-catkeysPreview -catkeysPreviewEmojiHold ❓"
   "app-setup|-catkeysTab setup"
   "app-settings|-catkeysTab settings"
   "app-tryit|-catkeysTab tryit"

@@ -33,6 +33,8 @@ public enum ReturnKeyLabel {
 /// - A touch whose lift never arrives is ended for it (ruling R33): when the view leaves or rejoins a window,
 ///   and when a new touch begins while UIKit no longer reports it.
 /// - The suggestion row is an empty band at the top in milestone 1.
+/// - While the controller's `state.panel` is `.emoji`, an `EmojiPanelView` covers the keys below the suggestion row,
+///   at the same height. It is made the first time it opens and kept, unless a memory warning frees it while closed.
 /// - The view looks clear, so the system's keyboard backdrop shows around and between the keys (ruling R42). Its fill
 ///   is `UIColor.touchableClear`, not `.clear`, so taps between the keys still reach it (ruling M3-R8).
 @MainActor public final class KeyboardView: UIView {
@@ -49,6 +51,7 @@ public enum ReturnKeyLabel {
     public var theme: KeyboardTheme = .light {
         didSet {
             guard theme != oldValue else { return }
+            emojiPanel?.theme = theme
             rebuild()
         }
     }
@@ -57,13 +60,21 @@ public enum ReturnKeyLabel {
     /// before the controller sees the touch. The keyboard extension measures touch delivery with it.
     public var onTouchDown: ((_ timestamp: TimeInterval, _ isBottomRow: Bool) -> Void)?
     /// Runs a stretch of the view's work, for timing: "touch" for each batch of touches handed to the controller
-    /// (the touch processor and the controller's whole response), and "render" for each `render()`.
+    /// (the touch processor and the controller's whole response), "render" for each `render()`, "emojiPanelOpen" from
+    /// the emoji panel opening to its first layout with emoji, and "emojiInsert" for each emoji the panel types.
     /// The keyboard extension wraps `work` in a signpost interval. Without it the work just runs.
     public var measure: ((_ name: StaticString, _ work: () -> Void) -> Void)?
     /// Called once, after the first render that drew keys. The keyboard extension ends its startup measurement with it.
     public var onFirstKeysDrawn: (() -> Void)?
 
     private let controller: KeyboardController
+    /// Haptics and sound for the emoji panel's taps; the controller plays the keys' own.
+    private let feedback: any FeedbackSink
+    private let emojiPreferences: EmojiPreferences
+    /// The emoji panel, once it has opened.
+    private var emojiPanel: EmojiPanelView?
+    /// What shows below the suggestion row now.
+    private var shownPanel = KeyboardPanel.keys
     private let keysLayer = CALayer()
     private let previewLayer = KeyPreviewLayer()
     private let alternatesLayer = AlternatesLayer()
@@ -90,8 +101,12 @@ public enum ReturnKeyLabel {
         var label: String
     }
 
-    public init(controller: KeyboardController) {
+    /// The keyboard for `controller`. The emoji panel plays `feedback` on its taps and keeps Recent and skin tones in
+    /// `emojiPreferences`.
+    public init(controller: KeyboardController, feedback: any FeedbackSink, emojiPreferences: EmojiPreferences) {
         self.controller = controller
+        self.feedback = feedback
+        self.emojiPreferences = emojiPreferences
         super.init(frame: .zero)
         isMultipleTouchEnabled = true
         liveTouchIDs.reserveCapacity(Self.touchCapacity)
@@ -124,6 +139,7 @@ public enum ReturnKeyLabel {
         // setWidth redraws through onChange only when the width changed. Frames the controller already had,
         // such as before this view existed, still need drawing.
         if controller.frames != builtFrames { render() }
+        layOutEmojiPanel()
     }
 
     public override func didMoveToWindow() {
@@ -133,6 +149,7 @@ public enum ReturnKeyLabel {
         // So every touch ends here, before the timer can restart.
         liveTouchIDs.removeAll(keepingCapacity: true)
         controller.cancelAllTouches()
+        emojiPanel?.endInteractions()
         if window == nil {
             displayLink?.invalidate()
             displayLink = nil
@@ -158,6 +175,7 @@ public enum ReturnKeyLabel {
         updateKeys(to: state)
         updatePreview(state)
         updateAlternates(state)
+        updatePanel(state.panel)
         CATransaction.commit()
         renderedState = state
         updateTimer()
@@ -253,6 +271,66 @@ public enum ReturnKeyLabel {
 
     private var displayScale: CGFloat {
         max(traitCollection.displayScale, 1)
+    }
+
+    // MARK: Emoji panel
+
+    /// Frees the emoji panel, its decoded emoji and its cells, unless it is showing; it is made again when it next opens.
+    /// The keyboard extension calls this on a memory warning.
+    public func didReceiveMemoryWarning() {
+        guard shownPanel == .keys, let emojiPanel else { return }
+        emojiPanel.removeFromSuperview()
+        self.emojiPanel = nil
+    }
+
+    /// For the app's preview: shows the emoji panel's skin popup for `emoji` as if a finger held it, once the panel is open.
+    public func showEmojiHoldForPreview(_ emoji: String) {
+        emojiPanel?.showHoldForPreview(emoji)
+    }
+
+    /// Shows the emoji panel in place of the keys, or the keys again. Opening is timed as "emojiPanelOpen", up to the
+    /// panel's first layout with its emoji.
+    private func updatePanel(_ panel: KeyboardPanel) {
+        guard panel != shownPanel else { return }
+        shownPanel = panel
+        guard panel == .emoji else {
+            emojiPanel?.endInteractions()
+            emojiPanel?.isHidden = true
+            keysLayer.isHidden = false
+            return
+        }
+        measuring("emojiPanelOpen") {
+            let emojiPanel = self.emojiPanel ?? makeEmojiPanel()
+            keysLayer.isHidden = true
+            emojiPanel.isHidden = false
+            layOutEmojiPanel()
+            emojiPanel.open()
+            emojiPanel.layoutIfNeeded()
+        }
+    }
+
+    private func makeEmojiPanel() -> EmojiPanelView {
+        let layouts = controller.layouts
+        let emojiPanel = EmojiPanelView(
+            controller: controller, feedback: feedback, preferences: emojiPreferences,
+            lettersLabel: layouts.firstKey { $0.action == .switchPage(.letters) }?.label ?? "",
+            deleteLabel: layouts.firstKey { $0.action == .backspace }?.label ?? "")
+        emojiPanel.theme = theme
+        emojiPanel.measure = { [weak self] name, work in
+            guard let self else { return work() }
+            measuring(name, work)
+        }
+        addSubview(emojiPanel)
+        self.emojiPanel = emojiPanel
+        return emojiPanel
+    }
+
+    /// The panel fills the view below the suggestion row, so the keyboard keeps its height.
+    private func layOutEmojiPanel() {
+        guard let emojiPanel else { return }
+        let top = min(CGFloat(controller.metrics.suggestionRowHeight), bounds.height)
+        let frame = CGRect(x: 0, y: top, width: bounds.width, height: bounds.height - top)
+        if emojiPanel.frame != frame { emojiPanel.frame = frame }
     }
 
     /// What `key` shows: letters in capitals while shift is on, ⇪ for caps lock, and the field's return label.
