@@ -408,3 +408,17 @@ public struct EmojiSearch {
 ## Progress
 
 - 2026-10-22: plan written after milestone 1 closed. The user asked for the emoji panel before the suggestion row.
+- 2026-10-22/23: built and reviewed on branch `m3-emoji-panel` (each task reviewed clean; commit ranges are base..last):
+  - Task 1, emoji data: `40d6cc8..b71507e`
+  - Task 2, catalog and preferences: `b71507e..f731236`
+  - Task 3, controller panel mode: `7c15304..a79cdfb`
+  - Task 4, panel view: `cff982e..627835b`. Includes M3-R8 (taps in key gaps were dropped by the fully clear background, which the user confirmed on the device; fixed in `d770b60`), the font warm-up (M3-R12), the remembered skin tone (M3-R10) and the catalog kept per process (M3-R11).
+  - Task 4b, typing test in the app: `90fe2d2..bfb5c52`
+  - Task 5a, faded section headers on the device: `bfb5c52..11e5287`. iOS's scroll edge effect is hidden. Not yet confirmed on the iPhone, because the simulator never showed the fade.
+  - Task 4c, emoji search data and logic: `2b604fe..267c2b4`. Ranking per M3-R16 and M3-R17.
+  - Task 4d, emoji search view: `e576e7e..bb29a75`. Covers M3-R18, M3-R19 and M3-R20 (results never block typing).
+- 2026-10-22: the user confirmed on the device that gap taps work again, the emoji panel works, and the feel is "great again".
+- 2026-10-25: the IPA with search (788K, from `bb29a75`) is in the user's iCloud Drive and not yet installed or confirmed. Still to do:
+  - The user has more changes to request. The session ran out of context, so a new session continues from here.
+  - Task 5: confirm the headers on the device, measure on the device (footprint with the warm-up and the panel, panel open, search query signposts), the user's feel test, then merge to `main`.
+- Rulings live in the Rulings section above. The ledger, with every deferred minor, is local and gitignored: `.superpowers/sdd/2026-10-22-m3-emoji-panel/progress.md`.
