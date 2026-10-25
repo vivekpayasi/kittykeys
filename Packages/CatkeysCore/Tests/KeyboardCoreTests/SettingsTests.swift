@@ -30,6 +30,7 @@ final class SettingsTests {
         let s = KeyboardSettings()
         #expect(s.haptics && !s.sound && s.keyPopup && s.doubleSpacePeriod)
         #expect(s.longPressDelay == 0.3)
+        #expect(s.handOffCodeFields)
         #expect(store.load() == s)   // nothing saved yet
     }
 
@@ -40,6 +41,7 @@ final class SettingsTests {
         s.keyPopup = false
         s.doubleSpacePeriod = false
         s.longPressDelay = 0.45
+        s.handOffCodeFields = false
         store.save(s)
         #expect(store.load() == s)
         #expect(SettingsStore(defaults: UserDefaults(suiteName: suiteName)!).load() == s)
@@ -90,6 +92,13 @@ final class SettingsTests {
         store.save(s)
         s.longPressDelay = 0.3
         #expect(store.load() == s)
+    }
+
+    @Test func handOffCodeFieldsDecodes() {
+        writeSettingsJSON(#"{"handOffCodeFields":false}"#)
+        var expected = KeyboardSettings()
+        expected.handOffCodeFields = false
+        #expect(store.load() == expected)
     }
 
     @Test func oneBadFieldKeepsTheOthers() {

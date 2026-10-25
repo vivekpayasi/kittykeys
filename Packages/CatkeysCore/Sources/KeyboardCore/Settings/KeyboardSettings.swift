@@ -7,13 +7,16 @@ public struct KeyboardSettings: Codable, Equatable, Sendable {
     public var haptics = true, sound = false, keyPopup = true, doubleSpacePeriod = true
     /// Seconds a key is held before its long-press options show.
     public var longPressDelay = 0.3
+    /// Whether a one-time code field goes to the next keyboard, so Apple's keyboard can offer the code from Messages
+    /// (`CodeFieldHandOff`).
+    public var handOffCodeFields = true
 
     public init() {}
 }
 
 extension KeyboardSettings {
     private enum CodingKeys: String, CodingKey {
-        case haptics, sound, keyPopup, doubleSpacePeriod, longPressDelay
+        case haptics, sound, keyPopup, doubleSpacePeriod, longPressDelay, handOffCodeFields
     }
 
     /// A missing or wrong-typed field takes its default, so settings saved before a field existed still load
@@ -27,6 +30,7 @@ extension KeyboardSettings {
         doubleSpacePeriod = (try? container.decodeIfPresent(Bool.self, forKey: .doubleSpacePeriod)) ?? doubleSpacePeriod
         let delay = (try? container.decodeIfPresent(Double.self, forKey: .longPressDelay)) ?? longPressDelay
         longPressDelay = Self.validLongPressDelay(delay)
+        handOffCodeFields = (try? container.decodeIfPresent(Bool.self, forKey: .handOffCodeFields)) ?? handOffCodeFields
     }
 
     /// `delay` clamped to `longPressDelayRange`; NaN or infinity gives the default.

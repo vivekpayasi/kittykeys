@@ -18,6 +18,8 @@ final class KeyboardViewController: UIInputViewController {
         canonical: Bundle.main.object(forInfoDictionaryKey: "CatkeysAppGroup") as? String)
     /// The settings on that group, also made once per process. A resolved id resolves to itself.
     private static let appGroupStore = SettingsStore.appGroup(id: appGroupID)
+    /// Which code field catkeys last handed to the next keyboard, in the extension's own defaults.
+    private static let codeFieldHandOff = CodeFieldHandOff(defaults: .standard)
 
     private let feedback = DeviceFeedback()
     /// The settings shared with the app. nil without the App Group, when the defaults apply.
@@ -28,6 +30,8 @@ final class KeyboardViewController: UIInputViewController {
     private var heightConstraint: NSLayoutConstraint?
     /// From `viewDidLoad` until the first keys are drawn.
     private var startupInterval: OSSignpostIntervalState?
+    /// From `viewDidAppear` to `viewWillDisappear`: the keyboard only switches away while it shows.
+    private var isShowing = false
 
     /// iOS creates a view controller each time the keyboard appears, and keeps the old input view alive after
     /// its controller goes (seen on the iOS 26.4 simulator). Taking the keys out of it frees them, their layers
@@ -144,6 +148,13 @@ final class KeyboardViewController: UIInputViewController {
         for recognizer in recognizers { recognizer.delaysTouchesBegan = false }
         Self.logger.notice(
             "Turned off delaysTouchesBegan on \(recognizers.count, privacy: .public) window gesture recognizers")
+        isShowing = true
+        handOffIfCodeField()
+    }
+
+    override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        isShowing = false
     }
 
     /// `needsInputModeSwitchKey` is reliable only once the view is being laid out.
@@ -159,6 +170,8 @@ final class KeyboardViewController: UIInputViewController {
         controller.fieldDidChange(document.traits)
         controller.documentDidChange()
         updateTheme()
+        // Focus can move to a code field while the keyboard stays up.
+        if isShowing { handOffIfCodeField() }
     }
 
     override func selectionDidChange(_ textInput: (any UITextInput)?) {
@@ -178,6 +191,32 @@ final class KeyboardViewController: UIInputViewController {
     private func updateTheme() {
         let isDark = textDocumentProxy.keyboardAppearance == .dark || traitCollection.userInterfaceStyle == .dark
         keyboardView?.theme = isDark ? .dark : .light
+    }
+
+    /// A one-time code field goes to the next keyboard, where Apple's keyboard can offer the code from Messages,
+    /// unless `CodeFieldHandOff` says catkeys stays. Stays are logged at info level, not notice: every keystroke in
+    /// a code field asks again.
+    private func handOffIfCodeField() {
+        guard let controller, controller.settings.handOffCodeFields,
+              textDocumentProxy.textContentType == .oneTimeCode
+        else { return }
+        let decision = Self.codeFieldHandOff.decide(document: documentIdentifier, now: Date())
+        guard decision == .handOff else {
+            Self.logger.info("Staying in a one-time code field: \(String(describing: decision), privacy: .public)")
+            return
+        }
+        Self.logger.notice("Handing a one-time code field to the next keyboard")
+        // This controller is on its way out; it doesn't switch again.
+        isShowing = false
+        advanceToNextInputMode()
+    }
+
+    /// The field's `documentIdentifier`, or nil. While focus moves between fields iOS reports none, though the SDK
+    /// declares it non-null, and reading it as a Swift `UUID` then traps; asking the proxy as an object doesn't.
+    private var documentIdentifier: UUID? {
+        let getter = #selector(getter: UITextDocumentProxy.documentIdentifier)
+        guard let proxy = textDocumentProxy as? NSObject, proxy.responds(to: getter) else { return nil }
+        return (proxy.perform(getter)?.takeUnretainedValue() as? NSUUID) as UUID?
     }
 
     private func updateHeight() {

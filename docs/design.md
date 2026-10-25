@@ -53,6 +53,7 @@ So the first job of catkeys is the typing itself. Every tap must register on the
 
 - **Memory:** iOS kills a keyboard extension that uses more than roughly 48-60 MB of RAM, without warning. The limit is on RAM, not on app size: read-only memory-mapped files mostly don't count.
 - **Password fields:** iOS always shows its own keyboard in secure (password) fields. The same is true for phone-number pads.
+- **SMS codes:** iOS offers a code from Messages only on Apple's keyboard; no API gives it to other keyboards (checked against the iOS 27.1 SDK). In a one-time code field catkeys switches to the next keyboard once, and stays if the user comes back with 🌐 (`CodeFieldHandOff`; a setting in the app turns it off). (user, 2026-10-25)
 - **Microphone:** keyboard extensions have no microphone access. On Face ID iPhones, iOS draws its own 🌐 and 🎙 below every keyboard.
 - **Cursor movement:** the cursor can only move by character offsets (`adjustTextPosition`). iOS doesn't tell a keyboard where a long line wraps on screen, and there's no API for selecting text.
 - **Drawing area:** a keyboard can't draw outside its own view. Key popups for the top rows must fit inside the keyboard; the suggestion row gives them room.
@@ -212,7 +213,7 @@ Items 2 and 3 stay only if they measurably improve accuracy.
 
 | Target | What it is | UI tech |
 |---|---|---|
-| `Catkeys` | Container app: setup steps, settings, a test text field | SwiftUI (planning) |
+| `Catkeys` | Container app: setup steps, settings, test fields (text and one-time code), a typing test | SwiftUI (planning) |
 | `CatkeysKeyboard` | Keyboard extension (`UIInputViewController`) | UIKit with raw touch handling (planning) |
 | `KeyboardCore` | Local Swift package with all logic that doesn't need UIKit | none |
 
@@ -236,7 +237,7 @@ There are no `UIButton`s and no gesture recognizers on keys, because both add de
 
 ### Settings
 
-- **Settings:** haptics, sound, key popup, double-space full stop and long-press delay.
+- **Settings:** haptics, sound, key popup, double-space full stop, long-press delay, and switching to Apple's keyboard in one-time code fields.
 - **Storage:** an App Group's shared defaults, written by the app and read by the keyboard.
 - **Risk:** it's unconfirmed whether a free Apple ID can use App Groups with a keyboard extension. Verify on the device in M1. If it doesn't work, settings move into the keyboard itself, as a gear in the suggestion row when it's empty. Until then, the defaults in this document apply.
 

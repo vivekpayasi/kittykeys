@@ -34,6 +34,14 @@ struct SettingsView: View {
                     Text("How long you hold a key before its symbols show.")
                 }
                 .disabled(store == nil)
+                Section {
+                    Toggle("Switch to Apple's keyboard for codes", isOn: saving(\.handOffCodeFields))
+                } footer: {
+                    Text(
+                        "iOS offers codes from Messages only on its own keyboard. In a code field, catkeys switches to the next keyboard in iOS Settings › General › Keyboard › Keyboards, so list Apple's keyboard right after catkeys. Press 🌐 to come back; catkeys then stays in that field."
+                    )
+                }
+                .disabled(store == nil)
             }
             .navigationTitle("Settings")
         }
