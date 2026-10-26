@@ -5,12 +5,16 @@
 DEVELOPMENT_TEAM = ABCDE12345
 
 // A reverse-DNS prefix you own, for example io.github.<handle>.
-// The app becomes <prefix>.catkeys, the keyboard <prefix>.catkeys.keyboard,
-// and the App Group group.<prefix>.catkeys.
-CATKEYS_BUNDLE_PREFIX = io.github.yourname
+// The app becomes <prefix>.kittykeys, the keyboard <prefix>.kittykeys.keyboard,
+// and the App Group group.<prefix>.kittykeys.
+KITTYKEYS_BUNDLE_PREFIX = io.github.yourname
+
+// Or set the app's whole bundle id, for example to keep the id of an install from before the rename
+// from catkeys. The keyboard and the App Group follow it.
+// KITTYKEYS_BUNDLE_ID = io.github.yourname.catkeys
 
 // If signing fails because your Apple ID (for example a free one) can't provision App Groups,
 // uncomment both lines to build without the App Group. The app's Setup tab then says the App Group
 // isn't available, and the keyboard uses the default settings.
-// CATKEYS_APP_ENTITLEMENTS =
-// CATKEYS_KB_ENTITLEMENTS =
+// KITTYKEYS_APP_ENTITLEMENTS =
+// KITTYKEYS_KB_ENTITLEMENTS =

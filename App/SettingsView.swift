@@ -38,7 +38,7 @@ struct SettingsView: View {
                     Toggle("Switch to Apple's keyboard for codes", isOn: saving(\.handOffCodeFields))
                 } footer: {
                     Text(
-                        "iOS offers codes from Messages only on its own keyboard. In a code field, catkeys switches to the next keyboard in iOS Settings › General › Keyboard › Keyboards, so list Apple's keyboard right after catkeys. Press 🌐 to come back; catkeys then stays in that field."
+                        "iOS offers codes from Messages only on its own keyboard. In a code field, kittykeys switches to the next keyboard in iOS Settings › General › Keyboard › Keyboards, so list Apple's keyboard right after kittykeys. Press 🌐 to come back; kittykeys then stays in that field."
                     )
                 }
                 .disabled(store == nil)

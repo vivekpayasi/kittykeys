@@ -2,7 +2,7 @@ import SwiftUI
 
 /// Fields to try the keyboard in: free text, and a one-time code field like the ones apps use for codes sent by SMS.
 struct TryItView: View {
-    /// The fields. A launch argument, `-catkeysFocus text` or `-catkeysFocus code`, focuses one, for UI tests on the
+    /// The fields. A launch argument, `-kittykeysFocus text` or `-kittykeysFocus code`, focuses one, for UI tests on the
     /// simulator.
     enum Field: String { case text, code }
 
@@ -18,7 +18,7 @@ struct TryItView: View {
                         .lineLimit(5...)
                         .focused($focused, equals: .text)
                 } footer: {
-                    Text("The catkeys keyboard must be picked with 🌐: touch and hold 🌐, then choose catkeys.")
+                    Text("The kittykeys keyboard must be picked with 🌐: touch and hold 🌐, then choose kittykeys.")
                 }
                 Section {
                     TextField("Code", text: $code)
@@ -26,7 +26,7 @@ struct TryItView: View {
                         .keyboardType(.numberPad)
                         .focused($focused, equals: .code)
                 } footer: {
-                    Text("A one-time code field: catkeys hands it to the next keyboard, and 🌐 brings catkeys back.")
+                    Text("A one-time code field: kittykeys hands it to the next keyboard, and 🌐 brings kittykeys back.")
                 }
             }
             // The keyboard covers the tab bar; dragging the form down puts it away.
@@ -34,7 +34,7 @@ struct TryItView: View {
             .navigationTitle("Try it")
         }
         .onAppear {
-            if let field = UserDefaults.standard.string(forKey: "catkeysFocus").flatMap(Field.init(rawValue:)) {
+            if let field = UserDefaults.standard.string(forKey: "kittykeysFocus").flatMap(Field.init(rawValue:)) {
                 focused = field
             }
         }

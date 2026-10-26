@@ -4,7 +4,7 @@ import SwiftUI
 import UIKit
 
 /// The keyboard view hosted in the app, pinned to the bottom of the screen above a text view it types into.
-/// The simulator screenshot script launches it with `-catkeysPreview`; see `PreviewScene` for the other arguments.
+/// The simulator screenshot script launches it with `-kittykeysPreview`; see `PreviewScene` for the other arguments.
 struct KeyboardPreviewView: UIViewRepresentable {
     func makeUIView(context: Context) -> UIView {
         do {
@@ -23,15 +23,15 @@ struct KeyboardPreviewView: UIViewRepresentable {
 }
 
 /// What the preview shows, from launch arguments. Each step drives the controller as touches would.
-/// - `-catkeysPreviewPage <id>`: taps page keys until page `id` shows.
-/// - `-catkeysPreviewHold <label>`: holds the key with that label until its long-press options show.
-/// - `-catkeysPreviewCursor`: holds space until cursor mode begins.
-/// - `-catkeysPreviewEmoji`: taps the emoji key, opening the emoji panel.
-/// - `-catkeysPreviewEmojiHold <emoji>`: opens the emoji panel, scrolls to `emoji` and holds it, so its skin-tone popup
+/// - `-kittykeysPreviewPage <id>`: taps page keys until page `id` shows.
+/// - `-kittykeysPreviewHold <label>`: holds the key with that label until its long-press options show.
+/// - `-kittykeysPreviewCursor`: holds space until cursor mode begins.
+/// - `-kittykeysPreviewEmoji`: taps the emoji key, opening the emoji panel.
+/// - `-kittykeysPreviewEmojiHold <emoji>`: opens the emoji panel, scrolls to `emoji` and holds it, so its skin-tone popup
 ///   shows if it has skin tones.
-/// - `-catkeysPreviewEmojiSearch [query]`: opens the emoji panel, then search, as a touch on its field does, and types
-///   `query` on the keys (none when the next argument is missing or another flag). With `-catkeysPreviewEmojiHold`, the
-///   emoji is held in the results instead; with `-catkeysPreviewHold`, the key is held in search.
+/// - `-kittykeysPreviewEmojiSearch [query]`: opens the emoji panel, then search, as a touch on its field does, and types
+///   `query` on the keys (none when the next argument is missing or another flag). With `-kittykeysPreviewEmojiHold`, the
+///   emoji is held in the results instead; with `-kittykeysPreviewHold`, the key is held in search.
 /// Held keys are never lifted.
 struct PreviewScene {
     var pageID: String?
@@ -47,14 +47,14 @@ struct PreviewScene {
             guard let index = arguments.firstIndex(of: flag), arguments.indices.contains(index + 1) else { return nil }
             return arguments[index + 1]
         }
-        pageID = value(after: "-catkeysPreviewPage")
-        heldLabel = value(after: "-catkeysPreviewHold")
-        holdsSpace = arguments.contains("-catkeysPreviewCursor")
-        heldEmoji = value(after: "-catkeysPreviewEmojiHold")
-        if arguments.contains("-catkeysPreviewEmojiSearch") {
-            searchQuery = value(after: "-catkeysPreviewEmojiSearch").flatMap { $0.hasPrefix("-") ? nil : $0 } ?? ""
+        pageID = value(after: "-kittykeysPreviewPage")
+        heldLabel = value(after: "-kittykeysPreviewHold")
+        holdsSpace = arguments.contains("-kittykeysPreviewCursor")
+        heldEmoji = value(after: "-kittykeysPreviewEmojiHold")
+        if arguments.contains("-kittykeysPreviewEmojiSearch") {
+            searchQuery = value(after: "-kittykeysPreviewEmojiSearch").flatMap { $0.hasPrefix("-") ? nil : $0 } ?? ""
         }
-        opensEmoji = heldEmoji != nil || searchQuery != nil || arguments.contains("-catkeysPreviewEmoji")
+        opensEmoji = heldEmoji != nil || searchQuery != nil || arguments.contains("-kittykeysPreviewEmoji")
     }
 }
 
@@ -62,7 +62,7 @@ struct PreviewScene {
 /// The keyboard view is clear, so a grey like the system's keyboard backdrop goes behind it and below it.
 final class KeyboardPreviewHost: UIView {
     /// Invented text, so the keyboard starts mid-sentence with shift off.
-    private static let startingText = "Typing in the catkeys preview"
+    private static let startingText = "Typing in the kittykeys preview"
     /// How long each scripted tap is held, and the hold that outlasts the long-press and cursor-mode delays.
     private static let tapDuration = 0.05, holdDuration = 0.5
     /// The preview's one scripted finger. A real touch's id is a hash of its object, so a clash is vanishingly unlikely.

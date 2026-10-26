@@ -18,14 +18,14 @@ struct SetupView: View {
                         if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
                     }
                     SetupStep(1, "Tap **Open Settings**, then **Keyboards**.")
-                    SetupStep(2, "Turn on **catkeys**, then **Allow Full Access**.")
+                    SetupStep(2, "Turn on **kittykeys**, then **Allow Full Access**.")
                 } header: {
-                    Text("Turn on catkeys")
+                    Text("Turn on kittykeys")
                 } footer: {
                     Text("Or, in Settings, go to General › Keyboard › Keyboards › Add New Keyboard.")
                 }
                 Section("Full Access") {
-                    Text("Full Access lets catkeys use haptics and read the settings you choose here. catkeys never connects to the internet: nothing you type leaves your phone.")
+                    Text("Full Access lets kittykeys use haptics and read the settings you choose here. kittykeys never connects to the internet: nothing you type leaves your phone.")
                 }
                 Section("Status") {
                     Text(status)

@@ -245,7 +245,7 @@ final class TypingRunStoreTests {
         targetCharacters: 198, typedCharacters: 199, errorsLeft: 1, corrections: 4, seconds: 48.125)
 
     init() {
-        suiteFolder = FileManager.default.temporaryDirectory.appendingPathComponent("catkeys-tests-\(UUID())")
+        suiteFolder = FileManager.default.temporaryDirectory.appendingPathComponent("kittykeys-tests-\(UUID())")
         suiteName = suiteFolder.appendingPathComponent("typing").path
         defaults = UserDefaults(suiteName: suiteName)!
         store = TypingRunStore(defaults: defaults)
@@ -285,7 +285,7 @@ final class TypingRunStoreTests {
     @Test func corruptDataLoadsEmpty() {
         defaults.set(Data([0xDE, 0xAD, 0xBE, 0xEF]), forKey: "catkeys.typingTest.runs")
         #expect(store.load().isEmpty)
-        defaults.set(Data(#"[{"keyboard":"catkeys"}]"#.utf8), forKey: "catkeys.typingTest.runs")
+        defaults.set(Data(#"[{"keyboard":"kittykeys"}]"#.utf8), forKey: "catkeys.typingTest.runs")
         #expect(store.load().isEmpty)
         defaults.set(Data(#"{"runs":[]}"#.utf8), forKey: "catkeys.typingTest.runs")
         #expect(store.load().isEmpty)
@@ -321,7 +321,7 @@ final class TypingRunStoreTests {
         store.append(Self.first)
         store.append(Self.second)
         var relabelled = Self.second
-        relabelled.keyboard = "catkeys"
+        relabelled.keyboard = "kittykeys"
         #expect(store.replace(relabelled))
         #expect(store.load() == [relabelled, Self.first])
     }

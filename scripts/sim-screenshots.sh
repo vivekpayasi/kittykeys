@@ -10,44 +10,44 @@ cd "$(dirname "$0")/.."
 DEVICE_NAME="iPhone 17"
 OS_VERSION="26.4"
 DERIVED_DATA="build/DerivedData"
-APP="$DERIVED_DATA/Build/Products/Debug-iphonesimulator/Catkeys.app"
+APP="$DERIVED_DATA/Build/Products/Debug-iphonesimulator/Kittykeys.app"
 OUT="build/screenshots"
 # Seconds from launch to screenshot.
 SETTLE=2
 
 # Each scene: <name>|<launch arguments>
 SCENES=(
-  "letters|-catkeysPreview"
-  "symbols-1|-catkeysPreview -catkeysPreviewPage symbols-1"
-  "symbols-2|-catkeysPreview -catkeysPreviewPage symbols-2"
-  "hold-d|-catkeysPreview -catkeysPreviewHold d"
-  "hold-period|-catkeysPreview -catkeysPreviewHold ."
-  "cursor|-catkeysPreview -catkeysPreviewCursor"
-  "emoji|-catkeysPreview -catkeysPreviewEmoji"
+  "letters|-kittykeysPreview"
+  "symbols-1|-kittykeysPreview -kittykeysPreviewPage symbols-1"
+  "symbols-2|-kittykeysPreview -kittykeysPreviewPage symbols-2"
+  "hold-d|-kittykeysPreview -kittykeysPreviewHold d"
+  "hold-period|-kittykeysPreview -kittykeysPreviewHold ."
+  "cursor|-kittykeysPreview -kittykeysPreviewCursor"
+  "emoji|-kittykeysPreview -kittykeysPreviewEmoji"
   # Skin-tone popups at a middle column (base remembered), and at the left-most and right-most columns (the third skin
   # remembered, so it starts picked though the edge keeps it from the finger). 8 columns at 402 points.
-  "emoji-hold|-catkeysPreview -catkeysPreviewEmojiHold 👋"
-  "emoji-hold-left|-catkeysPreview -catkeysPreviewEmojiHold 👉"
-  "emoji-hold-right|-catkeysPreview -catkeysPreviewEmojiHold 👈"
+  "emoji-hold|-kittykeysPreview -kittykeysPreviewEmojiHold 👋"
+  "emoji-hold-left|-kittykeysPreview -kittykeysPreviewEmojiHold 👉"
+  "emoji-hold-right|-kittykeysPreview -kittykeysPreviewEmojiHold 👈"
   # The Symbols section around ❓, where bare symbols such as ➕ ❓ ✅ ❌ must draw as colour emoji.
-  "emoji-symbols|-catkeysPreview -catkeysPreviewEmojiHold ❓"
+  "emoji-symbols|-kittykeysPreview -kittykeysPreviewEmojiHold ❓"
   # Emoji search: just opened (Recent in the results), after typing "lau", and holding 👋 among the results for "hand".
-  "emoji-search-empty|-catkeysPreview -catkeysPreviewEmojiSearch"
-  "emoji-search-lau|-catkeysPreview -catkeysPreviewEmojiSearch lau"
-  "emoji-search-hold|-catkeysPreview -catkeysPreviewEmojiSearch hand -catkeysPreviewEmojiHold 👋"
-  "app-setup|-catkeysTab setup"
-  "app-settings|-catkeysTab settings"
-  "app-tryit|-catkeysTab tryit"
+  "emoji-search-empty|-kittykeysPreview -kittykeysPreviewEmojiSearch"
+  "emoji-search-lau|-kittykeysPreview -kittykeysPreviewEmojiSearch lau"
+  "emoji-search-hold|-kittykeysPreview -kittykeysPreviewEmojiSearch hand -kittykeysPreviewEmojiHold 👋"
+  "app-setup|-kittykeysTab setup"
+  "app-settings|-kittykeysTab settings"
+  "app-tryit|-kittykeysTab tryit"
   # The typing test before a run, mid-run, its summary over invented sample history, and the summary offering to
-  # relabel a run as catkeys (all but the first need a debug build).
-  "app-typingtest|-catkeysTab typingtest"
-  "app-typingtest-run|-catkeysTab typingtest -catkeysTypingTestScene run"
-  "app-typingtest-summary|-catkeysTab typingtest -catkeysTypingTestScene summary"
-  "app-typingtest-relabel|-catkeysTab typingtest -catkeysTypingTestScene relabel"
+  # relabel a run as kittykeys (all but the first need a debug build).
+  "app-typingtest|-kittykeysTab typingtest"
+  "app-typingtest-run|-kittykeysTab typingtest -kittykeysTypingTestScene run"
+  "app-typingtest-summary|-kittykeysTab typingtest -kittykeysTypingTestScene summary"
+  "app-typingtest-relabel|-kittykeysTab typingtest -kittykeysTypingTestScene relabel"
 )
 
 xcodegen generate
-xcodebuild -project Catkeys.xcodeproj -scheme Catkeys \
+xcodebuild -project Kittykeys.xcodeproj -scheme Kittykeys \
   -destination "platform=iOS Simulator,name=$DEVICE_NAME,OS=$OS_VERSION" \
   -derivedDataPath "$DERIVED_DATA" -quiet build
 

@@ -1,5 +1,7 @@
 # Milestone 1: Typing Shell Implementation Plan
 
+> **Renamed:** catkeys became kittykeys on 2026-10-26 (M3-R24). This plan keeps the names and paths of its time: `Packages/CatkeysCore` is now `Packages/KittykeysCore`, the `Catkeys` targets are `Kittykeys`, and the log subsystem is `kittykeys`. Bundle ids, the App Group and saved data keys kept `catkeys`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** a working catkeys keyboard with every typing feature from milestone 1 in `docs/design.md`, plus the container app. It's checked on the simulator first, then measured on the user's iPhone 16 for speed and memory.

@@ -11,7 +11,7 @@ final class SettingsTests {
     let store: SettingsStore
 
     init() {
-        suiteFolder = FileManager.default.temporaryDirectory.appendingPathComponent("catkeys-tests-\(UUID())")
+        suiteFolder = FileManager.default.temporaryDirectory.appendingPathComponent("kittykeys-tests-\(UUID())")
         suiteName = suiteFolder.appendingPathComponent("settings").path
         defaults = UserDefaults(suiteName: suiteName)!
         store = SettingsStore(defaults: defaults)

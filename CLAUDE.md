@@ -1,4 +1,4 @@
-# catkeys
+# kittykeys
 
 Open-source iOS custom keyboard, SwiftKey-style layout, powered by the anantara engine (`../anantara`). Claude builds this project; the user tests it on their iPhone. Installed by sideloading (SideStore or Xcode with a free Apple ID; possibly a paid developer account later).
 
@@ -33,6 +33,6 @@ Design approved 2026-10-21: `docs/design.md` is the source of truth (`docs/brief
 
 Milestone 1 (typing shell) is done and merged to `main` (2026-10-22). It was measured on the user's iPhone; see the plan's Progress section. Next is the emoji panel (milestone 3), moved ahead of the suggestion row at the user's request.
 
-Install path: SideStore, the same as the user's other sideloaded app. `scripts/build-ipa.sh` builds an unsigned IPA from the gitignored `Config/Local.xcconfig`, which holds the user's bundle prefix. Copy `build/catkeys.ipa` to iCloud Drive, and the user installs it from SideStore → My Apps → +. Never change the bundle ids: the free Apple ID has a weekly App ID quota.
+Install path: SideStore, the same as the user's other sideloaded app. `scripts/build-ipa.sh` builds an unsigned IPA from the gitignored `Config/Local.xcconfig`, which holds the user's bundle prefix. Copy `build/kittykeys.ipa` to iCloud Drive, and the user installs it from SideStore → My Apps → +. Never change the bundle ids: the free Apple ID has a weekly App ID quota.
 
 Disk: keep builds in `build/` (gitignored) and clear it between milestones. The external SSD is exFAT, so it can't hold Xcode builds; use it only for large throwaway files such as Instruments traces.

@@ -1,6 +1,6 @@
-# catkeys: hand-off brief
+# kittykeys: hand-off brief
 
-Written 2026-10-21 by the planning session (the one that also works on the anantara engine) for the session that builds catkeys. This brief records what's been decided and what's still open. It is not the design doc; writing that is your first job.
+Written 2026-10-21 by the planning session (the one that also works on the anantara engine) for the session that builds kittykeys. This brief records what's been decided and what's still open. It is not the design doc; writing that is your first job.
 
 ## What the user wants
 

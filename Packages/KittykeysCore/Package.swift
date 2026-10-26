@@ -2,7 +2,7 @@
 import PackageDescription
 
 let package = Package(
-    name: "CatkeysCore",
+    name: "KittykeysCore",
     platforms: [.iOS(.v26), .macOS(.v26)],
     products: [
         .library(name: "KeyboardCore", targets: ["KeyboardCore"]),

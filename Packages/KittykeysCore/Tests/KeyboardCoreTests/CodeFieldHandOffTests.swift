@@ -17,7 +17,7 @@ final class CodeFieldHandOffTests {
     static let fourthField = UUID()
 
     init() {
-        suiteFolder = FileManager.default.temporaryDirectory.appendingPathComponent("catkeys-tests-\(UUID())")
+        suiteFolder = FileManager.default.temporaryDirectory.appendingPathComponent("kittykeys-tests-\(UUID())")
         suiteName = suiteFolder.appendingPathComponent("handoff").path
         defaults = UserDefaults(suiteName: suiteName)!
         handOff = CodeFieldHandOff(defaults: defaults)
@@ -38,14 +38,14 @@ final class CodeFieldHandOffTests {
         #expect(handOff.decide(document: Self.field, now: Self.start) == .handOff)
     }
 
-    /// The user pressed 🌐 to come back: catkeys stays, however long they took.
+    /// The user pressed 🌐 to come back: kittykeys stays, however long they took.
     @Test func staysWhenBackInTheFieldItHandedOff() {
         #expect(handOff.decide(document: Self.field, now: Self.start) == .handOff)
         #expect(handOff.decide(document: Self.field, now: Self.start + 10) == .sameField)
         #expect(handOff.decide(document: Self.field, now: Self.start + 3600) == .sameField)
     }
 
-    /// A code split over several boxes is several fields; once the user came back, catkeys stays for the rest.
+    /// A code split over several boxes is several fields; once the user came back, kittykeys stays for the rest.
     @Test func staysForOtherFieldsSoonAfterAHandOff() {
         #expect(handOff.decide(document: Self.field, now: Self.start) == .handOff)
         #expect(handOff.decide(document: Self.otherField, now: Self.start + 59) == .quietPeriod)
@@ -62,14 +62,14 @@ final class CodeFieldHandOffTests {
         #expect(handOff.decide(document: Self.fourthField, now: Self.start + 440) == .handOff)
     }
 
-    /// The field catkeys stayed in is never handed off later, as when the user leaves for an authenticator app.
+    /// The field kittykeys stayed in is never handed off later, as when the user leaves for an authenticator app.
     @Test func neverHandsOffTheFieldItStayedIn() {
         #expect(handOff.decide(document: Self.field, now: Self.start) == .handOff)
         #expect(handOff.decide(document: Self.otherField, now: Self.start + 30) == .quietPeriod)
         #expect(handOff.decide(document: Self.otherField, now: Self.start + 600) == .sameField)
     }
 
-    @Test func aClockSetBackDoesNotKeepCatkeys() {
+    @Test func aClockSetBackDoesNotKeepKittykeys() {
         #expect(handOff.decide(document: Self.field, now: Self.start) == .handOff)
         #expect(handOff.decide(document: Self.otherField, now: Self.start - 3600) == .handOff)
     }

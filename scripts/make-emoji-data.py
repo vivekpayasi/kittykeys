@@ -2,8 +2,8 @@
 """Builds the emoji panel's data files from Emojibase (MIT).
 
 Downloads emojibase-data@17.0.0 into build/emoji-src/ (gitignored) and writes, under
-Packages/CatkeysCore/Sources/KeyboardCore/Emoji/, these committed files: emoji.json (the panel's emoji),
-EmojiKeywords/en.json (the English search words for each of them) and EmojiKeywords/popular.json (catkeys'
+Packages/KittykeysCore/Sources/KeyboardCore/Emoji/, these committed files: emoji.json (the panel's emoji),
+EmojiKeywords/en.json (the English search words for each of them) and EmojiKeywords/popular.json (kittykeys'
 hand-curated choice of commonly used emoji, informed by Unicode's published emoji frequency ranking, which search
 ranks first among equal matches). The keyboard reads every
 file in EmojiKeywords/, so another language's words (Hinglish next) can be added there as data alone.
@@ -23,7 +23,7 @@ Output (UTF-8, one emoji per line so diffs stay readable, otherwise compact):
     {"source": "emojibase-data 17.0.0", "language": "en", "stopwords": [...],
      "keywords": {"<base emoji>": [[label words], [tag words not among the label words]]}}
     EmojiKeywords/popular.json, most used first:
-    {"source": "catkeys' hand-curated choice of ...", "popular": ["<base emoji>", ...]}
+    {"source": "kittykeys' hand-curated choice of ...", "popular": ["<base emoji>", ...]}
 """
 
 import json
@@ -48,7 +48,7 @@ SYSTEM_CA_FILE = "/etc/ssl/cert.pem"
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC_DIR = os.path.join(ROOT, "build", "emoji-src")
-OUT_DIR = os.path.join(ROOT, "Packages", "CatkeysCore", "Sources", "KeyboardCore", "Emoji")
+OUT_DIR = os.path.join(ROOT, "Packages", "KittykeysCore", "Sources", "KeyboardCore", "Emoji")
 OUT_PATH = os.path.join(OUT_DIR, "emoji.json")
 KEYWORDS_DIR = os.path.join(OUT_DIR, "EmojiKeywords")
 KEYWORDS_PATH = os.path.join(KEYWORDS_DIR, "en.json")
@@ -63,7 +63,7 @@ MIN_KEYWORD_LENGTH = 2
 # search treats them as optional in a query: they exclude nothing and only lift the emoji that match them.
 EN_STOPWORDS = {"with", "of", "on", "the", "a", "an", "and", "in", "at", "for", "to", "from", "by"}
 
-# Commonly used emoji, most used first: catkeys' hand-curated choice of commonly used emoji, informed by Unicode's
+# Commonly used emoji, most used first: kittykeys' hand-curated choice of commonly used emoji, informed by Unicode's
 # published emoji frequency ranking (not a copy of it). Search ranks them first among otherwise equal matches. Each is matched to emoji.json ignoring U+FE0F and skin tones, so this list is written without
 # variation selectors (nothing invisible), and popular.json gets emoji.json's own spelling.
 POPULAR = (
@@ -71,7 +71,7 @@ POPULAR = (
     "😆 🤗 😉 🤔 👏 🙂 😳 🥳 😎 👌 😔 💪 ✨ 👀 😋 😏 😢 💯 🌹 💙 "
     "😀 💜 😇 😜 😡 😱 🙌 🎂 👋 💔"
 ).split()
-POPULAR_SOURCE = ("catkeys' hand-curated choice of commonly used emoji, "
+POPULAR_SOURCE = ("kittykeys' hand-curated choice of commonly used emoji, "
                   "informed by Unicode's published emoji frequency ranking")
 
 # How many single-character emoji lose a redundant U+FE0F in `unicode_form` for emojibase-data 17.0.0. A different

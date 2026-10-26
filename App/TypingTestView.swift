@@ -1,13 +1,26 @@
 import KeyboardCore
 import SwiftUI
 
-/// The keyboard a run used, as the user picks it. The raw value is saved as `TypingRun.keyboard`.
+/// The keyboard a run used, as the user picks it. The raw value is saved as `TypingRun.keyboard`; kittykeys keeps
+/// its old name there, "catkeys", so runs saved before the rename still count as kittykeys.
 enum TestKeyboard: String, CaseIterable, Identifiable {
-    case catkeys = "catkeys"
+    case kittykeys = "catkeys"
     case apple = "Apple"
     case other = "Other"
 
     var id: Self { self }
+
+    /// The name shown for a saved `TypingRun.keyboard`.
+    static func label(of saved: String) -> String {
+        TestKeyboard(rawValue: saved)?.label ?? saved
+    }
+
+    var label: String {
+        switch self {
+        case .kittykeys: "kittykeys"
+        case .apple, .other: rawValue
+        }
+    }
 }
 
 /// A run in progress: its sentences, which one shows, and the numbers so far. The typed text isn't here; it lives
@@ -17,7 +30,7 @@ struct RunProgress {
 
     var sentences: [TypingSentence]
     var index = 0
-    /// When Start was tapped, to tell whether the catkeys keyboard opened during the run.
+    /// When Start was tapped, to tell whether the kittykeys keyboard opened during the run.
     var startedAt = Date.now
     /// Times each sentence from its first edit to Done, stopped while the app isn't active.
     var stopwatch = TypingStopwatch()
@@ -30,7 +43,7 @@ struct RunProgress {
 }
 
 /// A typing test: 5 sentences, then errors left, corrections and speed, with past runs below. It measures how
-/// accurately taps land, to compare catkeys builds with each other and with Apple's keyboard.
+/// accurately taps land, to compare kittykeys builds with each other and with Apple's keyboard.
 /// Only the numbers are saved, in the app's own defaults; the typed text never is. Nothing leaves the phone.
 struct TypingTestView: View {
     /// The keyboard's heartbeat, which suggests the keyboard in use. nil when this install has no App Group.
@@ -46,14 +59,14 @@ struct TypingTestView: View {
     @State private var progress: RunProgress?
     @State private var typed = ""
     @State private var lastRun: TypingRun?
-    /// Whether the catkeys keyboard opened after the last run's Start, which offers to relabel it as catkeys.
-    @State private var catkeysOpenedDuringLastRun = false
+    /// Whether the kittykeys keyboard opened after the last run's Start, which offers to relabel it as kittykeys.
+    @State private var kittykeysOpenedDuringLastRun = false
     @State private var sentencesMissing = false
     @FocusState private var fieldFocused: Bool
 
     #if DEBUG
     /// Built once per launch, as SwiftUI may build this view many times.
-    private static let screenshotScene = ScreenshotScene(UserDefaults.standard.string(forKey: "catkeysTypingTestScene"))
+    private static let screenshotScene = ScreenshotScene(UserDefaults.standard.string(forKey: "kittykeysTypingTestScene"))
     #endif
 
     init(heartbeat: SettingsStore?) {
@@ -64,7 +77,7 @@ struct TypingTestView: View {
             _progress = State(initialValue: scene.progress)
             _typed = State(initialValue: scene.typed)
             _lastRun = State(initialValue: scene.lastRun)
-            _catkeysOpenedDuringLastRun = State(initialValue: scene.catkeysOpenedDuringLastRun)
+            _kittykeysOpenedDuringLastRun = State(initialValue: scene.kittykeysOpenedDuringLastRun)
             return
         }
         #endif
@@ -103,7 +116,7 @@ struct TypingTestView: View {
             Section {
                 Picker("Keyboard", selection: pickedKeyboard) {
                     ForEach(TestKeyboard.allCases) { keyboard in
-                        Text(keyboard.rawValue).tag(keyboard)
+                        Text(keyboard.label).tag(keyboard)
                     }
                 }
                 .pickerStyle(.segmented)
@@ -139,7 +152,7 @@ struct TypingTestView: View {
             }
             Section {
                 TextField("Type the sentence", text: typedText, axis: .vertical)
-                    // Without autocorrect, Apple's keyboard is measured on taps alone, like catkeys.
+                    // Without autocorrect, Apple's keyboard is measured on taps alone, like kittykeys.
                     .autocorrectionDisabled(true)
                     .focused($fieldFocused)
                 // An explicit button, not Return: keyboards treat Return differently.
@@ -162,7 +175,7 @@ struct TypingTestView: View {
                 LabeledContent("Corrections", value: "\(run.corrections)")
                 LabeledContent("Speed", value: "\(run.wordsPerMinuteText) WPM")
             } header: {
-                Text("This run: \(run.keyboard)")
+                Text("This run: \(TestKeyboard.label(of: run.keyboard))")
             } footer: {
                 Text("""
                     Errors left: characters still wrong or missing when you tapped Done.
@@ -170,10 +183,10 @@ struct TypingTestView: View {
                     Speed: words per minute of what you typed, counting 5 characters as a word.
                     """)
             }
-            if catkeysOpenedDuringLastRun && run.keyboard != TestKeyboard.catkeys.rawValue {
+            if kittykeysOpenedDuringLastRun && run.keyboard != TestKeyboard.kittykeys.rawValue {
                 Section {
-                    Text("Looks like you used catkeys — relabel?")
-                    Button("Relabel as catkeys", action: relabelLastRunAsCatkeys)
+                    Text("Looks like you used kittykeys — relabel?")
+                    Button("Relabel as kittykeys", action: relabelLastRunAsKittykeys)
                 }
             }
             Section {
@@ -221,12 +234,12 @@ struct TypingTestView: View {
             })
     }
 
-    /// catkeys if its keyboard opened in the last minute, else Apple's, unless the user has picked. Only on the
+    /// kittykeys if its keyboard opened in the last minute, else Apple's, unless the user has picked. Only on the
     /// ready screen: a run's label is settled when it starts.
     private func suggestKeyboard() {
         guard progress == nil, lastRun == nil, !keyboardPicked else { return }
         let opened = heartbeat?.lastKeyboardOpen
-        keyboard = opened.map { Date.now.timeIntervalSince($0) < 60 } == true ? .catkeys : .apple
+        keyboard = opened.map { Date.now.timeIntervalSince($0) < 60 } == true ? .kittykeys : .apple
     }
 
     /// Draws 5 sentences, 3 in one language and 2 in the other, interleaved. The language with 3 takes turns from
@@ -245,7 +258,7 @@ struct TypingTestView: View {
         sentencesMissing = false
         typed = ""
         lastRun = nil
-        catkeysOpenedDuringLastRun = false
+        kittykeysOpenedDuringLastRun = false
         progress = RunProgress(sentences: drawn)
     }
 
@@ -270,7 +283,7 @@ struct TypingTestView: View {
         runStore.append(finished)
         history = runStore.load()
         // The keyboard writes its heartbeat each time it appears, which for a run is just after Start.
-        catkeysOpenedDuringLastRun = heartbeat?.lastKeyboardOpen.map { $0 > run.startedAt } ?? false
+        kittykeysOpenedDuringLastRun = heartbeat?.lastKeyboardOpen.map { $0 > run.startedAt } ?? false
         fieldFocused = false
         progress = nil
         lastRun = finished
@@ -283,9 +296,9 @@ struct TypingTestView: View {
         typed = ""
     }
 
-    private func relabelLastRunAsCatkeys() {
+    private func relabelLastRunAsKittykeys() {
         guard var run = lastRun else { return }
-        run.keyboard = TestKeyboard.catkeys.rawValue
+        run.keyboard = TestKeyboard.kittykeys.rawValue
         runStore.replace(run)
         history = runStore.load()
         lastRun = run
@@ -306,7 +319,7 @@ private struct HistoryRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline) {
-                Text(run.keyboard)
+                Text(TestKeyboard.label(of: run.keyboard))
                     .font(.headline)
                 Spacer()
                 Text(run.date, format: .dateTime.day().month().hour().minute())
@@ -354,10 +367,10 @@ private extension TypingRun {
 #if DEBUG
 // MARK: - Simulator screenshots (debug builds only)
 
-/// `scripts/sim-screenshots.sh` opens the tab in a set state with `-catkeysTypingTestScene <scene>`:
+/// `scripts/sim-screenshots.sh` opens the tab in a set state with `-kittykeysTypingTestScene <scene>`:
 /// - `run`: a run at sentence 2 of 5, partly typed.
 /// - `summary`: a finished run, with invented sample runs as history.
-/// - `relabel`: the same, but the run is labelled Apple while the catkeys keyboard opened during it.
+/// - `relabel`: the same, but the run is labelled Apple while the kittykeys keyboard opened during it.
 /// The sample runs live in their own defaults suite, emptied at each launch, so they never mix with real history.
 private struct ScreenshotScene {
     private static let suite = "catkeys.screenshots.typingTest"
@@ -366,7 +379,7 @@ private struct ScreenshotScene {
     var progress: RunProgress?
     var typed = ""
     var lastRun: TypingRun?
-    var catkeysOpenedDuringLastRun = false
+    var kittykeysOpenedDuringLastRun = false
 
     init?(_ name: String?) {
         guard let name else { return nil }
@@ -405,7 +418,7 @@ private struct ScreenshotScene {
             ]
             if name == "relabel" {
                 samples[samples.count - 1].keyboard = "Apple"
-                catkeysOpenedDuringLastRun = true
+                kittykeysOpenedDuringLastRun = true
             }
             samples.forEach(runStore.append)
             lastRun = samples.last

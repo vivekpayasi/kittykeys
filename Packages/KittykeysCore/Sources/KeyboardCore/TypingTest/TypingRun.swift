@@ -3,7 +3,8 @@ import Foundation
 /// The numbers from one run of the typing test. The typed text is never kept. A run is identified by its date.
 public struct TypingRun: Codable, Equatable, Sendable, Identifiable {
     public var date: Date
-    /// Which keyboard the run used, as the user picked it: "catkeys", "Apple" or "Other".
+    /// Which keyboard the run used, as the user picked it: "catkeys" (kittykeys' name when the test began), "Apple"
+    /// or "Other".
     public var keyboard: String
     /// The characters in the run's target sentences.
     public var targetCharacters: Int

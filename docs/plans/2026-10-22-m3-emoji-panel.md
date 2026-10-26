@@ -1,5 +1,7 @@
 # Milestone 3: Emoji Panel Implementation Plan
 
+> **Renamed:** catkeys became kittykeys on 2026-10-26 (M3-R24). This plan keeps the names and paths of its time: `Packages/CatkeysCore` is now `Packages/KittykeysCore`, the `Catkeys` targets are `Kittykeys`, and the log subsystem is `kittykeys`. Bundle ids, the App Group and saved data keys kept `catkeys`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** the 😊 key opens an emoji panel that matches design §7:
@@ -407,6 +409,7 @@ public struct EmojiSearch {
 - M3-R21: one-time code fields (Task 5c, the user's request). iOS offers SMS codes only on Apple's keyboard, so catkeys hands a field whose content type is one-time code to the next keyboard, once. It stays when the user comes back to that field with 🌐, and for any code field within 60 s of the last code field it saw (codes split over several boxes); coming back restarts that minute, and a field it stayed in is never handed off later. The memory is in the extension's own defaults. A setting in the app turns it off; it is on by default.
 - M3-R22: text replacements (Task 5d, the user's request). catkeys reads the user's Text Replacement list from iOS (`requestSupplementaryLexicon`) each time it appears. A shortcut before a space, return or word-ending punctuation (Unicode sentence terminals, comma, semicolon, colon) becomes its phrase. Shortcuts match in any case, and a capital typed first capitalises the phrase. ⌫ right after a replacement puts the shortcut back, and a word end typed right there keeps it. There are no replacements in email, URL or number fields. Showing the phrase in the suggestion row's middle slot before the space, as Gboard does, comes with the suggestion row (M2).
 - M3-R23: the Settings tab shows the version and build at the bottom, and the Setup tab gets an Open Settings button (`UIApplication.openSettingsURLString`, the only supported link), as Gboard has. On the iOS 26.4 simulator it opens Settings' main page, with or without a Settings bundle; the phone is checked in Task 5.
+- M3-R24: catkeys is renamed kittykeys (the user's request): the app and keyboard names, the repo, the project, targets, package and code names, the docs and the log subsystem. Kept so the installed app updates in place: the bundle ids (`KITTYKEYS_BUNDLE_ID`, set to the old id in the user's `Local.xcconfig`; new installs default to `<prefix>.kittykeys`), the App Group, every saved defaults key (`catkeys.…`), and the typing test's saved label "catkeys", shown as kittykeys.
 
 ## Progress
 

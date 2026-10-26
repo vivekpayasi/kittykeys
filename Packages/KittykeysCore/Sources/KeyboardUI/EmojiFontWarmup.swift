@@ -23,7 +23,7 @@ import UIKit
 /// `draw(_:scale:completion:)` draws them off the main thread before they show, and a bounded set remembers what was
 /// drawn, so the main thread's own first drawing of a result never holds up typing. A memory warning empties that set.
 enum EmojiFontWarmup {
-    private static let logger = Logger(subsystem: "catkeys", category: "emoji")
+    private static let logger = Logger(subsystem: "kittykeys", category: "emoji")
     /// How long after the keys' first draw the warm-up starts, so it never competes with that frame.
     private static let delay = 0.3
     /// Drawn when the emoji data can't be read: it still loads the font.

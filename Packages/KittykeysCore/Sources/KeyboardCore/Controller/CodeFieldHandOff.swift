@@ -1,8 +1,8 @@
 import Foundation
 
-/// When catkeys steps aside for a one-time code field. iOS offers a code from Messages only on Apple's keyboard
-/// and gives other keyboards no way to read it, so in such a field catkeys switches to the next keyboard, once.
-/// When the user comes back with 🌐, they chose catkeys: it stays in that field, and in any other code field
+/// When kittykeys steps aside for a one-time code field. iOS offers a code from Messages only on Apple's keyboard
+/// and gives other keyboards no way to read it, so in such a field kittykeys switches to the next keyboard, once.
+/// When the user comes back with 🌐, they chose kittykeys: it stays in that field, and in any other code field
 /// within a minute of the last one, which covers a code split over several boxes. It never hands off a field it
 /// stayed in.
 ///
@@ -14,7 +14,7 @@ public struct CodeFieldHandOff {
     public enum Decision: Equatable, Sendable {
         /// Switch to the next keyboard.
         case handOff
-        /// Stay: catkeys handed this field off, so the user came back, or it already stayed in it.
+        /// Stay: kittykeys handed this field off, so the user came back, or it already stayed in it.
         case sameField
         /// Stay: another code field within a minute of the last one.
         case quietPeriod
@@ -35,7 +35,7 @@ public struct CodeFieldHandOff {
 
     /// Decides for the code field `document`, which iOS names with `UITextDocumentProxy.documentIdentifier`, at
     /// `now`, and remembers the field and the time for every decision but `noDocument`. So a user who came back
-    /// after minutes still keeps catkeys for the next box, and the field catkeys stays in is never handed off later.
+    /// after minutes still keeps kittykeys for the next box, and the field kittykeys stays in is never handed off later.
     public func decide(document: UUID?, now: Date) -> Decision {
         guard let document else { return .noDocument }
         let decision = reasonToStay(in: document, now: now) ?? .handOff
@@ -44,7 +44,7 @@ public struct CodeFieldHandOff {
         return decision
     }
 
-    /// Why catkeys stays in `document`, or nil to hand it off. A clock set back ends the quiet period.
+    /// Why kittykeys stays in `document`, or nil to hand it off. A clock set back ends the quiet period.
     private func reasonToStay(in document: UUID, now: Date) -> Decision? {
         guard let last = defaults.object(forKey: Self.dateKey) as? Date else { return nil }
         if defaults.string(forKey: Self.documentKey) == document.uuidString { return .sameField }

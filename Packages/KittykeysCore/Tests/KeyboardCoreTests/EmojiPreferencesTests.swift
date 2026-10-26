@@ -14,7 +14,7 @@ final class EmojiPreferencesTests {
     static let grin = EmojiItem(base: "😀", version: 1.0, skins: [])
 
     init() {
-        suiteFolder = FileManager.default.temporaryDirectory.appendingPathComponent("catkeys-tests-\(UUID())")
+        suiteFolder = FileManager.default.temporaryDirectory.appendingPathComponent("kittykeys-tests-\(UUID())")
         suiteName = suiteFolder.appendingPathComponent("emoji").path
         defaults = UserDefaults(suiteName: suiteName)!
         prefs = EmojiPreferences(defaults: defaults)

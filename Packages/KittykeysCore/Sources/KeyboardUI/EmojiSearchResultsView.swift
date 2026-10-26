@@ -21,7 +21,7 @@ import UIKit
 ///   something was typed, so results never reshuffle under a finger.
 /// - Nothing types unless search shows, and no touch reaches the keyboard view behind.
 final class EmojiSearchResultsView: UIView, UICollectionViewDataSource, UICollectionViewDelegateFlowLayout {
-    private static let logger = Logger(subsystem: "catkeys", category: "emoji")
+    private static let logger = Logger(subsystem: "kittykeys", category: "emoji")
     /// About how wide each result is. The width is fitted so that part of a result always shows at the row's end, which
     /// says the row scrolls. The row is the band's height, and the emoji are the panel's size.
     private static let preferredCellWidth: CGFloat = 46

@@ -21,7 +21,7 @@ import UIKit
 /// - Nothing types while the controller has the keys showing: a lift that arrives after the panel closed does nothing.
 ///   `endInteractions()` ends a hold and a held ⌫.
 final class EmojiPanelView: UIView, UICollectionViewDataSource, UICollectionViewDelegateFlowLayout {
-    private static let logger = Logger(subsystem: "catkeys", category: "emoji")
+    private static let logger = Logger(subsystem: "kittykeys", category: "emoji")
     private static let tabBarHeight: CGFloat = 40
     /// Columns are as many as fit at this width or more; 8 on a 390-point-wide iPhone.
     private static let minimumCellWidth: CGFloat = 46

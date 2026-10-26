@@ -9,16 +9,16 @@ import UIKit
 /// A crash here silently kills the keyboard, so every failure falls back: no layouts shows an empty keyboard,
 /// and no App Group means the default settings.
 final class KeyboardViewController: UIInputViewController {
-    private static let logger = Logger(subsystem: "catkeys", category: "keyboard")
+    private static let logger = Logger(subsystem: "kittykeys", category: "keyboard")
     /// Speed measurements for Instruments. They cost next to nothing while nothing records them.
-    private static let signposter = OSSignposter(subsystem: "catkeys", category: "perf")
+    private static let signposter = OSSignposter(subsystem: "kittykeys", category: "perf")
     /// The App Group, resolved once per process: iOS creates a controller each time the keyboard appears, and
     /// when SideStore has renamed the group, resolving it reads the provisioning profile.
     private static let appGroupID = AppGroupResolver.resolve(
-        canonical: Bundle.main.object(forInfoDictionaryKey: "CatkeysAppGroup") as? String)
+        canonical: Bundle.main.object(forInfoDictionaryKey: "KittykeysAppGroup") as? String)
     /// The settings on that group, also made once per process. A resolved id resolves to itself.
     private static let appGroupStore = SettingsStore.appGroup(id: appGroupID)
-    /// Which code field catkeys last handed to the next keyboard, in the extension's own defaults.
+    /// Which code field kittykeys last handed to the next keyboard, in the extension's own defaults.
     private static let codeFieldHandOff = CodeFieldHandOff(defaults: .standard)
 
     private let feedback = DeviceFeedback()
@@ -211,7 +211,7 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     /// A one-time code field goes to the next keyboard, where Apple's keyboard can offer the code from Messages,
-    /// unless `CodeFieldHandOff` says catkeys stays. Stays are logged at info level, not notice: every keystroke in
+    /// unless `CodeFieldHandOff` says kittykeys stays. Stays are logged at info level, not notice: every keystroke in
     /// a code field asks again.
     private func handOffIfCodeField() {
         guard let controller, controller.settings.handOffCodeFields,

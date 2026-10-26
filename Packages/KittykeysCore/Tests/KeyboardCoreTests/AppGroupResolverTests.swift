@@ -5,17 +5,17 @@ import KeyboardCore
 /// Each test gets its own folder to stand in for the app's bundle, so `resolve` can read an
 /// `embedded.mobileprovision` from it. The folder is removed when the test ends.
 final class AppGroupResolverTests {
-    static let canonical = "group.com.example.catkeys"
+    static let canonical = "group.com.example.kittykeys"
     /// How SideStore renames the canonical group for the signing team.
-    static let renamed = "group.com.example.catkeys.ABCDE12345"
+    static let renamed = "group.com.example.kittykeys.ABCDE12345"
     static let unrelated = "group.com.example.othergroup"
 
     let bundleFolder: URL
 
     init() {
         bundleFolder = FileManager.default.temporaryDirectory
-            .appendingPathComponent("catkeys-tests-\(UUID())")
-            .appendingPathComponent("CatkeysKeyboard.appex")
+            .appendingPathComponent("kittykeys-tests-\(UUID())")
+            .appendingPathComponent("KittykeysKeyboard.appex")
     }
 
     deinit {
@@ -25,9 +25,9 @@ final class AppGroupResolverTests {
     /// A .mobileprovision stand-in: an XML plist between binary bytes, as in the CMS envelope of a real one.
     static func profile(groups: [String]) throws -> Data {
         let plist: [String: Any] = [
-            "AppIDName": "Catkeys",
+            "AppIDName": "Kittykeys",
             "Entitlements": [
-                "application-identifier": "ABCDE12345.com.example.catkeys.ABCDE12345",
+                "application-identifier": "ABCDE12345.com.example.kittykeys.ABCDE12345",
                 "com.apple.security.application-groups": groups,
             ],
         ]
