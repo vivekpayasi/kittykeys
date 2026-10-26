@@ -415,16 +415,16 @@ public struct EmojiSearch {
 
 - 2026-10-22: plan written after milestone 1 closed. The user asked for the emoji panel before the suggestion row.
 - 2026-10-22/23: built and reviewed on branch `m3-emoji-panel` (each task reviewed clean; commit ranges are base..last):
-  - Task 1, emoji data: `40d6cc8..b71507e`
-  - Task 2, catalog and preferences: `b71507e..f731236`
-  - Task 3, controller panel mode: `7c15304..a79cdfb`
-  - Task 4, panel view: `cff982e..627835b`. Includes M3-R8 (taps in key gaps were dropped by the fully clear background, which the user confirmed on the device; fixed in `d770b60`), the font warm-up (M3-R12), the remembered skin tone (M3-R10) and the catalog kept per process (M3-R11).
-  - Task 4b, typing test in the app: `90fe2d2..bfb5c52`
-  - Task 5a, faded section headers on the device: `bfb5c52..11e5287`. iOS's scroll edge effect is hidden. Not yet confirmed on the iPhone, because the simulator never showed the fade.
-  - Task 4c, emoji search data and logic: `2b604fe..267c2b4`. Ranking per M3-R16 and M3-R17.
-  - Task 4d, emoji search view: `e576e7e..bb29a75`. Covers M3-R18, M3-R19 and M3-R20 (results never block typing).
+  - Task 1, emoji data: `c8f7237..e957e21`
+  - Task 2, catalog and preferences: `e957e21..f65a7ae`
+  - Task 3, controller panel mode: `58a4290..e786d3e`
+  - Task 4, panel view: `16e162f..30a4332`. Includes M3-R8 (taps in key gaps were dropped by the fully clear background, which the user confirmed on the device; fixed in `aacb2ad`), the font warm-up (M3-R12), the remembered skin tone (M3-R10) and the catalog kept per process (M3-R11).
+  - Task 4b, typing test in the app: `56d00c9..aef8fd5`
+  - Task 5a, faded section headers on the device: `aef8fd5..8c7543e`. iOS's scroll edge effect is hidden. Not yet confirmed on the iPhone, because the simulator never showed the fade.
+  - Task 4c, emoji search data and logic: `67956b7..6894c02`. Ranking per M3-R16 and M3-R17.
+  - Task 4d, emoji search view: `ed625f9..7bb93cc`. Covers M3-R18, M3-R19 and M3-R20 (results never block typing).
 - 2026-10-22: the user confirmed on the device that gap taps work again, the emoji panel works, and the feel is "great again".
-- 2026-10-25: the IPA with search (788K, from `bb29a75`) is in the user's iCloud Drive and not yet installed or confirmed. Still to do:
+- 2026-10-25: the IPA with search (788K, from `7bb93cc`) is in the user's iCloud Drive and not yet installed or confirmed. Still to do:
   - The user has more changes to request. The session ran out of context, so a new session continues from here.
   - Task 5: confirm the headers on the device, measure on the device (footprint with the warm-up and the panel, panel open, search query signposts), the user's feel test, then merge to `main`.
   - Task 5, text replacements and setup (M3-R22, M3-R23): the user's own shortcuts expand and ⌫ undoes, including a Devanagari phrase (counts are in graphemes, but `deleteBackward` may remove one code point at a time); Open Settings lands on the app's page with Keyboards.
