@@ -19,7 +19,11 @@ import KeyboardCore
 
     var textAfter: String? { cursor == characters.count ? nil : String(characters[cursor...]) }
 
+    /// Texts the field ignores when typed, as a single-line field ignores a return that sends instead.
+    var ignoredInsertions: Set<String> = []
+
     func insert(_ text: String) {
+        guard !ignoredInsertions.contains(text) else { return }
         characters.insert(contentsOf: text, at: cursor)
         cursor += text.count
     }

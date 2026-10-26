@@ -12,11 +12,11 @@ kittykeys is early. It is tested on one iPhone, and it changes often.
 - An emoji panel with Recent, categories, skin tones and search
 - Your Text Replacement shortcuts from iOS Settings, such as "omw" for "On my way!"; ⌫ right after puts the shortcut
   back
-- In a one-time code field it switches to Apple's keyboard, which is the only keyboard iOS gives SMS codes to
+- In a one-time code field it switches to the next keyboard, so Apple's keyboard (list it right after kittykeys) can
+  offer the code from Messages; iOS gives SMS codes to no other keyboard
 - A typing test in the app, to compare it with other keyboards
 
-Coming later: next-word and emoji suggestions, and glide typing, from the anantara prediction engine, which isn't
-public yet.
+Coming later: next-word and emoji suggestions from the anantara prediction engine (not public yet), and glide typing.
 
 ## Install
 
@@ -48,7 +48,7 @@ open Kittykeys.xcodeproj
 
 - `cd Packages/KittykeysCore && swift test` runs the tests. The keyboard's logic lives in this Swift package, free of
   UIKit.
-- `scripts/build-ipa.sh` builds an unsigned IPA for SideStore.
+- `scripts/build-ipa.sh` builds an ad-hoc signed IPA for SideStore, which signs it again with your Apple ID.
 - `scripts/release.sh <version>` publishes a GitHub release and updates the SideStore source.
 
 The design is in [`docs/design.md`](docs/design.md), and the build plans and their progress are in

@@ -13,7 +13,8 @@ struct SetupView: View {
         NavigationStack {
             List {
                 Section {
-                    // iOS opens this app's own page in Settings, which lists its keyboard under Keyboards.
+                    // Meant to open this app's page in Settings, which lists its keyboard under Keyboards. The iOS 26.4
+                    // simulator opens Settings' main page instead; the footer gives the way from there.
                     Button("Open Settings", systemImage: "gear") {
                         if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
                     }

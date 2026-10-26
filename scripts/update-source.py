@@ -8,7 +8,7 @@ Reads what it lists from the build scripts/build-ipa.sh just made, so the source
     - the bundle id, version, build and minimum iOS from build/Payload/Kittykeys.app/Info.plist
     - the entitlements from the signed entitlements build-ipa.sh saved in build/ipa-entitlements/; SideStore refuses
       an app whose entitlements the source doesn't list
-    - the privacy usage descriptions (NS...UsageDescription) from the app's Info.plist
+    - the privacy usage descriptions (NS...UsageDescription) from the app's and its keyboard's Info.plist
     - the size of build/kittykeys.ipa
 
 Each release goes first in "versions", and the older top-level fields (version, downloadURL, ...) that some SideStore
@@ -26,6 +26,7 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SOURCE_PATH = os.path.join(ROOT, "release", "source.json")
 APP_PATH = os.path.join(ROOT, "build", "Payload", "Kittykeys.app")
+EXTENSION_INFO_GLOB = os.path.join(APP_PATH, "PlugIns", "*.appex", "Info.plist")
 IPA_PATH = os.path.join(ROOT, "build", "kittykeys.ipa")
 ENTITLEMENTS_GLOB = os.path.join(ROOT, "build", "ipa-entitlements", "*.signed.plist")
 ICON_PATH = "App/Assets.xcassets/AppIcon.appiconset/AppIcon.png"
@@ -60,6 +61,15 @@ def entitlements():
     for path in paths:
         keys.update(read_plist(path).keys())
     return sorted(keys - IMPLICIT_ENTITLEMENTS)
+
+
+def privacy(app_info):
+    """The privacy usage descriptions of the app and its extensions, by Info.plist key."""
+    infos = [app_info] + [read_plist(path) for path in sorted(glob.glob(EXTENSION_INFO_GLOB))]
+    return {
+        key: value for info in infos for key, value in info.items()
+        if key.startswith("NS") and key.endswith("UsageDescription")
+    }
 
 
 def new_source(repo, bundle_id, icon_url):
@@ -134,7 +144,7 @@ def main():
     app["versions"].insert(0, release)
     app["appPermissions"] = {
         "entitlements": entitlements(),
-        "privacy": {key: value for key, value in info.items() if key.startswith("NS") and key.endswith("UsageDescription")},
+        "privacy": privacy(info),
     }
     app["iconURL"] = source["iconURL"] = icon_url
     # The older fields, for SideStore versions that read only the latest release.

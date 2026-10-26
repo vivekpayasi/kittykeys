@@ -39,7 +39,8 @@
     }
 
     /// The user's text replacements, which the host reads from iOS. A shortcut is replaced when a word end follows it
-    /// (`TextReplacements.isTrigger(_:)`), except in email, URL and number fields.
+    /// (`TextReplacements.isTrigger(_:)`); in an email field only a space or return does, and in URL and number fields
+    /// nothing does.
     public var textReplacements = TextReplacements.none
 
     /// Called when the globe key is typed: the host switches to the next keyboard.
@@ -96,7 +97,8 @@
     /// The latest shortcut replaced, while ⌫ can still undo it: the shortcut, how many graphemes its phrase and the word
     /// end after it take, and the text before the cursor just after. Cleared like `lastSpace`.
     private var undoableReplacement: (shortcut: String, length: Int, textBefore: String?)?
-    /// The text before the cursor just after an undone replacement. A word end typed right there keeps the shortcut.
+    /// The text before the cursor just after an undone replacement. A word end typed right there keeps the shortcut;
+    /// any other edit here, or another field, clears it.
     private var keepShortcutAt: String?
     /// The text before the cursor when automatic capitals were last checked, which is after every edit made here.
     /// A host notice that finds the same text brings nothing new, so it leaves shift alone (ruling R34).
@@ -456,6 +458,8 @@
     /// Search keeps its own keys, and the field's show once it closes.
     private func adopt(_ traits: FieldTraits) {
         self.traits = traits
+        undoableReplacement = nil
+        keepShortcutAt = nil
         state.returnKey = traits.returnKey
         let variant: BottomVariant = switch traits.kind {
         case .email: .email
@@ -543,13 +547,17 @@
     }
 
     /// Types the word end `text` through `type`, first replacing a shortcut that ends the text before the cursor with
-    /// its phrase. Not in email, URL or number fields, nor right where an undo kept the shortcut. ⌫ next undoes it.
+    /// its phrase. In an email field only a space or return replaces, since a "." belongs to the address; never in URL
+    /// or number fields, nor right where an undo kept the shortcut. ⌫ next undoes it.
     private func typeWordEnd(_ text: String, _ type: () -> Void) {
         let textBefore = document.textBefore
-        let replacement: (length: Int, phrase: String)? = switch (traits ?? FieldTraits()).kind {
-        case .email, .url, .number: nil
-        case .text: textBefore == keepShortcutAt ? nil : textReplacements.replacement(before: textBefore)
+        let replaces = switch (traits ?? FieldTraits()).kind {
+        case .text: true
+        case .email: text.first?.isWhitespace == true
+        case .url, .number: false
         }
+        let replacement = replaces && textBefore != keepShortcutAt
+            ? textReplacements.replacement(before: textBefore) : nil
         guard let replacement, let textBefore else {
             type()
             return
@@ -557,13 +565,16 @@
         document.deleteBackward(count: replacement.length)
         document.insert(replacement.phrase)
         type()
+        // Only when the word end landed: a field may ignore it, as a single-line field ignores a return that sends.
+        let typed = replacement.phrase + text
+        guard let after = document.textBefore, after.hasSuffix(typed) else { return }
         undoableReplacement = (
-            shortcut: String(textBefore.suffix(replacement.length)), length: (replacement.phrase + text).count,
-            textBefore: document.textBefore)
+            shortcut: String(textBefore.suffix(replacement.length)), length: typed.count, textBefore: after)
     }
 
     /// ⌫ right after a replacement puts its shortcut back, without the word end that followed it, and a word end typed
-    /// right there keeps the shortcut. False when there is nothing to undo: anything typed, deleted or moved since ends it.
+    /// right there keeps the shortcut. False when there is nothing to undo: anything typed, deleted or moved since, or
+    /// another field, ends it.
     private func undoReplacement() -> Bool {
         guard let undo = undoableReplacement, document.textBefore == undo.textBefore else { return false }
         document.deleteBackward(count: undo.length)
@@ -589,11 +600,13 @@
     private func insert(_ text: String) {
         document.insert(text)
         forgetPreviousKey()
+        keepShortcutAt = nil
         updateAutoShift()
     }
 
     private func delete(_ count: Int) {
         forgetPreviousKey()
+        keepShortcutAt = nil
         guard count > 0 else { return }
         document.deleteBackward(count: count)
         updateAutoShift()

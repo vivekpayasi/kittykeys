@@ -20,6 +20,13 @@ struct TextReplacementsTests {
         #expect(Self.omw.replacement(before: "ty")?.phrase == "thank you")
     }
 
+    /// A phrase that starts with a capital where it wants one, such as "iOS" or "iPhone", keeps its case.
+    @Test func keepsAPhraseWithItsOwnCapitals() {
+        let replacements = TextReplacements(pairs: [(shortcut: "ios", phrase: "iOS"), (shortcut: "ip", phrase: "iPhone 17")])
+        #expect(replacements.replacement(before: "Ios")?.phrase == "iOS")
+        #expect(replacements.replacement(before: "Ip")?.phrase == "iPhone 17")
+    }
+
     @Test func needsTheWholeShortcut() {
         #expect(Self.omw.replacement(before: "xomw") == nil)
         #expect(Self.omw.replacement(before: "om") == nil)
@@ -28,9 +35,18 @@ struct TextReplacementsTests {
         #expect(Self.omw.replacement(before: "") == nil)
     }
 
-    @Test func findsTheShortcutAfterPunctuation() {
-        let found = Self.omw.replacement(before: "(omw")
-        #expect(found?.length == 3 && found?.phrase == "On my way!")
+    @Test func findsTheShortcutAfterOpeningPunctuation() {
+        for opening in ["(", "[", "\"", "'", "“", "¿", "¡"] {
+            let found = Self.omw.replacement(before: opening + "omw")
+            #expect(found?.length == 3 && found?.phrase == "On my way!")
+        }
+    }
+
+    /// Only opening punctuation comes off: a shortcut inside a handle, a tag, a path or a longer word stays as typed.
+    @Test func ignoresAShortcutInsideOtherText() {
+        for text in ["@omw", "#omw", "a/omw", "re-omw", "x.omw"] {
+            #expect(Self.omw.replacement(before: text) == nil)
+        }
     }
 
     @Test func aShortcutMayHoldPunctuation() {
@@ -131,12 +147,56 @@ struct TextReplacementsTests {
         #expect(k.doc.text == "be right back. ")
     }
 
-    @Test(arguments: [FieldKind.email, .url, .number])
-    func noExpansionInAddressAndNumberFields(_ kind: FieldKind) throws {
+    @Test(arguments: [FieldKind.url, .number])
+    func noExpansionInURLAndNumberFields(_ kind: FieldKind) throws {
         let k = try harness("omw")
         k.controller.fieldDidChange(FieldTraits(kind: kind, autoCap: .none))
         try k.tap(kind == .number ? "," : "space")
         #expect(!k.doc.text.contains("On my way!"))
+    }
+
+    /// In an email field a "." belongs to the address, so only space and return end a shortcut, as for "@@".
+    @Test func emailFieldsExpandOnSpaceOnly() throws {
+        let k = try harness("x@@")
+        k.controller.textReplacements = TextReplacements(pairs: [(shortcut: "x@@", phrase: "me@example.com")])
+        k.controller.fieldDidChange(FieldTraits(kind: .email, autoCap: .none))
+        try k.tap("space")
+        #expect(k.doc.text == "me@example.com ")
+        let dot = try harness("omw")
+        dot.controller.fieldDidChange(FieldTraits(kind: .email, autoCap: .none))
+        try dot.tap(".")
+        #expect(dot.doc.text == "omw.")
+    }
+
+    /// A field that ignores return, as one that sends with it, leaves nothing after the phrase; ⌫ then deletes as usual.
+    @Test func noUndoWhenTheWordEndDidNotLand() throws {
+        let k = try harness("I am omw")
+        k.doc.ignoredInsertions = ["\n"]
+        try k.tap("return")
+        #expect(k.doc.text == "I am On my way!")
+        try k.tap("⌫")
+        #expect(k.doc.text == "I am On my way")
+    }
+
+    /// After an undo, the shortcut stays as typed only right there: once anything is typed, it expands again.
+    @Test func keepingTheShortcutEndsWithTheNextEdit() throws {
+        let k = try harness("omw")
+        try k.tap("space")
+        try k.tap("⌫")
+        #expect(k.doc.text == "omw")
+        // The host sends the message and empties the field; the next message types the shortcut again.
+        k.doc.deleteBackward(count: 3)
+        k.controller.documentDidChange()
+        for letter in ["o", "m", "w", "space"] { try k.tap(letter) }
+        #expect(k.doc.text == "On my way! ")
+    }
+
+    @Test func aNewFieldForgetsTheUndo() throws {
+        let k = try harness("omw")
+        try k.tap("space")
+        k.controller.fieldDidChange(FieldTraits(kind: .email, autoCap: .none))
+        try k.tap("⌫")
+        #expect(k.doc.text == "On my way!")
     }
 
     @Test func noShortcutsNoExpansion() throws {

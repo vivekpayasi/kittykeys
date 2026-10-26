@@ -127,7 +127,7 @@ final class KeyboardViewController: UIInputViewController {
         heightConstraint = height
     }
 
-    /// Picks up settings changed in the app and the text replacements changed in iOS Settings, records that the keyboard
+    /// Picks up settings changed in the app and text replacements changed in iOS Settings, records that the keyboard
     /// opened, and starts afresh for the field.
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
@@ -192,7 +192,7 @@ final class KeyboardViewController: UIInputViewController {
     /// Reads the user's text replacements from iOS. They arrive a moment later; until then the last ones read apply.
     /// Only their number is logged, never a shortcut or a phrase.
     /// iOS calls back on its own queue, and Swift traps a main-actor closure run there (seen on the simulator), so the
-    /// closure is `@Sendable` and hops to the main actor, where the SDK says the lexicon is read.
+    /// closure is `@Sendable` and hops to the main actor; the SDK marks `UILexicon` as main-actor only.
     private func loadTextReplacements() {
         requestSupplementaryLexicon { @Sendable [weak self] lexicon in
             Task { @MainActor in
