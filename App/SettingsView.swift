@@ -42,12 +42,23 @@ struct SettingsView: View {
                     )
                 }
                 .disabled(store == nil)
+                Section {
+                    LabeledContent("Version", value: appVersion)
+                }
             }
             .navigationTitle("Settings")
         }
         .onAppear {
             if let store { settings = store.load() }
         }
+    }
+
+    /// The app's version and build, such as "0.2.0 (2)".
+    private var appVersion: String {
+        let info = Bundle.main.infoDictionary
+        let version = info?["CFBundleShortVersionString"] as? String ?? "?"
+        let build = info?["CFBundleVersion"] as? String ?? "?"
+        return "\(version) (\(build))"
     }
 
     /// The delay in seconds to two decimals, such as "0.30".

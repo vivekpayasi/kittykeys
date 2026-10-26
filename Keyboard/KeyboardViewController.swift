@@ -127,7 +127,8 @@ final class KeyboardViewController: UIInputViewController {
         heightConstraint = height
     }
 
-    /// Picks up settings changed in the app, records that the keyboard opened, and starts afresh for the field.
+    /// Picks up settings changed in the app and the text replacements changed in iOS Settings, records that the keyboard
+    /// opened, and starts afresh for the field.
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         guard let controller, let document else { return }
@@ -138,6 +139,7 @@ final class KeyboardViewController: UIInputViewController {
         feedback.configure(settings: controller.settings, hasFullAccess: hasFullAccess)
         controller.keyboardWillAppear(document.traits)
         updateTheme()
+        loadTextReplacements()
     }
 
     /// Design §9's bottom-row workaround: the window's system gesture recognizers can hold back touches near the
@@ -185,6 +187,21 @@ final class KeyboardViewController: UIInputViewController {
         super.didReceiveMemoryWarning()
         Self.logger.notice("Memory warning")
         keyboardView?.didReceiveMemoryWarning()
+    }
+
+    /// Reads the user's text replacements from iOS. They arrive a moment later; until then the last ones read apply.
+    /// Only their number is logged, never a shortcut or a phrase.
+    /// iOS calls back on its own queue, and Swift traps a main-actor closure run there (seen on the simulator), so the
+    /// closure is `@Sendable` and hops to the main actor, where the SDK says the lexicon is read.
+    private func loadTextReplacements() {
+        requestSupplementaryLexicon { @Sendable [weak self] lexicon in
+            Task { @MainActor in
+                guard let controller = self?.controller else { return }
+                let pairs = lexicon.entries.map { (shortcut: $0.userInput, phrase: $0.documentText) }
+                controller.textReplacements = TextReplacements(pairs: pairs)
+                Self.logger.notice("Text replacements: \(pairs.count, privacy: .public) lexicon entries")
+            }
+        }
     }
 
     /// Dark for a field that asks for a dark keyboard, and in dark mode.

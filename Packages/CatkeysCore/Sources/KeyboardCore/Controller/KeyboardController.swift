@@ -1,9 +1,10 @@
 /// The keyboard's brain, free of UIKit. It runs the host's raw touches through a `TouchProcessor`, applies the events
 /// to a `TextDocument`, and keeps the `state` and `frames` the keyboard view draws.
 ///
-/// It applies the typing rules: shift and caps lock, automatic capitals, the double-space full stop,
-/// the field's bottom row and first page, and the globe key. It opens and closes the emoji panel, and types and
-/// deletes the panel's emoji as typing. In emoji search the keys type into `state.searchQuery` instead (ruling M3-R15).
+/// It applies the typing rules: shift and caps lock, automatic capitals, the double-space full stop, the user's text
+/// replacements, the field's bottom row and first page, and the globe key. It opens and closes the emoji panel, and
+/// types and deletes the panel's emoji as typing. In emoji search the keys type into `state.searchQuery` instead
+/// (ruling M3-R15).
 ///
 /// Times are the host's touch timestamps in seconds. The host calls `advance(to:)` before forwarding each touch,
 /// and whenever `nextDeadline` passes.
@@ -36,6 +37,10 @@
             notifying { layOutKeys() }
         }
     }
+
+    /// The user's text replacements, which the host reads from iOS. A shortcut is replaced when a word end follows it
+    /// (`TextReplacements.isTrigger(_:)`), except in email, URL and number fields.
+    public var textReplacements = TextReplacements.none
 
     /// Called when the globe key is typed: the host switches to the next keyboard.
     public var onGlobe: (() -> Void)?
@@ -88,6 +93,11 @@
     /// The latest space typed, while it is the latest key typed here: when, and the text before the cursor just after it.
     /// Any other key or edit here, or cursor mode, clears it. A change made elsewhere shows up as different text before the cursor.
     private var lastSpace: (time: Double, textBefore: String?)?
+    /// The latest shortcut replaced, while ⌫ can still undo it: the shortcut, how many graphemes its phrase and the word
+    /// end after it take, and the text before the cursor just after. Cleared like `lastSpace`.
+    private var undoableReplacement: (shortcut: String, length: Int, textBefore: String?)?
+    /// The text before the cursor just after an undone replacement. A word end typed right there keeps the shortcut.
+    private var keepShortcutAt: String?
     /// The text before the cursor when automatic capitals were last checked, which is after every edit made here.
     /// A host notice that finds the same text brings nothing new, so it leaves shift alone (ruling R34).
     private var lastSeenTextBefore: String?
@@ -149,6 +159,7 @@
             state.panel = .keys
             adopt(traits)
             forgetPreviousKey()
+            keepShortcutAt = nil
             state.shift = .off
             updateAutoShift()
         }
@@ -360,10 +371,11 @@
         case .activateAlternate(_, let text) where searching:
             appendToQuery(text)
         case .activateAlternate(_, let text):
-            typeText(text)
+            typeCharacters(text)
         case .deleteBackward(let word) where searching:
             deleteFromQuery(word: word)
         case .deleteBackward(let word):
+            guard !undoReplacement() else { return }
             delete(word ? max(TextRules.previousWordLength(before: document.textBefore), 1) : 1)
         case .deleteRestOfWord where searching:
             state.searchQuery.removeLast(TextRules.trailingRunLength(before: state.searchQuery))
@@ -392,11 +404,11 @@
         switch key.action {
         case .character:
             // Shift changes a single character; a longer output such as ".com" is typed as written.
-            typeText(state.shift == .off || key.output.count != 1 ? key.output : key.output.uppercased())
+            typeCharacters(state.shift == .off || key.output.count != 1 ? key.output : key.output.uppercased())
         case .space:
-            typeSpace(key.output, after: previousSpace)
+            typeWordEnd(key.output) { typeSpace(key.output, after: previousSpace) }
         case .returnKey:
-            insert(key.output)
+            typeWordEnd(key.output) { insert(key.output) }
         case .shift:
             tapShift(after: previousShiftTap)
         case .switchPage(let ref):
@@ -521,6 +533,45 @@
         insert(text)
     }
 
+    /// Types a character key's output or a long-press option; a word end among them replaces a shortcut before it.
+    private func typeCharacters(_ text: String) {
+        if TextReplacements.isTrigger(text) {
+            typeWordEnd(text) { typeText(text) }
+        } else {
+            typeText(text)
+        }
+    }
+
+    /// Types the word end `text` through `type`, first replacing a shortcut that ends the text before the cursor with
+    /// its phrase. Not in email, URL or number fields, nor right where an undo kept the shortcut. ⌫ next undoes it.
+    private func typeWordEnd(_ text: String, _ type: () -> Void) {
+        let textBefore = document.textBefore
+        let replacement: (length: Int, phrase: String)? = switch (traits ?? FieldTraits()).kind {
+        case .email, .url, .number: nil
+        case .text: textBefore == keepShortcutAt ? nil : textReplacements.replacement(before: textBefore)
+        }
+        guard let replacement, let textBefore else {
+            type()
+            return
+        }
+        document.deleteBackward(count: replacement.length)
+        document.insert(replacement.phrase)
+        type()
+        undoableReplacement = (
+            shortcut: String(textBefore.suffix(replacement.length)), length: (replacement.phrase + text).count,
+            textBefore: document.textBefore)
+    }
+
+    /// ⌫ right after a replacement puts its shortcut back, without the word end that followed it, and a word end typed
+    /// right there keeps the shortcut. False when there is nothing to undo: anything typed, deleted or moved since ends it.
+    private func undoReplacement() -> Bool {
+        guard let undo = undoableReplacement, document.textBefore == undo.textBefore else { return false }
+        document.deleteBackward(count: undo.length)
+        insert(undo.shortcut)
+        keepShortcutAt = document.textBefore
+        return true
+    }
+
     /// A second space soon after a first one, after a word, replaces the first with a full stop and a space,
     /// as long as the cursor is still where the first space left it.
     private func typeSpace(_ space: String, after previousSpace: (time: Double, textBefore: String?)?) {
@@ -548,10 +599,12 @@
         updateAutoShift()
     }
 
-    /// Anything typed or deleted between two spaces or two shift taps stops them pairing up.
+    /// Anything typed or deleted between two spaces or two shift taps stops them pairing up, and ends the undo of a
+    /// replacement.
     private func forgetPreviousKey() {
         lastSpace = nil
         lastShiftTapTime = nil
+        undoableReplacement = nil
     }
 
     private func moveCursor(by offset: Int, ticks: Int) {
