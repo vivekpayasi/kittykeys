@@ -14,7 +14,10 @@ set -euo pipefail
 
 VERSION=${1:-}
 # The notes file's path is taken before the cd below, so a relative one works from anywhere.
-NOTES_FILE=${2:+$(cd "$(dirname "$2")" && pwd)/$(basename "$2")}
+NOTES_FILE=${2:-}
+if [[ -n "$NOTES_FILE" && -d "$(dirname "$NOTES_FILE")" ]]; then
+  NOTES_FILE="$(cd "$(dirname "$NOTES_FILE")" && pwd)/$(basename "$NOTES_FILE")"
+fi
 
 cd "$(dirname "$0")/.."
 
@@ -45,14 +48,22 @@ else
   [[ -s "$NOTES" ]] || fail "nothing has changed since $PREVIOUS."
 fi
 
-# Until the commit, a failure puts project.yml and the source back as they were.
+# Until the commit, a failure or Ctrl-C puts project.yml and the source back as they were, from HEAD, since a failed
+# commit leaves them staged.
 SOURCE_TRACKED=$(git ls-files --error-unmatch "$SOURCE" >/dev/null 2>&1 && echo yes || echo no)
 restore() {
-  git checkout -q -- project.yml
-  if [[ "$SOURCE_TRACKED" == yes ]]; then git checkout -q -- "$SOURCE"; else rm -f "$SOURCE"; fi
-  echo "release: failed; project.yml and $SOURCE are back as they were." >&2
+  trap - ERR INT
+  git checkout -q HEAD -- project.yml
+  if [[ "$SOURCE_TRACKED" == yes ]]; then
+    git checkout -q HEAD -- "$SOURCE"
+  else
+    git rm -q --cached --ignore-unmatch "$SOURCE"
+    rm -f "$SOURCE"
+  fi
+  echo "release: stopped; project.yml and $SOURCE are back as they were." >&2
+  exit 1
 }
-trap restore ERR
+trap restore ERR INT
 
 BUILD=$(($(awk '$1 == "CURRENT_PROJECT_VERSION:" { print $2 }' project.yml) + 1))
 sed -i '' -E "s/^( +MARKETING_VERSION: ).*/\1$VERSION/; s/^( +CURRENT_PROJECT_VERSION: ).*/\1$BUILD/" project.yml
@@ -65,7 +76,7 @@ python3 -I scripts/update-source.py --repo "$REPO" --tag "$TAG" --notes "$NOTES"
 
 git add project.yml "$SOURCE"
 git commit -q -m "Release $VERSION"
-trap - ERR
+trap - ERR INT
 
 LEFT="git tag -a $TAG -m 'kittykeys $VERSION'; git push --atomic origin $BRANCH $TAG; \
 gh release create $TAG build/kittykeys.ipa $SOURCE --title 'kittykeys $VERSION' --notes-file $NOTES"

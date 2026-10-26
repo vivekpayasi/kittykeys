@@ -431,4 +431,12 @@ public struct EmojiSearch {
   - Task 5, SMS codes (M3-R21), only the device can show: "From Messages" appears on Apple's keyboard after catkeys switches; coming back with 🌐 stays on catkeys in apps and in Safari `autocomplete="one-time-code"` fields (same document id); a second code box within a minute stays; no crash when focus moves between fields. Stays are logged at info level ("Staying in a one-time code field: sameField", or `quietPeriod`, `noDocument`); Console shows them with Action › Include Info Messages.
 - 2026-10-25, Task 5c, SMS codes (M3-R21). The user asked for the code from Messages, or a switch to Apple's keyboard, in code fields. No API gives the code to a third-party keyboard (iOS 27.1 SDK), so catkeys switches. Checked on the simulator with the real extension: iOS reports the field's content type to the keyboard, the switch lands on Apple's number pad, coming back with 🌐 stays on catkeys (same document id), and moving from a text field into a code field also switches. iOS briefly reports no document id between fields, although the SDK says it is never nil, so the keyboard reads it as an object. The Try it tab gained a code field to test with, and a `-catkeysFocus text|code` launch argument for UI tests.
 - 2026-10-26, Tasks 5d and 5e (M3-R22, M3-R23): text replacements, the version in Settings, and Open Settings in Setup. On the simulator with the real extension, "omw" then space typed "On my way! ", and ⌫ right after a second one put back "Omw". The first try crashed the keyboard: iOS calls the lexicon's completion on its own queue, and Swift 6 traps a closure it inferred as main-actor. The closure is now `@Sendable` and hops to the main actor.
+- 2026-10-26, Task 5f (M3-R24) and release tooling: the rename to kittykeys, `scripts/release.sh` with the SideStore source (`release/source.json`, served from the latest release), and the README. A review found no crash path. Its fixes:
+  - the undo only when the word end landed;
+  - the kept shortcut forgotten after any other edit;
+  - only opening marks stripped before a shortcut;
+  - phrases with their own capitals kept;
+  - email fields replace on space and return only;
+  - release.sh puts the version back if it stops before its commit, and pushes the branch and the tag together.
+  A re-review approved the fixes. 311 tests pass.
 - Rulings live in the Rulings section above. The ledger, with every deferred minor, is local and gitignored: `.superpowers/sdd/2026-10-22-m3-emoji-panel/progress.md`.
