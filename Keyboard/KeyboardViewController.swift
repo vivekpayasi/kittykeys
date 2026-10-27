@@ -208,11 +208,11 @@ final class KeyboardViewController: UIInputViewController {
         }
     }
 
-    /// Records a thing to try, for the app's Try it tab to tick. Each is written once; without Full Access the shared
-    /// settings can't be written, and nothing is.
+    /// Records a thing to try, for the app's Try it tab to tick. Each is written once, on the next turn so the keystroke
+    /// that did it isn't held up; without Full Access the shared settings can't be written, and nothing is.
     private func recordTried(_ feature: TryFeature) {
         guard let settingsStore, triedFeatures.insert(feature).inserted else { return }
-        settingsStore.markTried(feature)
+        DispatchQueue.main.async { settingsStore.markTried(feature) }
     }
 
     /// Dark for a field that asks for a dark keyboard, and in dark mode.

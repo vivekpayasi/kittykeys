@@ -240,7 +240,8 @@ import Foundation
     /// From search too, it goes into the document, and search stays as it is.
     public func insertEmoji(_ emoji: String) {
         notifying { typeText(emoji) }
-        if state.panel == .emojiSearch { onFeatureUsed?(.emojiSearch) }
+        // An empty query shows Recent: only an emoji found by typing one is a search.
+        if state.panel == .emojiSearch, !state.searchQuery.isEmpty { onFeatureUsed?(.emojiSearch) }
     }
 
     /// The panel's ⌫: deletes one grapheme, so one whole emoji, flags, skin tones and joined sequences included,
@@ -599,10 +600,10 @@ import Foundation
         document.deleteBackward(count: replacement.length)
         document.insert(replacement.phrase)
         type()
+        onFeatureUsed?(.textReplacement)
         // Only when the word end landed: a field may ignore it, as a single-line field ignores a return that sends.
         let typed = replacement.phrase + text
         guard let after = document.textBefore, after.hasSuffix(typed) else { return }
-        onFeatureUsed?(.textReplacement)
         undoableReplacement = (
             shortcut: String(textBefore.suffix(replacement.length)), length: typed.count, textBefore: after)
     }

@@ -6,6 +6,7 @@ import Foundation
 public struct SettingsStore {
     private static let settingsKey = "catkeys.settings"
     private static let keyboardOpenedAtKey = "catkeys.keyboardOpenedAt"
+    // Keys from before the rename keep "catkeys." so saved data carries over; new keys use "kittykeys.".
     private static let triedFeaturesKey = "kittykeys.triedFeatures"
 
     private let defaults: UserDefaults

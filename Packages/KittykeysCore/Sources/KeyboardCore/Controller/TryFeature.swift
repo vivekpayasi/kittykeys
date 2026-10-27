@@ -1,7 +1,7 @@
 /// The things the app's Try it tab suggests, which the keyboard reports as the user does them. Only which ones were
 /// done is kept, never what was typed. Raw values are saved in the shared settings (`SettingsStore.triedFeatures`).
 public enum TryFeature: String, CaseIterable, Sendable {
-    /// Holding space and sliding moved the cursor.
+    /// Holding space and sliding moved the cursor, or tried to, at an end of the text.
     case cursorMove
     /// A long-press option was typed.
     case longPressSymbol
@@ -9,6 +9,6 @@ public enum TryFeature: String, CaseIterable, Sendable {
     case wordDelete
     /// A text replacement shortcut became its phrase.
     case textReplacement
-    /// An emoji was typed from search's results.
+    /// An emoji was typed from search's results for a query typed, not from Recent.
     case emojiSearch
 }

@@ -93,6 +93,8 @@ struct TryItView: View {
                 }
                 if !tried.isEmpty {
                     Button("Start over") {
+                        // The keyboard reloads what's tried when it next appears, so it goes away first.
+                        isFocused = false
                         store?.resetTried()
                         tried = []
                         showsFinishedList = false
@@ -103,7 +105,7 @@ struct TryItView: View {
             Text("Things to try")
         } footer: {
             Text(store == nil
-                ? appGroupUnavailableMessage
+                ? "\(appGroupUnavailableMessage), so nothing can be ticked."
                 : "Each gets its tick when you do it with kittykeys, which needs Full Access. kittykeys notes only that you did it, never what you typed.")
         }
     }
@@ -113,7 +115,7 @@ struct TryItView: View {
         case .cursorMove: "Hold the **space bar**, then slide to move the cursor"
         case .longPressSymbol: "Hold a key for the symbol in its corner, like **a** for **@**"
         case .wordDelete: "Slide left from **⌫** to delete a whole word"
-        case .textReplacement: "Type **omw**, then space, for a shortcut; **⌫** right after undoes it"
+        case .textReplacement: "Type **omw** or another of your text replacements, then space; **⌫** right after undoes it"
         case .emojiSearch: "Tap **😊**, search for an emoji, and tap it"
         }
     }
