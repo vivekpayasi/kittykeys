@@ -34,6 +34,10 @@ final class KeyboardViewController: UIInputViewController {
     private var isShowing = false
     /// The things to try already recorded in the shared settings, read as the keyboard appears, so each is written once.
     private var triedFeatures: Set<TryFeature> = []
+    /// The user's own themes, read from the shared settings as the keyboard appears.
+    private var customThemes: [ThemeSpec] = []
+    /// The theme the keys show, so a keystroke that changes nothing doesn't build a new one.
+    private var shownTheme: ThemeSpec?
 
     /// iOS creates a view controller each time the keyboard appears, and keeps the old input view alive after
     /// its controller goes (seen on the iOS 26.4 simulator). Taking the keys out of it frees them, their layers
@@ -139,6 +143,7 @@ final class KeyboardViewController: UIInputViewController {
             controller.settings = settingsStore.load()
             settingsStore.lastKeyboardOpen = Date()
             triedFeatures = settingsStore.triedFeatures
+            customThemes = settingsStore.customThemes
         }
         feedback.configure(settings: controller.settings, hasFullAccess: hasFullAccess)
         controller.keyboardWillAppear(document.traits)
@@ -215,10 +220,17 @@ final class KeyboardViewController: UIInputViewController {
         DispatchQueue.main.async { settingsStore.markTried(feature) }
     }
 
-    /// Dark for a field that asks for a dark keyboard, and in dark mode.
+    /// The theme the settings pick, with the dark-mode one for a field that asks for a dark keyboard and in dark mode.
+    /// It runs at each text change, so it only compares unless the theme changed.
     private func updateTheme() {
+        guard let controller, let keyboardView else { return }
         let isDark = textDocumentProxy.keyboardAppearance == .dark || traitCollection.userInterfaceStyle == .dark
-        keyboardView?.theme = isDark ? .dark : .light
+        let spec = Themes.active(
+            themeID: controller.settings.themeID, darkThemeID: controller.settings.darkThemeID, custom: customThemes,
+            isDark: isDark)
+        guard spec != shownTheme else { return }
+        shownTheme = spec
+        keyboardView.theme = KeyboardTheme(spec: spec)
     }
 
     /// A one-time code field goes to the next keyboard, where Apple's keyboard can offer the code from Messages,

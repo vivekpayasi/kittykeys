@@ -17,12 +17,21 @@ struct KeyboardPreviewView: UIViewRepresentable {
         }
     }
 
+    /// The theme `-kittykeysPreviewTheme <id>` names, else Automatic, for the app's light or dark.
     func updateUIView(_ view: UIView, context: Context) {
-        (view as? KeyboardPreviewHost)?.theme = context.environment.colorScheme == .dark ? .dark : .light
+        let arguments = ProcessInfo.processInfo.arguments
+        let id = arguments.firstIndex(of: "-kittykeysPreviewTheme").flatMap {
+            arguments.indices.contains($0 + 1) ? arguments[$0 + 1] : nil
+        }
+        let spec = Themes.active(
+            themeID: id ?? Themes.automaticID, darkThemeID: "", custom: [],
+            isDark: context.environment.colorScheme == .dark)
+        (view as? KeyboardPreviewHost)?.theme = KeyboardTheme(spec: spec)
     }
 }
 
 /// What the preview shows, from launch arguments. Each step drives the controller as touches would.
+/// - `-kittykeysPreviewTheme <id>`: a ready-made theme (`Themes.presets`); Automatic otherwise.
 /// - `-kittykeysPreviewField <email|url|number>`: the field asks for that kind of keys; a text field otherwise.
 /// - `-kittykeysPreviewPage <id>`: taps page keys until page `id` shows.
 /// - `-kittykeysPreviewHold <label>`: holds the key with that label until its long-press options show.
@@ -270,7 +279,7 @@ final class KeyboardPreviewHost: UIView {
 }
 
 /// The preview has no haptics or sound; the keyboard extension has the real ones.
-@MainActor private final class SilentFeedback: FeedbackSink {
+@MainActor final class SilentFeedback: FeedbackSink {
     func keyDown() {}
     func cursorTick() {}
 }

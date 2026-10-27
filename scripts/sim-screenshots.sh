@@ -38,9 +38,24 @@ SCENES=(
   "emoji-search-empty|-kittykeysPreview -kittykeysPreviewEmojiSearch"
   "emoji-search-lau|-kittykeysPreview -kittykeysPreviewEmojiSearch lau"
   "emoji-search-hold|-kittykeysPreview -kittykeysPreviewEmojiSearch hand -kittykeysPreviewEmojiHold 👋"
+  # Ready-made themes (docs/plans/2026-10-27-themes.md): the user's Neon with a popup and the emoji panel, and one of
+  # each key style and font design.
+  "theme-neon|-kittykeysPreview -kittykeysPreviewTheme neon"
+  "theme-neon-hold-d|-kittykeysPreview -kittykeysPreviewTheme neon -kittykeysPreviewHold d"
+  "theme-neon-emoji|-kittykeysPreview -kittykeysPreviewTheme neon -kittykeysPreviewEmoji"
+  "theme-light|-kittykeysPreview -kittykeysPreviewTheme light"
+  "theme-dark|-kittykeysPreview -kittykeysPreviewTheme dark"
+  "theme-midnight|-kittykeysPreview -kittykeysPreviewTheme midnight"
+  "theme-amber|-kittykeysPreview -kittykeysPreviewTheme amber"
+  "theme-synthwave|-kittykeysPreview -kittykeysPreviewTheme synthwave"
+  "theme-terminal|-kittykeysPreview -kittykeysPreviewTheme terminal"
+  "theme-paper|-kittykeysPreview -kittykeysPreviewTheme paper"
+  "theme-rose|-kittykeysPreview -kittykeysPreviewTheme rose"
   "app-setup|-kittykeysTab setup"
   "app-settings|-kittykeysTab settings"
   "app-tryit|-kittykeysTab tryit"
+  "app-themes|-kittykeysTab settings -kittykeysSettingsPage themes"
+  "app-dark-themes|-kittykeysTab settings -kittykeysSettingsPage darkthemes"
 )
 
 xcodegen generate

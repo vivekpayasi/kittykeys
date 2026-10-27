@@ -8,6 +8,7 @@ public struct SettingsStore {
     private static let keyboardOpenedAtKey = "catkeys.keyboardOpenedAt"
     // Keys from before the rename keep "catkeys." so saved data carries over; new keys use "kittykeys.".
     private static let triedFeaturesKey = "kittykeys.triedFeatures"
+    private static let customThemesKey = "kittykeys.customThemes"
 
     private let defaults: UserDefaults
 
@@ -69,5 +70,49 @@ public struct SettingsStore {
     /// Forgets every thing tried, so the Try it list starts over.
     public func resetTried() {
         defaults.removeObject(forKey: Self.triedFeaturesKey)
+    }
+
+    /// The user's own themes, stored as JSON, in the order the app keeps them. A theme that can't be read is dropped
+    /// and the rest load; missing or corrupt data gives none.
+    public var customThemes: [ThemeSpec] {
+        guard let data = defaults.data(forKey: Self.customThemesKey),
+              let themes = try? JSONDecoder().decode([Lossy<ThemeSpec>].self, from: data)
+        else { return [] }
+        return themes.compactMap(\.value)
+    }
+
+    public func saveCustomThemes(_ themes: [ThemeSpec]) {
+        guard let data = try? JSONEncoder().encode(themes) else { return }
+        defaults.set(data, forKey: Self.customThemesKey)
+    }
+
+    /// Saves a copy of `base` as a new custom theme (`Themes.newCustom`) at the end of the saved list, read afresh so
+    /// a change saved elsewhere meanwhile is kept, and returns it.
+    public func addCustomTheme(copying base: ThemeSpec) -> ThemeSpec {
+        var themes = customThemes
+        let theme = Themes.newCustom(from: base, existing: themes)
+        themes.append(theme)
+        saveCustomThemes(themes)
+        return theme
+    }
+
+    /// Deletes the custom theme `id`. A slot that picked it goes back to its default: Automatic, or the same as Theme
+    /// in dark mode.
+    public func removeCustomTheme(id: String) {
+        saveCustomThemes(customThemes.filter { $0.id != id })
+        var settings = load()
+        guard settings.themeID == id || settings.darkThemeID == id else { return }
+        if settings.themeID == id { settings.themeID = Themes.automaticID }
+        if settings.darkThemeID == id { settings.darkThemeID = "" }
+        save(settings)
+    }
+}
+
+/// One element of a saved array: nil when it can't be decoded, so one bad element doesn't lose the others.
+private struct Lossy<Value: Decodable>: Decodable {
+    let value: Value?
+
+    init(from decoder: any Decoder) throws {
+        value = try? Value(from: decoder)
     }
 }

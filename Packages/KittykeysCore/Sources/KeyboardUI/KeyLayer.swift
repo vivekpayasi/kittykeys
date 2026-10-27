@@ -1,13 +1,12 @@
 // UIKit only, so that `swift test` still builds the package on macOS.
 #if canImport(UIKit)
+import KeyboardCore
 import UIKit
 
 /// How a key looks, fixed when its layer is built.
 struct KeyStyle {
-    /// Whether the key rests in the special-key colour rather than the key colour.
-    var isSpecial: Bool
-    /// Whether the label uses the hint colour, as the space bar's does.
-    var dimsLabel: Bool
+    /// What the key is to the theme, which picks its colours.
+    var role: KeyRole
     /// The label's size; a label too wide for the key shrinks to fit.
     var fontSize: CGFloat
     /// An SF Symbol drawn in place of the label, sized to match it. A name the system lacks leaves the label.
@@ -27,11 +26,14 @@ func hasArea(_ size: CGSize) -> Bool {
 }
 
 /// One key: a rounded rectangle with a centred label or icon and, on letter rows, a symbol in its top-right corner.
+/// The theme gives it a fill, an outline or neither (`ThemeSpec`'s rules), worked out once here; a press only switches
+/// between the resting and pressed fills.
 ///
 /// Each setter changes Core Animation properties only when its value changes. The caller wraps changes
 /// in a `CATransaction` with actions disabled.
 final class KeyLayer: CALayer {
     static let cornerRadius: CGFloat = 6
+    private static let outlineWidth: CGFloat = 1.5
     private static let hintFontSize: CGFloat = 10
     /// The corner hint's distance from the key's top and right edges.
     private static let hintInset = CGSize(width: 4, height: 1)
@@ -43,8 +45,14 @@ final class KeyLayer: CALayer {
     /// The key's icon, drawn once in the label colour; nil for a key that shows its label.
     private var iconLayer: CALayer?
     private var labelsHidden = false
-    private var keyStyle = KeyStyle(isSpecial: false, dimsLabel: false, fontSize: 0)
-    private var theme = KeyboardTheme.light
+    private var keyStyle = KeyStyle(role: .letter, fontSize: 0)
+    /// The label's font at the style's size, and the one for a function key's symbol label such as ⌫; a long label
+    /// takes a smaller copy.
+    private var labelFont = UIFont.systemFont(ofSize: 17)
+    private var symbolFont = UIFont.systemFont(ofSize: 17)
+    /// The fill at rest, nil for none, and while pressed or active.
+    private var restingFill: CGColor?
+    private var pressedFill = UIColor.clear.cgColor
     private var label = ""
     private var isPressed = false
     /// Shift is on: the shift key is lit like a pressed key.
@@ -54,26 +62,36 @@ final class KeyLayer: CALayer {
     /// A key with an icon takes its image from `icons`, which renders it only the first time.
     init(rect: CGRect, style: KeyStyle, hint: String?, theme: KeyboardTheme, scale: CGFloat, icons: KeyIconCache) {
         self.keyStyle = style
-        self.theme = theme
+        let spec = theme.spec
+        let role = style.role
+        restingFill = spec.restingFill(role).map { UIColor(themeColor: $0).cgColor }
+        pressedFill = UIColor(themeColor: spec.pressedFill(role)).cgColor
+        labelFont = theme.font(ofSize: style.fontSize)
+        symbolFont = theme.symbolFont(ofSize: style.fontSize)
         super.init()
         frame = rect
         let radius = fittedCornerRadius(Self.cornerRadius, for: rect.size)
         cornerRadius = radius
-        shadowColor = UIColor.black.cgColor
-        shadowOpacity = 0.3
-        shadowOffset = CGSize(width: 0, height: 1)
-        shadowRadius = 0
+        if let outline = spec.outline(role) {
+            borderWidth = Self.outlineWidth
+            borderColor = UIColor(themeColor: outline).cgColor
+        }
         // A key squeezed to nothing, as on a very narrow layout, draws nothing rather than an impossible shape.
-        if hasArea(rect.size) {
-            shadowPath = CGPath(roundedRect: bounds, cornerWidth: radius, cornerHeight: radius, transform: nil)
-        } else {
+        if !hasArea(rect.size) {
             isHidden = true
+        } else if spec.hasShadow(role) {
+            shadowColor = UIColor.black.cgColor
+            shadowOpacity = 0.3
+            shadowOffset = CGSize(width: 0, height: 1)
+            shadowRadius = 0
+            shadowPath = CGPath(roundedRect: bounds, cornerWidth: radius, cornerHeight: radius, transform: nil)
         }
         updateFill()
 
-        let labelColor = style.dimsLabel ? theme.hint : theme.label
+        let labelColor = UIColor(themeColor: spec.labelColor(role))
         if let icon = style.icon,
-            let image = icons.image(named: icon, fontSize: style.fontSize, color: labelColor, scale: scale)
+            let image = icons.image(
+                named: icon, fontSize: style.fontSize, color: labelColor, scale: scale, weight: theme.symbolWeight)
         {
             let iconLayer = CALayer()
             let size = CGSize(width: CGFloat(image.width) / scale, height: CGFloat(image.height) / scale)
@@ -96,7 +114,7 @@ final class KeyLayer: CALayer {
 
         if let hint {
             let hintLayer = CATextLayer()
-            let font = UIFont.systemFont(ofSize: Self.hintFontSize)
+            let font = theme.hintFont(ofSize: Self.hintFontSize)
             hintLayer.contentsScale = scale
             hintLayer.alignmentMode = .right
             hintLayer.font = font
@@ -125,7 +143,9 @@ final class KeyLayer: CALayer {
         guard iconLayer == nil, text != label else { return }
         label = text
         labelLayer.string = text
-        let font = UIFont.systemFont(ofSize: fittedFontSize(for: text))
+        let isSymbol = keyStyle.role == .function && !text.contains { $0.isLetter || $0.isNumber }
+        let base = isSymbol ? symbolFont : labelFont
+        let font = base.withSize(fittedFontSize(for: text, in: base))
         let height = ceil(font.lineHeight)
         labelLayer.font = font
         labelLayer.fontSize = font.pointSize
@@ -153,15 +173,14 @@ final class KeyLayer: CALayer {
         updateFill()
     }
 
-    /// A pressed or active key swaps its resting colour for the other key colour, as Apple's keys do.
+    /// A pressed or active key shows its pressed fill: for filled keys the other key colour, as Apple's keys do.
     private func updateFill() {
-        let lit = isPressed || isActive
-        backgroundColor = (keyStyle.isSpecial == lit ? theme.key : theme.specialKey).cgColor
+        backgroundColor = isPressed || isActive ? pressedFill : restingFill
     }
 
-    /// `keyStyle.fontSize`, shrunk so that `text` fits across the key.
-    private func fittedFontSize(for text: String) -> CGFloat {
-        let width = (text as NSString).size(withAttributes: [.font: UIFont.systemFont(ofSize: keyStyle.fontSize)]).width
+    /// `keyStyle.fontSize`, shrunk so that `text` in `font` fits across the key.
+    private func fittedFontSize(for text: String, in font: UIFont) -> CGFloat {
+        let width = (text as NSString).size(withAttributes: [.font: font]).width
         let available = bounds.width - 2 * Self.labelInset
         guard width > available, width > 0 else { return keyStyle.fontSize }
         return (keyStyle.fontSize * available / width).rounded(.down)
@@ -180,14 +199,18 @@ final class KeyIconCache {
         var fontSize: CGFloat
         var color: UIColor
         var scale: CGFloat
+        var weight: UIImage.SymbolWeight
     }
 
     /// Rendered icons, and nil for a name the system lacks, so a missing symbol is looked up only once too.
     private var images: [Key: CGImage?] = [:]
 
-    /// The SF Symbol `name` in `color`, drawn at `scale` beside labels of `fontSize`; nil when the system lacks it.
-    func image(named name: String, fontSize: CGFloat, color: UIColor, scale: CGFloat) -> CGImage? {
-        let key = Key(name: name, fontSize: fontSize, color: color, scale: scale)
+    /// The SF Symbol `name` in `color` and `weight`, drawn at `scale` beside labels of `fontSize`; nil when the system
+    /// lacks it.
+    func image(
+        named name: String, fontSize: CGFloat, color: UIColor, scale: CGFloat, weight: UIImage.SymbolWeight = .regular
+    ) -> CGImage? {
+        let key = Key(name: name, fontSize: fontSize, color: color, scale: scale, weight: weight)
         if let cached = images[key] { return cached }
         let image = Self.render(key)
         images[key] = image
@@ -202,7 +225,7 @@ final class KeyIconCache {
     /// the smiley for a filled one, and the trait collection current while keys are built would pick that.
     private static func render(_ key: Key) -> CGImage? {
         let pointSize = UIFont.systemFont(ofSize: key.fontSize).capHeight * sizeInCapHeights
-        let configuration = UIImage.SymbolConfiguration(pointSize: pointSize, weight: .regular)
+        let configuration = UIImage.SymbolConfiguration(pointSize: pointSize, weight: key.weight)
             // Only the appearance is pinned; the size and weight come from this configuration, the scale from `key`.
             .withTraitCollection(UITraitCollection(userInterfaceStyle: .light))
         guard let symbol = UIImage(systemName: key.name, withConfiguration: configuration) else { return nil }
