@@ -47,7 +47,10 @@ built; there was no up-front task plan, as each change was small and approved in
   The keyboard's one write per item now waits for the next turn, off the keystroke. Merged to `main` and released as
   v0.4.0.
 - Later: the heatmap and themes (requests 5 and 6), each brainstormed first.
-- Device checks for Task 5 of milestone 3:
-  - whether `AppleKeyboards` is readable on the iPhone (Setup's tick);
-  - where Open Settings lands;
-  - how the domain popup feels.
+- 2026-10-27: on the iPhone with v0.4.0, the user checked everything on the device list and reported "tried them all,
+  everything works":
+  - Setup's ticks (so `AppleKeyboards` is readable on the phone) and Open Settings;
+  - the web-address row and the domain hold;
+  - Things to try;
+  - the SMS-code switch;
+  - text replacements.
