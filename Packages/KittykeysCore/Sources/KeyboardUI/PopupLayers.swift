@@ -22,9 +22,6 @@ final class KeyPreviewLayer: CAShapeLayer {
         shadowOpacity = 0.25
         shadowOffset = CGSize(width: 0, height: 3)
         shadowRadius = 6
-        let font = UIFont.systemFont(ofSize: Self.fontSize)
-        labelLayer.font = font
-        labelLayer.fontSize = font.pointSize
         labelLayer.alignmentMode = .center
         addSublayer(labelLayer)
     }
@@ -54,7 +51,10 @@ final class KeyPreviewLayer: CAShapeLayer {
         shadowPath = balloon
         fillColor = theme.popup.cgColor
 
-        let lineHeight = ceil(UIFont.systemFont(ofSize: Self.fontSize).lineHeight)
+        let font = theme.font(ofSize: Self.fontSize)
+        let lineHeight = ceil(font.lineHeight)
+        labelLayer.font = font
+        labelLayer.fontSize = font.pointSize
         labelLayer.contentsScale = scale
         labelLayer.foregroundColor = theme.label.cgColor
         labelLayer.string = label
@@ -168,13 +168,13 @@ final class AlternatesLayer: CALayer {
         shadowPath = CGPath(roundedRect: self.bounds, cornerWidth: radius, cornerHeight: radius, transform: nil)
         selectionLayer.backgroundColor = theme.selection.cgColor
 
-        let font = UIFont.systemFont(ofSize: Self.fontSize)
+        let font = theme.font(ofSize: Self.fontSize)
         let lineHeight = ceil(font.lineHeight)
         cells = options.enumerated().map { index, option in
             let cell = CATextLayer()
             cell.contentsScale = scale
             cell.font = font
-            cell.fontSize = Self.fittedFontSize(for: option, in: cellWidth)
+            cell.fontSize = Self.fittedFontSize(for: option, in: cellWidth, font: font)
             cell.alignmentMode = .center
             cell.foregroundColor = theme.label.cgColor
             cell.string = option
@@ -187,11 +187,11 @@ final class AlternatesLayer: CALayer {
         isHidden = false
     }
 
-    /// The font size that fits `option` in a cell `cellWidth` wide, inside the highlight: `fontSize`, or smaller for an
-    /// option too wide for it, so no data can make options overlap.
-    private static func fittedFontSize(for option: String, in cellWidth: CGFloat) -> CGFloat {
+    /// The size of `font` that fits `option` in a cell `cellWidth` wide, inside the highlight: `fontSize`, or smaller for
+    /// an option too wide for it, so no data can make options overlap.
+    private static func fittedFontSize(for option: String, in cellWidth: CGFloat, font: UIFont) -> CGFloat {
         let room = cellWidth - 2 * (selectionInset + 2)
-        let width = (option as NSString).size(withAttributes: [.font: UIFont.systemFont(ofSize: fontSize)]).width
+        let width = (option as NSString).size(withAttributes: [.font: font]).width
         guard width > room, room > 0 else { return fontSize }
         return max(fontSize * room / width, 1)
     }

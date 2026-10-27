@@ -39,8 +39,9 @@ public enum ReturnKeyLabel {
 /// - In `.emojiSearch` (ruling M3-R15) the keys show again without their number row, the field shows the query, and an
 ///   `EmojiSearchResultsView` fills the number row's band. It is made the first time search opens and kept, unless a
 ///   memory warning frees it, with the search keywords, while search is closed.
-/// - The view looks clear, so the system's keyboard backdrop shows around and between the keys (ruling R42). Its fill
-///   is `UIColor.touchableClear`, not `.clear`, so taps between the keys still reach it (ruling M3-R8).
+/// - With a theme that has no background the view looks clear, so the system's keyboard backdrop shows around and
+///   between the keys (ruling R42). Its fill is then `UIColor.touchableClear`, not `.clear`, so taps between the keys
+///   still reach it (ruling M3-R8). A theme's background fills the view instead.
 @MainActor public final class KeyboardView: UIView {
     /// The label shift shows while caps lock is on. The layout file's label shows otherwise.
     private static let capsLockLabel = "⇪"
@@ -49,10 +50,12 @@ public enum ReturnKeyLabel {
     /// More fingers than a screen reports at once, so tracking touches never grows its set.
     private static let touchCapacity = 20
 
-    /// Set by the host from the trait collection or the field's `keyboardAppearance`. Changing it redraws every key.
+    /// Set by the host from the settings, the trait collection and the field's `keyboardAppearance`. Changing it
+    /// redraws every key.
     public var theme: KeyboardTheme = .light {
         didSet {
             guard theme != oldValue else { return }
+            backgroundColor = Self.fill(for: theme)
             emojiPanel?.theme = theme
             searchField?.theme = theme
             searchResults?.theme = theme
@@ -134,9 +137,7 @@ public enum ReturnKeyLabel {
         super.init(frame: .zero)
         isMultipleTouchEnabled = true
         liveTouchIDs.reserveCapacity(Self.touchCapacity)
-        // Not `.clear`: iOS drops touches on fully transparent parts of a keyboard extension, which would lose taps
-        // in the gaps between keys (ruling R9 sends them to the nearest key) and in the suggestion row (ruling M3-R8).
-        backgroundColor = .touchableClear
+        backgroundColor = Self.fill(for: theme)
         layer.addSublayer(keysLayer)
         layer.addSublayer(previewLayer)
         layer.addSublayer(alternatesLayer)
@@ -213,6 +214,13 @@ public enum ReturnKeyLabel {
             hasScheduledFontWarmup = true
             EmojiFontWarmup.scheduleIfNeeded(scale: displayScale) { [weak self] in self?.emojiPreferences.recents ?? [] }
         }
+    }
+
+    /// The theme's background, else a clear-looking fill. Not `.clear`: iOS drops touches on fully transparent parts
+    /// of a keyboard extension, which would lose taps in the gaps between keys (ruling R9 sends them to the nearest key)
+    /// and in the suggestion row (ruling M3-R8).
+    private static func fill(for theme: KeyboardTheme) -> UIColor {
+        theme.background ?? .touchableClear
     }
 
     /// Throws away every key layer and icon and draws again, for a new theme or screen scale.
@@ -512,12 +520,18 @@ public enum ReturnKeyLabel {
         }
     }
 
-    /// Letter, number and symbol keys and space rest in the key colour; every other key, and everything else
-    /// on the bottom row (`lastRow`), in the special-key colour. Row 0 is the number row (`LayoutPage.rows[0]` always is).
+    /// Each key's role for the theme: characters above the bottom row (`lastRow`) are letters, characters on it
+    /// punctuation; space and return are their own; every other key is a function key. Row 0 is the number row
+    /// (`LayoutPage.rows[0]` always is).
     private static func style(of frame: KeyFrame, lastRow: Int?) -> KeyStyle {
         let key = frame.key
         let isSpace = key.action == .space
-        let isSpecial = !isSpace && (key.action != .character || frame.row == lastRow)
+        let role: KeyRole = switch key.action {
+        case .space: .space
+        case .returnKey: .returnKey
+        case .character: frame.row == lastRow ? .punctuation : .letter
+        default: .function
+        }
         let fontSize: CGFloat
         if isSpace || key.label.count > 1 {
             fontSize = wordFontSize
@@ -526,7 +540,7 @@ public enum ReturnKeyLabel {
         } else {
             fontSize = characterFontSize
         }
-        return KeyStyle(isSpecial: isSpecial, dimsLabel: isSpace, fontSize: fontSize, icon: key.icon)
+        return KeyStyle(role: role, fontSize: fontSize, icon: key.icon)
     }
 
     /// Corner hints go only on the letter and symbol rows between the number row (row 0) and the bottom row

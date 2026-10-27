@@ -56,9 +56,7 @@ final class EmojiTabBar: UIView {
             self.layer.addSublayer(layer)
         }
         lettersLabel.text = letters
-        lettersLabel.font = .systemFont(ofSize: Self.lettersFontSize)
         deleteLabel.text = delete
-        deleteLabel.font = .systemFont(ofSize: Self.deleteFontSize)
         for label in [lettersLabel, deleteLabel] {
             label.textAlignment = .center
             addSubview(label)
@@ -218,8 +216,10 @@ final class EmojiTabBar: UIView {
     private func applyTheme() {
         CATransaction.begin()
         CATransaction.setDisableActions(true)
-        lettersLabel.textColor = theme.label
-        deleteLabel.textColor = theme.label
+        lettersLabel.textColor = theme.functionLabel
+        lettersLabel.font = theme.font(ofSize: Self.lettersFontSize)
+        deleteLabel.textColor = theme.functionLabel
+        deleteLabel.font = theme.symbolFont(ofSize: Self.deleteFontSize)
         tabHighlight.backgroundColor = theme.specialKey.cgColor
         deleteHighlight.backgroundColor = theme.specialKey.cgColor
         CATransaction.commit()
