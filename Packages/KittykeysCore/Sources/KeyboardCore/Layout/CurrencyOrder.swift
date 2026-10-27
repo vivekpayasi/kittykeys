@@ -6,8 +6,8 @@ public enum CurrencyOrder {
     /// How many currencies a `{currencies}` long-press offers.
     public static let holdCount = 5
 
-    /// `all` with `choice` first, or else `region` (such as `Locale.current.currencySymbol`) first. A choice or a region
-    /// currency the list lacks, such as "CHF", leaves the list's order.
+    /// `all` with `choice` first, or else `region` (from `LayoutSet.currencySymbol(forCode:)`) first. A choice or a
+    /// region currency the list lacks leaves the list's order.
     public static func ordered(choice: String, region: String?, all: [String]) -> [String] {
         let first = all.contains(choice) ? choice : region.flatMap { all.contains($0) ? $0 : nil }
         guard let first else { return all }
@@ -31,7 +31,8 @@ extension KeySpec {
     private static func currency(named placeholder: String, in ordered: [String]) -> String? {
         let prefix = "{currency", suffix = "}"
         guard placeholder.hasPrefix(prefix), placeholder.hasSuffix(suffix),
-              let n = Int(placeholder.dropFirst(prefix.count).dropLast(suffix.count)), ordered.indices.contains(n - 1)
+              let n = Int(placeholder.dropFirst(prefix.count).dropLast(suffix.count)), n >= 1,
+              ordered.indices.contains(n - 1)
         else { return nil }
         return ordered[n - 1]
     }

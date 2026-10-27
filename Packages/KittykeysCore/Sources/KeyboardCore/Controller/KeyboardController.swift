@@ -27,17 +27,20 @@ import Foundation
             processor.timing.longPress = settings.longPressDelay
             notifying {
                 if !settings.keyPopup { state.previewKeyID = nil }
-                if settings.showDotComKey != oldValue.showDotComKey, let traits {
-                    adopt(traits)
-                } else if settings.currency != oldValue.currency {
-                    layOutKeys()
+                guard settings.showDotComKey != oldValue.showDotComKey || settings.currency != oldValue.currency else { return }
+                // Only the bottom row and the currencies change: the page, and search, stay as they are.
+                if let traits {
+                    let variant = Self.bottomVariant(for: traits.kind, settings: settings)
+                    if keysUnderSearch != nil { keysUnderSearch?.bottom = variant } else { bottomVariant = variant }
                 }
+                layOutKeys()
             }
         }
     }
 
     /// The currency of the user's region, such as "₹", which comes first unless `settings.currency` picks one.
-    public var regionCurrency: String? = Locale.current.currencySymbol {
+    /// It starts as the one for the region's currency code.
+    public var regionCurrency: String? {
         didSet {
             guard regionCurrency != oldValue else { return }
             notifying { layOutKeys() }
@@ -129,6 +132,7 @@ import Foundation
     ) {
         self.document = document
         self.layouts = layouts
+        regionCurrency = layouts.currencySymbol(forCode: Locale.current.currency?.identifier)
         self.settings = settings
         self.feedback = feedback
         self.metrics = metrics
@@ -381,7 +385,9 @@ import Foundation
         case let .alternatesShown(frame, options, selected, originX):
             // Only for a key highlighted now, so the popup's id is a current key.
             guard isCurrent(frame), pressCounts[frame.id] != nil else { return }
-            state.alternates = AlternatesPopup(keyID: frame.id, options: options, selected: selected, originX: originX)
+            state.alternates = AlternatesPopup(
+                keyID: frame.id, options: options, selected: selected, originX: originX,
+                cellWidth: processor.timing.alternateWidth * frame.key.longPressWidth)
         case let .alternateSelected(frame, selected):
             guard state.alternates?.keyID == frame.id, isCurrent(frame) else { return }
             state.alternates?.selected = selected
@@ -469,6 +475,15 @@ import Foundation
         if state.previewKeyID == frame.id { state.previewKeyID = nil }
     }
 
+    /// The bottom row a field of `kind` gets: web addresses have a .com key only if `settings` asks for one.
+    private static func bottomVariant(for kind: FieldKind, settings: KeyboardSettings) -> BottomVariant {
+        switch kind {
+        case .email: .email
+        case .url: settings.showDotComKey ? .urlWithDotCom : .url
+        case .text, .number: .standard
+        }
+    }
+
     /// Takes `traits` as the field's: its return key, its bottom row, and its first page (symbols for a number field, else letters).
     /// Search keeps its own keys, and the field's show once it closes.
     private func adopt(_ traits: FieldTraits) {
@@ -476,11 +491,7 @@ import Foundation
         undoableReplacement = nil
         keepShortcutAt = nil
         state.returnKey = traits.returnKey
-        let variant: BottomVariant = switch traits.kind {
-        case .email: .email
-        case .url: settings.showDotComKey ? .urlWithDotCom : .url
-        case .text, .number: .standard
-        }
+        let variant = Self.bottomVariant(for: traits.kind, settings: settings)
         let page = traits.kind == .number ? Self.numberPageID : layouts.lettersPageID
         if state.panel == .emojiSearch {
             keysUnderSearch = (page, variant)
@@ -501,10 +512,9 @@ import Foundation
         layOutKeys()
     }
 
-    /// Rebuilds `frames` for the current page, bottom row and width, and hands them to the touch processor.
-    /// Search's frames leave out the number row. Highlights, the preview and the popup go with the old frames, whose ids
-    /// may now mean other keys.
-    /// Lays out the current page, with its currency placeholders filled in (`CurrencyOrder`).
+    /// Rebuilds `frames` for the current page, bottom row and width, with its currency placeholders filled in
+    /// (`CurrencyOrder`), and hands them to the touch processor. Search's frames leave out the number row. Highlights,
+    /// the preview and the popup go with the old frames, whose ids may now mean other keys.
     private func layOutKeys() {
         framesAreForSearch = state.panel == .emojiSearch
         let currencies = CurrencyOrder.ordered(choice: settings.currency, region: regionCurrency, all: layouts.currencies)

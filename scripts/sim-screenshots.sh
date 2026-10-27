@@ -22,6 +22,9 @@ SCENES=(
   "symbols-2|-kittykeysPreview -kittykeysPreviewPage symbols-2"
   "hold-d|-kittykeysPreview -kittykeysPreviewHold d"
   "hold-period|-kittykeysPreview -kittykeysPreviewHold ."
+  # A web-address field: the row without the .com key, and holding . for the domains in their wider cells.
+  "web|-kittykeysPreview -kittykeysPreviewField url"
+  "web-hold-period|-kittykeysPreview -kittykeysPreviewField url -kittykeysPreviewHold ."
   "cursor|-kittykeysPreview -kittykeysPreviewCursor"
   "emoji|-kittykeysPreview -kittykeysPreviewEmoji"
   # Skin-tone popups at a middle column (base remembered), and at the left-most and right-most columns (the third skin

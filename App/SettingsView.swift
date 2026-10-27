@@ -6,10 +6,9 @@ import SwiftUI
 struct SettingsView: View {
     let store: SettingsStore?
     @State private var settings = KeyboardSettings()
-    /// The currencies the layouts offer, for the Currency picker. Empty if the layouts can't load.
-    private let currencies = (try? LayoutSet.bundled().currencies) ?? []
-    /// The region's currency, as the keyboard picks it when the setting is Automatic.
-    private let regionCurrency = Locale.current.currencySymbol
+    /// The layouts, for the currencies they offer. nil if they can't load.
+    private static let layouts = try? LayoutSet.bundled()
+    private static var currencies: [String] { layouts?.currencies ?? [] }
 
     var body: some View {
         NavigationStack {
@@ -41,7 +40,7 @@ struct SettingsView: View {
                 Section {
                     Picker("Currency", selection: saving(\.currency)) {
                         Text("Automatic (\(automaticCurrency))").tag("")
-                        ForEach(currencies, id: \.self) { Text($0).tag($0) }
+                        ForEach(Self.currencies, id: \.self) { Text($0).tag($0) }
                     }
                     Toggle("Show a .com key in web addresses", isOn: saving(\.showDotComKey))
                 } footer: {
@@ -69,9 +68,10 @@ struct SettingsView: View {
         }
     }
 
-    /// The currency Automatic gives, as `CurrencyOrder` picks it.
+    /// The currency Automatic gives, picked from the region's currency code as the keyboard picks it.
     private var automaticCurrency: String {
-        CurrencyOrder.ordered(choice: "", region: regionCurrency, all: currencies).first ?? "?"
+        let region = Self.layouts?.currencySymbol(forCode: Locale.current.currency?.identifier)
+        return CurrencyOrder.ordered(choice: "", region: region, all: Self.currencies).first ?? "?"
     }
 
     /// The app's version and build, such as "0.2.0 (2)".

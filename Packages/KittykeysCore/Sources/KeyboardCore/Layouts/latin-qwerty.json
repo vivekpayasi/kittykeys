@@ -66,7 +66,7 @@
       {"label": "😊", "action": "emoji", "icon": "face.smiling"},
       {"label": "@"},
       {"label": "space", "output": " ", "action": "space", "width": 0},
-      {"label": ".", "longPress": [".com", ".in", ".co.in", ".org", ".net"]},
+      {"label": ".", "longPress": [".com", ".in", ".co.in", ".org", ".net"], "longPressWidth": 1.6},
       {"label": "return", "output": "\n", "action": "return", "width": 2}
     ],
     "url": [
@@ -74,7 +74,7 @@
       {"label": "😊", "action": "emoji", "icon": "face.smiling"},
       {"label": "/"},
       {"label": "space", "output": " ", "action": "space", "width": 0},
-      {"label": ".", "longPress": [".com", ".in", ".co.in", ".org", ".net"]},
+      {"label": ".", "longPress": [".com", ".in", ".co.in", ".org", ".net"], "longPressWidth": 1.6},
       {"label": "return", "output": "\n", "action": "return", "width": 2}
     ],
     "url-com": [
@@ -83,7 +83,7 @@
       {"label": "/"},
       {"label": "space", "output": " ", "action": "space", "width": 0},
       {"label": ".com", "width": 1.5},
-      {"label": ".", "longPress": [".com", ".in", ".co.in", ".org", ".net"]},
+      {"label": ".", "longPress": [".com", ".in", ".co.in", ".org", ".net"], "longPressWidth": 1.6},
       {"label": "return", "output": "\n", "action": "return", "width": 2}
     ]
   }

@@ -11,6 +11,8 @@ public struct AlternatesPopup: Equatable, Sendable {
     public var selected: Int
     /// Where the first cell starts.
     public var originX: Double
+    /// Each option's cell width: `TouchTiming.alternateWidth`, times the key's `longPressWidth`.
+    public var cellWidth: Double
 }
 
 /// What fills the keyboard below the suggestion row: the keys, the emoji panel in their place, or emoji search.

@@ -6,7 +6,7 @@ An open-source iPhone keyboard for English and Hinglish, laid out like SwiftKey.
 words stay exactly as you type them. Nothing you type leaves your phone.
 
 <p>
-  <img src="docs/assets/keyboard-symbols.png" alt="The letters with a number row and symbol hints, holding d for ₹ $ €" width="32%">
+  <img src="docs/assets/keyboard-symbols.png" alt="The letters with a number row and symbol hints, holding d for ₹ $ € £ ¥" width="32%">
   <img src="docs/assets/keyboard-emoji.png" alt="The emoji panel with Recent and the category tabs" width="32%">
   <img src="docs/assets/keyboard-emoji-search.png" alt="Emoji search for lau, with 🤣 and 😂 first" width="32%">
 </p>
@@ -18,6 +18,8 @@ kittykeys is early. It is tested on one iPhone, and it changes often.
 - A number row above the letters, and symbols on long-press, with each key's symbol shown in its corner
 - Hold the space bar and slide to move the cursor
 - An emoji panel with Recent, categories, skin tones and search
+- Your currency first when you hold d, from your region or picked in Settings
+- In web addresses a full-width space bar; hold . for .com, .in and other endings
 - Your Text Replacement shortcuts from iOS Settings, such as "omw" for "On my way!"; ⌫ right after puts the shortcut
   back
 - In a one-time code field it switches to the next keyboard, so Apple's keyboard (list it right after kittykeys) can

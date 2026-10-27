@@ -42,8 +42,6 @@ public enum ReturnKeyLabel {
 /// - The view looks clear, so the system's keyboard backdrop shows around and between the keys (ruling R42). Its fill
 ///   is `UIColor.touchableClear`, not `.clear`, so taps between the keys still reach it (ruling M3-R8).
 @MainActor public final class KeyboardView: UIView {
-    /// The width of a long-press option's cell, the touch processor's own.
-    private static let alternateWidth = CGFloat(TouchTiming().alternateWidth)
     /// The label shift shows while caps lock is on. The layout file's label shows otherwise.
     private static let capsLockLabel = "⇪"
     /// Label sizes: number row, single-character labels, longer labels such as "123" or "return".
@@ -295,10 +293,11 @@ public enum ReturnKeyLabel {
         }
         let isNewPopup = shownAlternates.map {
             $0.keyID != popup.keyID || $0.options != popup.options || $0.originX != popup.originX
+                || $0.cellWidth != popup.cellWidth
         } ?? true
         if isNewPopup {
             alternatesLayer.show(
-                popup.options, originX: CGFloat(popup.originX), cellWidth: Self.alternateWidth,
+                popup.options, originX: CGFloat(popup.originX), cellWidth: CGFloat(popup.cellWidth),
                 above: CGRect(controller.frames[popup.keyID].rect), within: bounds, theme: theme, scale: displayScale)
         }
         alternatesLayer.select(popup.selected)

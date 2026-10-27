@@ -23,6 +23,7 @@ struct KeyboardPreviewView: UIViewRepresentable {
 }
 
 /// What the preview shows, from launch arguments. Each step drives the controller as touches would.
+/// - `-kittykeysPreviewField <email|url|number>`: the field asks for that kind of keys; a text field otherwise.
 /// - `-kittykeysPreviewPage <id>`: taps page keys until page `id` shows.
 /// - `-kittykeysPreviewHold <label>`: holds the key with that label until its long-press options show.
 /// - `-kittykeysPreviewCursor`: holds space until cursor mode begins.
@@ -34,6 +35,7 @@ struct KeyboardPreviewView: UIViewRepresentable {
 ///   emoji is held in the results instead; with `-kittykeysPreviewHold`, the key is held in search.
 /// Held keys are never lifted.
 struct PreviewScene {
+    var fieldKind = FieldKind.text
     var pageID: String?
     var heldLabel: String?
     var holdsSpace: Bool
@@ -46,6 +48,12 @@ struct PreviewScene {
         func value(after flag: String) -> String? {
             guard let index = arguments.firstIndex(of: flag), arguments.indices.contains(index + 1) else { return nil }
             return arguments[index + 1]
+        }
+        fieldKind = switch value(after: "-kittykeysPreviewField") {
+        case "email": .email
+        case "url": .url
+        case "number": .number
+        default: .text
         }
         pageID = value(after: "-kittykeysPreviewPage")
         heldLabel = value(after: "-kittykeysPreviewHold")
@@ -98,7 +106,7 @@ final class KeyboardPreviewHost: UIView {
         controller = KeyboardController(
             document: TextViewDocument(textView), layouts: layouts, settings: KeyboardSettings(),
             feedback: SilentFeedback())
-        controller.keyboardWillAppear(FieldTraits())
+        controller.keyboardWillAppear(FieldTraits(kind: scene.fieldKind))
         keyboardView = KeyboardView(
             controller: controller, feedback: SilentFeedback(), emojiPreferences: Self.sampleEmojiPreferences())
         // A steady caret, so every screenshot of search shows it.
