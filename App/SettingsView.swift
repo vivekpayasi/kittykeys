@@ -34,12 +34,31 @@ struct SettingsView: View {
                     Text("How long you hold a key before its symbols show.")
                 }
                 .disabled(store == nil)
+                Section {
+                    Toggle("Switch to Apple's keyboard for codes", isOn: saving(\.handOffCodeFields))
+                } footer: {
+                    Text(
+                        "iOS offers codes from Messages only on its own keyboard. In a code field, kittykeys switches to the next keyboard in iOS Settings › General › Keyboard › Keyboards, so list Apple's keyboard right after kittykeys. Press 🌐 to come back; kittykeys then stays in that field."
+                    )
+                }
+                .disabled(store == nil)
+                Section {
+                    LabeledContent("Version", value: appVersion)
+                }
             }
             .navigationTitle("Settings")
         }
         .onAppear {
             if let store { settings = store.load() }
         }
+    }
+
+    /// The app's version and build, such as "0.2.0 (2)".
+    private var appVersion: String {
+        let info = Bundle.main.infoDictionary
+        let version = info?["CFBundleShortVersionString"] as? String ?? "?"
+        let build = info?["CFBundleVersion"] as? String ?? "?"
+        return "\(version) (\(build))"
     }
 
     /// The delay in seconds to two decimals, such as "0.30".

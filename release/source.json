@@ -1,0 +1,42 @@
+{
+  "name": "kittykeys",
+  "identifier": "io.github.vivekpayasi.kittykeys",
+  "subtitle": "An open-source keyboard for English and Hinglish",
+  "sourceURL": "https://github.com/vivekpayasi/kittykeys/releases/latest/download/source.json",
+  "website": "https://github.com/vivekpayasi/kittykeys",
+  "iconURL": "https://raw.githubusercontent.com/vivekpayasi/kittykeys/v0.2.0/App/Assets.xcassets/AppIcon.appiconset/AppIcon.png",
+  "apps": [
+    {
+      "name": "kittykeys",
+      "bundleIdentifier": "com.vivek.catkeys",
+      "developerName": "vivekpayasi",
+      "subtitle": "An open-source keyboard for English and Hinglish",
+      "localizedDescription": "An open-source iPhone keyboard for English and Hinglish: a number row, symbols on long-press with hints on the keys, space-bar cursor control, an emoji panel with search, and no autocorrect, so Hinglish words stay as typed. Nothing you type leaves your phone.",
+      "iconURL": "https://raw.githubusercontent.com/vivekpayasi/kittykeys/v0.2.0/App/Assets.xcassets/AppIcon.appiconset/AppIcon.png",
+      "category": "utilities",
+      "versions": [
+        {
+          "version": "0.2.0",
+          "buildVersion": "2",
+          "date": "2026-10-26",
+          "localizedDescription": "The first public release. catkeys is now kittykeys; updating keeps your settings and Recent emoji.\n\n- Emoji panel: Recent, categories, skin tones on hold, and search\n- Your Text Replacement shortcuts from iOS Settings expand after a space, return or punctuation; ⌫ right after puts the shortcut back\n- In a one-time code field, kittykeys switches to the next keyboard so Apple's keyboard can offer the code from Messages; 🌐 brings kittykeys back (Settings › Switch to Apple's keyboard for codes)\n- Settings shows the version, and Setup has an Open Settings button\n- A typing test in the app, to compare keyboards",
+          "downloadURL": "https://github.com/vivekpayasi/kittykeys/releases/download/v0.2.0/kittykeys.ipa",
+          "size": 825981,
+          "minOSVersion": "26.0"
+        }
+      ],
+      "appPermissions": {
+        "entitlements": [
+          "com.apple.security.application-groups"
+        ],
+        "privacy": {}
+      },
+      "version": "0.2.0",
+      "versionDate": "2026-10-26",
+      "versionDescription": "The first public release. catkeys is now kittykeys; updating keeps your settings and Recent emoji.\n\n- Emoji panel: Recent, categories, skin tones on hold, and search\n- Your Text Replacement shortcuts from iOS Settings expand after a space, return or punctuation; ⌫ right after puts the shortcut back\n- In a one-time code field, kittykeys switches to the next keyboard so Apple's keyboard can offer the code from Messages; 🌐 brings kittykeys back (Settings › Switch to Apple's keyboard for codes)\n- Settings shows the version, and Setup has an Open Settings button\n- A typing test in the app, to compare keyboards",
+      "downloadURL": "https://github.com/vivekpayasi/kittykeys/releases/download/v0.2.0/kittykeys.ipa",
+      "size": 825981
+    }
+  ],
+  "news": []
+}

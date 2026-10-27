@@ -1,5 +1,7 @@
 # Milestone 1: Typing Shell Implementation Plan
 
+> **Renamed:** catkeys became kittykeys on 2026-10-26 (M3-R24). This plan keeps the names and paths of its time: `Packages/CatkeysCore` is now `Packages/KittykeysCore`, the `Catkeys` targets are `Kittykeys`, and the log subsystem is `kittykeys`. Bundle ids, the App Group and saved data keys kept `catkeys`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** a working catkeys keyboard with every typing feature from milestone 1 in `docs/design.md`, plus the container app. It's checked on the simulator first, then measured on the user's iPhone 16 for speed and memory.
@@ -857,21 +859,21 @@ The user's feel test on the iPhone found two problems with how the keyboard look
 
 - 2026-10-21: plan written. Building on the simulator starts on branch `m1-typing-shell`, with the device check (Task 12) once the user is back.
 - 2026-10-21: Tasks 1-11 done on the simulator, each reviewed clean (commit ranges are base..last):
-  - Task 1, scaffold: `23274c0..4a7c8e2`
-  - Task 2, layouts: `e112ac0..cc2feb6`
-  - Task 3, geometry: `cc2feb6..e7e501e`
-  - Task 4, text rules: `ed19085..fb46c0b`
-  - Task 5, touch taps and long-press: `e76ddb6..bb69d35`
-  - Task 6, backspace and cursor mode: `698d4f9..dd497e8`
-  - Task 8, settings (run before Task 7, ruling R1): `e5d23d1..160b24a`
-  - Task 7, controller: `71a9a1d..1919868`
-  - Task 9, keyboard view: `08ddb66..731582d`
-  - Task 10, keyboard extension: `731582d..bfbb8cb`
-  - Task 11, container app: `bfbb8cb..0654db6`
-- 2026-10-21: final whole-branch review of `23274c0..0654db6` (ruling R32, before Task 12): ready to merge with fixes; 0 Critical, 5 Important, 4 Minor. None of the deferred minors must be fixed before merge.
-- 2026-10-21: final-review fix wave, `0654db6..95809e5` plus this plan update: stale-touch reset (R33), host-notice guard (R34), `touch`/`render` signposts and `bottomRow` metadata, Release builds for the device (R35), switchable entitlements (R36), iPhone only and clamped corner radii (R37), Setup status copy (R38). A scoped re-review follows.
+  - Task 1, scaffold: `993c754..944bdb1`
+  - Task 2, layouts: `1cd31bf..ac061d5`
+  - Task 3, geometry: `ac061d5..0f73821`
+  - Task 4, text rules: `41af7c8..9ed90e2`
+  - Task 5, touch taps and long-press: `334fa8b..ccaf888`
+  - Task 6, backspace and cursor mode: `8c882e6..63fd025`
+  - Task 8, settings (run before Task 7, ruling R1): `c61c3a2..35b2b1d`
+  - Task 7, controller: `6e246e4..ef5145d`
+  - Task 9, keyboard view: `ae2e9fe..8515ec1`
+  - Task 10, keyboard extension: `8515ec1..fb595b4`
+  - Task 11, container app: `fb595b4..bea6348`
+- 2026-10-21: final whole-branch review of `993c754..bea6348` (ruling R32, before Task 12): ready to merge with fixes; 0 Critical, 5 Important, 4 Minor. None of the deferred minors must be fixed before merge.
+- 2026-10-21: final-review fix wave, `bea6348..43f276f` plus this plan update: stale-touch reset (R33), host-notice guard (R34), `touch`/`render` signposts and `bottomRow` metadata, Release builds for the device (R35), switchable entitlements (R36), iPhone only and clamped corner radii (R37), Setup status copy (R38). A scoped re-review follows.
 - 2026-10-21: the fix wave's scoped re-review is clean. The screenshot script was re-run, and the scripted long-press and cursor scenes still render.
-- 2026-10-22: Task 11a, the SideStore install path (ruling R39): `14e9b44..1d679ce`, reviewed clean.
+- 2026-10-22: Task 11a, the SideStore install path (ruling R39): `09339fe..e212ec1`, reviewed clean.
 - 2026-10-22: Task 12, device check, on the user's iPhone 16 (iOS 27.0.1). This is the Release build, signed by SideStore, measured with Instruments using `--all-processes`:
   - **Install and App Group:** installed via SideStore. The App Group survives SideStore's rename: the app shows "Keyboard last opened" from the keyboard's heartbeat.
   - **Startup:** median 4.6 ms over 6 opens, worst 7.2 ms. Target ≤ 50 ms.
@@ -881,8 +883,8 @@ The user's feel test on the iPhone found two problems with how the keyboard look
   - **Touch delivery from iOS:** median 10.6 ms, p95 18.7 ms. The bottom row matches the other rows, so there is no system-gesture delay.
   - **Memory:** the keyboard's footprint stays at 9.3–12.1 MiB, flat across 20–30 open/close cycles. Budget 22 MB. The container app uses 33–37 MiB.
   - **The user's feel test:** "the feel is great. it is snappy and taps are accurate." Every checklist item works. The stale-touch edge case is not tested yet. The emoji key opening nothing is expected until the emoji panel milestone.
-- 2026-10-22: Task 12b, look polish from the feel test (R41, R42): `be31339..6262fe1`, reviewed clean. The emoji key is now an icon, and the keys sit on iOS's Liquid Glass keyboard backdrop.
-- 2026-10-22: the app icon was added (`9afb4c7`). Milestone 1 is closed and merged to `main`. Next comes the emoji panel (milestone 3), moved ahead of the suggestion row at the user's request.
+- 2026-10-22: Task 12b, look polish from the feel test (R41, R42): `9494710..6fb30e2`, reviewed clean. The emoji key is now an icon, and the keys sit on iOS's Liquid Glass keyboard backdrop.
+- 2026-10-22: the app icon was added (`ccb8839`). Milestone 1 is closed and merged to `main`. Next comes the emoji panel (milestone 3), moved ahead of the suggestion row at the user's request.
 
 ## Rulings
 

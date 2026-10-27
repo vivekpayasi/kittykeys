@@ -9,15 +9,17 @@ import UIKit
 /// A crash here silently kills the keyboard, so every failure falls back: no layouts shows an empty keyboard,
 /// and no App Group means the default settings.
 final class KeyboardViewController: UIInputViewController {
-    private static let logger = Logger(subsystem: "catkeys", category: "keyboard")
+    private static let logger = Logger(subsystem: "kittykeys", category: "keyboard")
     /// Speed measurements for Instruments. They cost next to nothing while nothing records them.
-    private static let signposter = OSSignposter(subsystem: "catkeys", category: "perf")
+    private static let signposter = OSSignposter(subsystem: "kittykeys", category: "perf")
     /// The App Group, resolved once per process: iOS creates a controller each time the keyboard appears, and
     /// when SideStore has renamed the group, resolving it reads the provisioning profile.
     private static let appGroupID = AppGroupResolver.resolve(
-        canonical: Bundle.main.object(forInfoDictionaryKey: "CatkeysAppGroup") as? String)
+        canonical: Bundle.main.object(forInfoDictionaryKey: "KittykeysAppGroup") as? String)
     /// The settings on that group, also made once per process. A resolved id resolves to itself.
     private static let appGroupStore = SettingsStore.appGroup(id: appGroupID)
+    /// Which code field kittykeys last handed to the next keyboard, in the extension's own defaults.
+    private static let codeFieldHandOff = CodeFieldHandOff(defaults: .standard)
 
     private let feedback = DeviceFeedback()
     /// The settings shared with the app. nil without the App Group, when the defaults apply.
@@ -28,6 +30,8 @@ final class KeyboardViewController: UIInputViewController {
     private var heightConstraint: NSLayoutConstraint?
     /// From `viewDidLoad` until the first keys are drawn.
     private var startupInterval: OSSignpostIntervalState?
+    /// From `viewDidAppear` to `viewWillDisappear`: the keyboard only switches away while it shows.
+    private var isShowing = false
 
     /// iOS creates a view controller each time the keyboard appears, and keeps the old input view alive after
     /// its controller goes (seen on the iOS 26.4 simulator). Taking the keys out of it frees them, their layers
@@ -66,7 +70,9 @@ final class KeyboardViewController: UIInputViewController {
             document: document, layouts: layouts, settings: settingsStore?.load() ?? KeyboardSettings(),
             feedback: feedback)
         controller.onGlobe = { [weak self] in self?.advanceToNextInputMode() }
-        let keyboardView = KeyboardView(controller: controller)
+        // Recent and the skin tones live in the extension's own defaults, which need no Full Access.
+        let keyboardView = KeyboardView(
+            controller: controller, feedback: feedback, emojiPreferences: EmojiPreferences(defaults: .standard))
         // How long iOS took to deliver the touch: the bottom-row delay shows up here, so the bottom row is marked
         // (only a 0 or 1, never where the touch was or which key).
         keyboardView.onTouchDown = { timestamp, isBottomRow in
@@ -75,9 +81,18 @@ final class KeyboardViewController: UIInputViewController {
             signposter.emitEvent(
                 "keyDown", "latencyMs=\(latency, format: .fixed(precision: 2)) bottomRow=\(bottomRow)")
         }
-        // "touch": each batch of touches through the touch processor and the controller; "render": each redraw.
+        // "touch": each batch of touches through the touch processor and the controller; "render": each redraw;
+        // "emojiInsert": each emoji the panel or search's results type.
         keyboardView.measure = { name, work in
             signposter.withIntervalSignpost(name, around: work)
+        }
+        // "emojiPanelOpen": the emoji panel opening, to its first frame committed with the emoji drawn.
+        // "emojiSearchOpen": a touch on the search field, to search's first frame committed with its keys and results.
+        // "emojiSearchQuery": a change to the search query, to the later frame committed with its results drawn.
+        // "emojiSearchDraw": drawing results' first-seen emoji off the main thread, before they show.
+        keyboardView.startMeasure = { name in
+            let state = signposter.beginInterval(name)
+            return { signposter.endInterval(name, state) }
         }
         keyboardView.onFirstKeysDrawn = { [weak self] in self?.endStartupInterval() }
         // The view redraws from onChange; the height follows the page too.
@@ -112,7 +127,8 @@ final class KeyboardViewController: UIInputViewController {
         heightConstraint = height
     }
 
-    /// Picks up settings changed in the app, records that the keyboard opened, and starts afresh for the field.
+    /// Picks up settings changed in the app and text replacements changed in iOS Settings, records that the keyboard
+    /// opened, and starts afresh for the field.
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         guard let controller, let document else { return }
@@ -123,6 +139,7 @@ final class KeyboardViewController: UIInputViewController {
         feedback.configure(settings: controller.settings, hasFullAccess: hasFullAccess)
         controller.keyboardWillAppear(document.traits)
         updateTheme()
+        loadTextReplacements()
     }
 
     /// Design §9's bottom-row workaround: the window's system gesture recognizers can hold back touches near the
@@ -133,6 +150,13 @@ final class KeyboardViewController: UIInputViewController {
         for recognizer in recognizers { recognizer.delaysTouchesBegan = false }
         Self.logger.notice(
             "Turned off delaysTouchesBegan on \(recognizers.count, privacy: .public) window gesture recognizers")
+        isShowing = true
+        handOffIfCodeField()
+    }
+
+    override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        isShowing = false
     }
 
     /// `needsInputModeSwitchKey` is reliable only once the view is being laid out.
@@ -148,6 +172,8 @@ final class KeyboardViewController: UIInputViewController {
         controller.fieldDidChange(document.traits)
         controller.documentDidChange()
         updateTheme()
+        // Focus can move to a code field while the keyboard stays up.
+        if isShowing { handOffIfCodeField() }
     }
 
     override func selectionDidChange(_ textInput: (any UITextInput)?) {
@@ -155,15 +181,59 @@ final class KeyboardViewController: UIInputViewController {
         controller?.documentDidChange()
     }
 
-    /// Nothing to free in milestone 1: the layouts and the key layers are all in use.
+    /// Frees what the emoji panel and search keep while they are closed: search's keywords and results unless search
+    /// shows, and the panel and its decoded emoji while the keys show. The layouts and the key layers are in use.
     override func didReceiveMemoryWarning() {
         super.didReceiveMemoryWarning()
+        Self.logger.notice("Memory warning")
+        keyboardView?.didReceiveMemoryWarning()
+    }
+
+    /// Reads the user's text replacements from iOS. They arrive a moment later; until then the last ones read apply.
+    /// Only their number is logged, never a shortcut or a phrase.
+    /// iOS calls back on its own queue, and Swift traps a main-actor closure run there (seen on the simulator), so the
+    /// closure is `@Sendable` and hops to the main actor; the SDK marks `UILexicon` as main-actor only.
+    private func loadTextReplacements() {
+        requestSupplementaryLexicon { @Sendable [weak self] lexicon in
+            Task { @MainActor in
+                guard let controller = self?.controller else { return }
+                let pairs = lexicon.entries.map { (shortcut: $0.userInput, phrase: $0.documentText) }
+                controller.textReplacements = TextReplacements(pairs: pairs)
+                Self.logger.notice("Text replacements: \(pairs.count, privacy: .public) lexicon entries")
+            }
+        }
     }
 
     /// Dark for a field that asks for a dark keyboard, and in dark mode.
     private func updateTheme() {
         let isDark = textDocumentProxy.keyboardAppearance == .dark || traitCollection.userInterfaceStyle == .dark
         keyboardView?.theme = isDark ? .dark : .light
+    }
+
+    /// A one-time code field goes to the next keyboard, where Apple's keyboard can offer the code from Messages,
+    /// unless `CodeFieldHandOff` says kittykeys stays. Stays are logged at info level, not notice: every keystroke in
+    /// a code field asks again.
+    private func handOffIfCodeField() {
+        guard let controller, controller.settings.handOffCodeFields,
+              textDocumentProxy.textContentType == .oneTimeCode
+        else { return }
+        let decision = Self.codeFieldHandOff.decide(document: documentIdentifier, now: Date())
+        guard decision == .handOff else {
+            Self.logger.info("Staying in a one-time code field: \(String(describing: decision), privacy: .public)")
+            return
+        }
+        Self.logger.notice("Handing a one-time code field to the next keyboard")
+        // This controller is on its way out; it doesn't switch again.
+        isShowing = false
+        advanceToNextInputMode()
+    }
+
+    /// The field's `documentIdentifier`, or nil. While focus moves between fields iOS reports none, though the SDK
+    /// declares it non-null, and reading it as a Swift `UUID` then traps; asking the proxy as an object doesn't.
+    private var documentIdentifier: UUID? {
+        let getter = #selector(getter: UITextDocumentProxy.documentIdentifier)
+        guard let proxy = textDocumentProxy as? NSObject, proxy.responds(to: getter) else { return nil }
+        return (proxy.perform(getter)?.takeUnretainedValue() as? NSUUID) as UUID?
     }
 
     private func updateHeight() {

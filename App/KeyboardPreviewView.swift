@@ -4,7 +4,7 @@ import SwiftUI
 import UIKit
 
 /// The keyboard view hosted in the app, pinned to the bottom of the screen above a text view it types into.
-/// The simulator screenshot script launches it with `-catkeysPreview`; see `PreviewScene` for the other arguments.
+/// The simulator screenshot script launches it with `-kittykeysPreview`; see `PreviewScene` for the other arguments.
 struct KeyboardPreviewView: UIViewRepresentable {
     func makeUIView(context: Context) -> UIView {
         do {
@@ -23,23 +23,38 @@ struct KeyboardPreviewView: UIViewRepresentable {
 }
 
 /// What the preview shows, from launch arguments. Each step drives the controller as touches would.
-/// - `-catkeysPreviewPage <id>`: taps page keys until page `id` shows.
-/// - `-catkeysPreviewHold <label>`: holds the key with that label until its long-press options show.
-/// - `-catkeysPreviewCursor`: holds space until cursor mode begins.
+/// - `-kittykeysPreviewPage <id>`: taps page keys until page `id` shows.
+/// - `-kittykeysPreviewHold <label>`: holds the key with that label until its long-press options show.
+/// - `-kittykeysPreviewCursor`: holds space until cursor mode begins.
+/// - `-kittykeysPreviewEmoji`: taps the emoji key, opening the emoji panel.
+/// - `-kittykeysPreviewEmojiHold <emoji>`: opens the emoji panel, scrolls to `emoji` and holds it, so its skin-tone popup
+///   shows if it has skin tones.
+/// - `-kittykeysPreviewEmojiSearch [query]`: opens the emoji panel, then search, as a touch on its field does, and types
+///   `query` on the keys (none when the next argument is missing or another flag). With `-kittykeysPreviewEmojiHold`, the
+///   emoji is held in the results instead; with `-kittykeysPreviewHold`, the key is held in search.
 /// Held keys are never lifted.
 struct PreviewScene {
     var pageID: String?
     var heldLabel: String?
     var holdsSpace: Bool
+    var opensEmoji: Bool
+    var heldEmoji: String?
+    /// The query to type into emoji search; nil to stay out of search.
+    var searchQuery: String?
 
     init(_ arguments: [String]) {
         func value(after flag: String) -> String? {
             guard let index = arguments.firstIndex(of: flag), arguments.indices.contains(index + 1) else { return nil }
             return arguments[index + 1]
         }
-        pageID = value(after: "-catkeysPreviewPage")
-        heldLabel = value(after: "-catkeysPreviewHold")
-        holdsSpace = arguments.contains("-catkeysPreviewCursor")
+        pageID = value(after: "-kittykeysPreviewPage")
+        heldLabel = value(after: "-kittykeysPreviewHold")
+        holdsSpace = arguments.contains("-kittykeysPreviewCursor")
+        heldEmoji = value(after: "-kittykeysPreviewEmojiHold")
+        if arguments.contains("-kittykeysPreviewEmojiSearch") {
+            searchQuery = value(after: "-kittykeysPreviewEmojiSearch").flatMap { $0.hasPrefix("-") ? nil : $0 } ?? ""
+        }
+        opensEmoji = heldEmoji != nil || searchQuery != nil || arguments.contains("-kittykeysPreviewEmoji")
     }
 }
 
@@ -47,11 +62,16 @@ struct PreviewScene {
 /// The keyboard view is clear, so a grey like the system's keyboard backdrop goes behind it and below it.
 final class KeyboardPreviewHost: UIView {
     /// Invented text, so the keyboard starts mid-sentence with shift off.
-    private static let startingText = "Typing in the catkeys preview"
+    private static let startingText = "Typing in the kittykeys preview"
     /// How long each scripted tap is held, and the hold that outlasts the long-press and cursor-mode delays.
     private static let tapDuration = 0.05, holdDuration = 0.5
     /// The preview's one scripted finger. A real touch's id is a hash of its object, so a clash is vanishingly unlikely.
     private static let scriptedTouch: TouchID = 1
+    /// The preview's own Recent and skin tones, emptied and filled with `sampleRecent` at each launch, so screenshots
+    /// show the Recent section the same way every time.
+    private static let emojiSuite = "catkeys.preview.emoji"
+    /// Invented, most recent first.
+    private static let sampleRecent = ["😂", "❤️", "👍🏽", "🙏", "🇮🇳", "👨‍👩‍👧", "🔥", "✅", "😭", "🎉"]
 
     var theme: KeyboardTheme = .light {
         didSet {
@@ -79,7 +99,10 @@ final class KeyboardPreviewHost: UIView {
             document: TextViewDocument(textView), layouts: layouts, settings: KeyboardSettings(),
             feedback: SilentFeedback())
         controller.keyboardWillAppear(FieldTraits())
-        keyboardView = KeyboardView(controller: controller)
+        keyboardView = KeyboardView(
+            controller: controller, feedback: SilentFeedback(), emojiPreferences: Self.sampleEmojiPreferences())
+        // A steady caret, so every screenshot of search shows it.
+        keyboardView.blinksSearchCaret = false
         super.init(frame: .zero)
         backgroundColor = .systemBackground
         backdrop.backgroundColor = theme.backdrop
@@ -117,11 +140,23 @@ final class KeyboardPreviewHost: UIView {
         play(scene)
     }
 
-    /// Opens the page, then holds one key: the labelled one, else space for cursor mode.
+    /// Opens the page, then holds one key: the labelled one, else space for cursor mode. Or opens the emoji panel, maybe
+    /// searches, and holds an emoji.
     private func play(_ scene: PreviewScene) {
         var clock = ProcessInfo.processInfo.systemUptime
         if let pageID = scene.pageID { open(page: pageID, clock: &clock) }
-        if let label = scene.heldLabel {
+        if scene.opensEmoji, let emojiKey = controller.frames.first(where: { $0.key.action == .emoji }) {
+            tap(emojiKey, clock: &clock)
+            if let query = scene.searchQuery {
+                controller.openEmojiSearch()
+                type(query, clock: &clock)
+                // Search's keys can be held too, to show a key's popup over the results.
+                if let label = scene.heldLabel, let key = controller.frames.first(where: { $0.key.label == label }) {
+                    hold(key, at: clock)
+                }
+            }
+            if let emoji = scene.heldEmoji { keyboardView.showEmojiHoldForPreview(emoji) }
+        } else if let label = scene.heldLabel {
             if let key = controller.frames.first(where: { $0.key.label == label }) { hold(key, at: clock) }
         } else if scene.holdsSpace, let space = controller.frames.first(where: { $0.key.action == .space }) {
             hold(space, at: clock)
@@ -139,17 +174,42 @@ final class KeyboardPreviewHost: UIView {
             }
             guard let next = unseen.first(where: { $0.pageID == id }) ?? unseen.first else { return }
             seen.insert(next.pageID)
-            let centre = Self.centre(of: next.frame)
-            controller.touchDown(Self.scriptedTouch, at: centre, time: clock)
-            clock += Self.tapDuration
-            controller.touchUp(Self.scriptedTouch, at: centre, time: clock)
-            clock += Self.tapDuration
+            tap(next.frame, clock: &clock)
         }
+    }
+
+    /// Taps the key for each character of `text`: space for a space, else the key that types it.
+    private func type(_ text: String, clock: inout Double) {
+        for character in text {
+            let key = controller.frames.first { frame in
+                character == " " ? frame.key.action == .space : frame.key.output == String(character)
+            }
+            if let key { tap(key, clock: &clock) }
+        }
+    }
+
+    private func tap(_ frame: KeyFrame, clock: inout Double) {
+        let centre = Self.centre(of: frame)
+        controller.touchDown(Self.scriptedTouch, at: centre, time: clock)
+        clock += Self.tapDuration
+        controller.touchUp(Self.scriptedTouch, at: centre, time: clock)
+        clock += Self.tapDuration
     }
 
     private func hold(_ frame: KeyFrame, at time: Double) {
         controller.touchDown(Self.scriptedTouch, at: Self.centre(of: frame), time: time)
         controller.advance(to: time + Self.holdDuration)
+    }
+
+    private static func sampleEmojiPreferences() -> EmojiPreferences {
+        UserDefaults.standard.removePersistentDomain(forName: emojiSuite)
+        let preferences = EmojiPreferences(defaults: UserDefaults(suiteName: emojiSuite) ?? .standard)
+        for emoji in sampleRecent.reversed() { preferences.recordUse(emoji, base: emoji) }
+        // The edge scenes' emoji remember the third skin, so their popups show it picked away from the finger.
+        for (variant, base) in [("👍🏽", "👍"), ("👉🏽", "👉"), ("👈🏽", "👈")] {
+            preferences.setPreferredVariant(variant, for: base)
+        }
+        return preferences
     }
 
     private static func centre(of frame: KeyFrame) -> KeyboardCore.Point {

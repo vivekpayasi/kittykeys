@@ -2,12 +2,15 @@
 // Personal values (signing team, bundle prefix) go in Local.xcconfig, which is
 // gitignored. Copy Local.xcconfig.example to start one.
 
-CATKEYS_BUNDLE_PREFIX = com.example
-CATKEYS_APP_GROUP = group.$(CATKEYS_BUNDLE_PREFIX).catkeys
+KITTYKEYS_BUNDLE_PREFIX = com.example
+// The app's bundle id; the keyboard's adds ".keyboard". An install made before a rename can keep its old id
+// in Local.xcconfig, so a sideloading tool updates it in place.
+KITTYKEYS_BUNDLE_ID = $(KITTYKEYS_BUNDLE_PREFIX).kittykeys
+KITTYKEYS_APP_GROUP = group.$(KITTYKEYS_BUNDLE_ID)
 
 // Each target's entitlements file, which grants the App Group. Local.xcconfig can set them empty.
-CATKEYS_APP_ENTITLEMENTS = App/Catkeys.entitlements
-CATKEYS_KB_ENTITLEMENTS = Keyboard/CatkeysKeyboard.entitlements
+KITTYKEYS_APP_ENTITLEMENTS = App/Kittykeys.entitlements
+KITTYKEYS_KB_ENTITLEMENTS = Keyboard/KittykeysKeyboard.entitlements
 
 DEVELOPMENT_TEAM =
 CODE_SIGN_STYLE = Automatic

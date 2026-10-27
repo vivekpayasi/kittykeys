@@ -1,4 +1,4 @@
-# catkeys
+# kittykeys
 
 Open-source iOS custom keyboard, SwiftKey-style layout, powered by the anantara engine (`../anantara`). Claude builds this project; the user tests it on their iPhone. Installed by sideloading (SideStore or Xcode with a free Apple ID; possibly a paid developer account later).
 
@@ -31,8 +31,10 @@ Open-source iOS custom keyboard, SwiftKey-style layout, powered by the anantara 
 
 Design approved 2026-10-21: `docs/design.md` is the source of truth (`docs/brief.md` is the earlier hand-off). Implementation plans and progress live in `docs/plans/`, one per milestone. Claude may commit on its own at milestones.
 
-Milestone 1 (typing shell) is done and merged to `main` (2026-10-22). It was measured on the user's iPhone; see the plan's Progress section. Next is the emoji panel (milestone 3), moved ahead of the suggestion row at the user's request.
+Milestone 1 (typing shell) is done and merged to `main` (2026-10-22). It was measured on the user's iPhone; see the plan's Progress section. Milestone 3 (emoji panel, moved ahead of the suggestion row at the user's request) and the user's later requests (SMS codes, text replacements, the rename) were merged to `main` on 2026-10-27 and released as v0.2.0. Its device check and measurement (Task 5) are still to do, on `main`.
 
-Install path: SideStore, the same as the user's other sideloaded app. `scripts/build-ipa.sh` builds an unsigned IPA from the gitignored `Config/Local.xcconfig`, which holds the user's bundle prefix. Copy `build/catkeys.ipa` to iCloud Drive, and the user installs it from SideStore → My Apps → +. Never change the bundle ids: the free Apple ID has a weekly App ID quota.
+The project was called catkeys until 2026-10-26 (M3-R24). Old plans keep the old names. The bundle ids, the App Group and saved defaults keys still say catkeys, on purpose.
+
+Releases: public repo `vivekpayasi/kittykeys` on GitHub. `scripts/release.sh <version>` bumps the version, builds the IPA, updates the SideStore source `release/source.json`, tags, pushes, and creates the GitHub release; the user gets it as an update in SideStore, from the source `https://github.com/vivekpayasi/kittykeys/releases/latest/download/source.json`. Commits use the author email `iamvivek7411@gmail.com` (set in this repo's git config). `scripts/build-ipa.sh` alone builds the ad-hoc signed `build/kittykeys.ipa` for a quick test build through iCloud Drive and SideStore → My Apps → +. Both read the gitignored `Config/Local.xcconfig`, which keeps the user's install on its old bundle id (`KITTYKEYS_BUNDLE_ID`). Never change the bundle ids: the free Apple ID has a weekly App ID quota.
 
 Disk: keep builds in `build/` (gitignored) and clear it between milestones. The external SSD is exFAT, so it can't hold Xcode builds; use it only for large throwaway files such as Instruments traces.

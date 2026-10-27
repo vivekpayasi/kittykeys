@@ -1,22 +1,32 @@
 import KeyboardCore
 import SwiftUI
+import UIKit
 
 /// How to turn the keyboard on, what Full Access is for, and whether the keyboard and the app share settings.
 struct SetupView: View {
     let store: SettingsStore?
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.openURL) private var openURL
     @State private var status = ""
 
     var body: some View {
         NavigationStack {
             List {
-                Section("Turn on catkeys") {
-                    SetupStep(1, "Open **Settings**, then go to **General → Keyboard → Keyboards**.")
-                    SetupStep(2, "Tap **Add New Keyboard**, then tap **catkeys**.")
-                    SetupStep(3, "Tap **catkeys**, then turn on **Allow Full Access**.")
+                Section {
+                    // Meant to open this app's page in Settings, which lists its keyboard under Keyboards. The iOS 26.4
+                    // simulator opens Settings' main page instead; the footer gives the way from there.
+                    Button("Open Settings", systemImage: "gear") {
+                        if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
+                    }
+                    SetupStep(1, "Tap **Open Settings**, then **Keyboards**.")
+                    SetupStep(2, "Turn on **kittykeys**, then **Allow Full Access**.")
+                } header: {
+                    Text("Turn on kittykeys")
+                } footer: {
+                    Text("Or, in Settings, go to General › Keyboard › Keyboards › Add New Keyboard.")
                 }
                 Section("Full Access") {
-                    Text("Full Access lets catkeys use haptics and read the settings you choose here. catkeys never connects to the internet: nothing you type leaves your phone.")
+                    Text("Full Access lets kittykeys use haptics and read the settings you choose here. kittykeys never connects to the internet: nothing you type leaves your phone.")
                 }
                 Section("Status") {
                     Text(status)
