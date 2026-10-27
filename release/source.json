@@ -4,7 +4,7 @@
   "subtitle": "An open-source keyboard for English and Hinglish",
   "sourceURL": "https://github.com/vivekpayasi/kittykeys/releases/latest/download/source.json",
   "website": "https://github.com/vivekpayasi/kittykeys",
-  "iconURL": "https://raw.githubusercontent.com/vivekpayasi/kittykeys/v0.3.0/App/Assets.xcassets/AppIcon.appiconset/AppIcon.png",
+  "iconURL": "https://raw.githubusercontent.com/vivekpayasi/kittykeys/v0.4.0/App/Assets.xcassets/AppIcon.appiconset/AppIcon.png",
   "apps": [
     {
       "name": "kittykeys",
@@ -12,9 +12,18 @@
       "developerName": "vivekpayasi",
       "subtitle": "An open-source keyboard for English and Hinglish",
       "localizedDescription": "An open-source iPhone keyboard for English and Hinglish: a number row, symbols on long-press with hints on the keys, space-bar cursor control, an emoji panel with search, and no autocorrect, so Hinglish words stay as typed. Nothing you type leaves your phone.",
-      "iconURL": "https://raw.githubusercontent.com/vivekpayasi/kittykeys/v0.3.0/App/Assets.xcassets/AppIcon.appiconset/AppIcon.png",
+      "iconURL": "https://raw.githubusercontent.com/vivekpayasi/kittykeys/v0.4.0/App/Assets.xcassets/AppIcon.appiconset/AppIcon.png",
       "category": "utilities",
       "versions": [
+        {
+          "version": "0.4.0",
+          "buildVersion": "4",
+          "date": "2026-10-27",
+          "localizedDescription": "- Try it has \"Things to try\": moving the cursor with the space bar, holding a key for its symbol, sliding left from ⌫ to delete a word, a text replacement, and emoji search. Each ticks itself the moment you do it with kittykeys\n- Setup offers \"Next: try it out\" once both of its steps are done",
+          "downloadURL": "https://github.com/vivekpayasi/kittykeys/releases/download/v0.4.0/kittykeys.ipa",
+          "size": 817726,
+          "minOSVersion": "26.0"
+        },
         {
           "version": "0.3.0",
           "buildVersion": "3",
@@ -40,11 +49,11 @@
         ],
         "privacy": {}
       },
-      "version": "0.3.0",
+      "version": "0.4.0",
       "versionDate": "2026-10-27",
-      "versionDescription": "- Web addresses: no separate .com key by default, so the space bar is full width; hold . for .com, .in, .co.in, .org or .net (also in email fields). Settings › Show a .com key brings the key back\n- Currency: d and the 123 page offer your currency first, from your region or picked in Settings › Currency\n- Setup shows a green tick for each step once it's done\n- Try it can switch the field between text, email, web and number, to see how the keys change\n- The typing test is gone",
-      "downloadURL": "https://github.com/vivekpayasi/kittykeys/releases/download/v0.3.0/kittykeys.ipa",
-      "size": 793406
+      "versionDescription": "- Try it has \"Things to try\": moving the cursor with the space bar, holding a key for its symbol, sliding left from ⌫ to delete a word, a text replacement, and emoji search. Each ticks itself the moment you do it with kittykeys\n- Setup offers \"Next: try it out\" once both of its steps are done",
+      "downloadURL": "https://github.com/vivekpayasi/kittykeys/releases/download/v0.4.0/kittykeys.ipa",
+      "size": 817726
     }
   ],
   "news": []
