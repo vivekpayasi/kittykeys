@@ -147,3 +147,14 @@ layer), `Keyboard/KeyboardViewController.swift`, `App/KeyboardPreviewView.swift`
   rounded presets, Rose with the fade (light and dark), Neon's emoji panel, Automatic unchanged; the editor through a
   UI test (dark version on, Start from Neon, Light tab with the fade, split card in the gallery); the real keyboard
   switching between the light look (Rose, rounded and faded) and the dark look (Neon) with the phone's appearance.
+- 2026-10-27: whole-branch review (fresh opus reviewer): "ready to merge", no critical or important issues; it loaded
+  real v0.5.0 themes and settings built from the old code. Fixed: Start from a theme with two looks on a one-look theme
+  now brings both (test), and the Settings footer says to customise a ready-made theme first. Deferred minors are in
+  the hand-off message. 339 tests.
+- Device check for the user (next release):
+  - A custom theme made in v0.5.0 is still there and still picked.
+  - Rose with Round top corners, then with Fade too, in light and dark mode; compare with iOS's bar above.
+  - The emoji panel and emoji search over a rounded, faded theme; tap the search field and near the rounded corners.
+  - Customise a theme, turn on Dark version, Start from Neon on the Dark tab; switch the phone between light and dark
+    while the keyboard shows.
+  - Typing still feels instant with Round and Fade both on.

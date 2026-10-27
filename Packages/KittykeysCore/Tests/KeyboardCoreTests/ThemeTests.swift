@@ -323,6 +323,25 @@ struct ThemeTests {
         #expect(throws: (any Error).self) { try decode(#"{"id":""}"#) }
     }
 
+    @Test func startFromCopiesWhatTheGalleryShows() {
+        let rose = Themes.presets.first { $0.id == "rose" }!, neon = Themes.presets.first { $0.id == "neon" }!
+        let single = ThemeSpec(id: "custom-1", name: "Mine", light: rose.light, dark: nil)
+
+        // One look, from a theme with one look: the look is replaced.
+        #expect(single.startingFrom(neon, editingDark: false) == ThemeSpec(id: "custom-1", name: "Mine", light: neon.light, dark: nil))
+        // One look, from a theme with two: both come, as its split card shows.
+        #expect(
+            single.startingFrom(Themes.automatic, editingDark: false)
+                == ThemeSpec(id: "custom-1", name: "Mine", light: Themes.automaticLight, dark: Themes.automaticDark))
+
+        // Two looks: only the tab being edited changes, from the source's look for that tab.
+        let both = ThemeSpec(id: "custom-2", name: "Both", light: rose.light, dark: neon.light)
+        #expect(both.startingFrom(Themes.automatic, editingDark: true).dark == Themes.automaticDark)
+        #expect(both.startingFrom(Themes.automatic, editingDark: true).light == rose.light)
+        #expect(both.startingFrom(neon, editingDark: false).light == neon.light)
+        #expect(both.startingFrom(neon, editingDark: false).dark == neon.light)
+    }
+
     @Test func newCustomCopiesBothVersions() {
         let first = Themes.newCustom(from: Themes.automatic, existing: [])
         #expect(first.name == "My theme")

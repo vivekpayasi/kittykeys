@@ -155,18 +155,18 @@ struct ThemeEditorView: View {
             })
     }
 
-    /// Copies a ready-made or saved theme's look, for the appearance being edited, into it.
+    /// Restarts the theme from a ready-made or saved one (`ThemeSpec.startingFrom`): the tab being edited, or with one
+    /// look, everything the chosen theme has, its dark look too.
     private var startFromMenu: some View {
         let others = store.customThemes.filter { $0.id != spec.id }
-        let isDark = editsDark
         return Menu {
             ForEach(Themes.presets) { preset in
-                Button(preset.name) { style.wrappedValue = preset.style(isDark: isDark) }
+                Button(preset.name) { startFrom(preset) }
             }
             if !others.isEmpty {
                 Section("Your themes") {
                     ForEach(others) { theme in
-                        Button(theme.name) { style.wrappedValue = theme.style(isDark: isDark) }
+                        Button(theme.name) { startFrom(theme) }
                     }
                 }
             }
@@ -175,6 +175,11 @@ struct ThemeEditorView: View {
                 Image(systemName: "chevron.up.chevron.down")
             }
         }
+    }
+
+    private func startFrom(_ source: ThemeSpec) {
+        spec = spec.startingFrom(source, editingDark: editsDark)
+        if spec.dark == nil { editsDark = false }
     }
 
     /// The bar behind the live keyboard: dark for the dark look, light for the light one, and for a theme with one

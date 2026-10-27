@@ -33,7 +33,7 @@ struct SettingsView: View {
                         LabeledContent("Theme", value: themeName(settings.themeID))
                     }
                 } footer: {
-                    Text("A theme can have its own look for dark mode: turn on Dark version in its editor.")
+                    Text("A theme can have its own look for dark mode: customise it, then turn on Dark version.")
                 }
                 Section {
                     Toggle("Haptics", isOn: saving(\.haptics))

@@ -19,6 +19,22 @@ public struct ThemeSpec: Hashable, Sendable, Identifiable {
     public func style(isDark: Bool) -> ThemeStyle {
         isDark ? dark ?? light : light
     }
+
+    /// This theme restarted from `source`, as the editor's Start from does. With two looks, only the one being edited
+    /// (`editingDark`) takes `source`'s look for that appearance. With one look, it takes all of `source`'s looks, so a
+    /// theme with a dark look, as its split card shows, comes with it.
+    public func startingFrom(_ source: ThemeSpec, editingDark: Bool) -> ThemeSpec {
+        var spec = self
+        if dark == nil {
+            spec.light = source.light
+            spec.dark = source.dark
+        } else if editingDark {
+            spec.dark = source.style(isDark: true)
+        } else {
+            spec.light = source.light
+        }
+        return spec
+    }
 }
 
 extension ThemeSpec: Codable {
