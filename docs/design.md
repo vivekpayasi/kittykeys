@@ -129,7 +129,8 @@ The bottom row is the same as on the letters page, with `ABC` in place of `123`.
 - **Themes, SwiftKey-style:** (user asked, 2026-10-27; the user named key borders, background colour, key font and key shadow, and uses black with neon green on the function keys on Android; the rest is Claude's call, in `docs/plans/2026-10-27-themes.md`)
   - A theme sets the background (a colour, or iOS's own backdrop), the letter-key and function-key colours, the letter, function-key label and hint colours, an accent, the key style (Filled, Outlined or No borders), a key shadow, the return key in the accent, and the system font's design (Default, Rounded, Serif, Monospaced) and weight.
   - Ready-made themes: Automatic (the look above, the default), Light, Dark, Neon (the user's), Midnight, Amber, Synthwave, Terminal, Paper and Rose. Users make their own in an editor with a live keyboard, starting from any theme.
-  - iOS draws the strip below the keys (🌐 and the microphone) light or dark with the phone, and a keyboard can't paint it. So there is a second theme for dark mode, by default the same as the first.
+  - A theme can carry a dark version, edited in Light and Dark tabs, like Yandex Keyboard (user, 2026-10-27, after trying v0.5.0). iOS draws the strip below the keys (🌐 and the microphone) light or dark with the phone, and a keyboard can't paint it, so a dark look for dark mode matches it. Automatic is one such theme. This replaced v0.5.0's separate "In dark mode" setting. (`docs/plans/2026-10-27-themes-dark-versions.md`)
+  - A colour background can round its top corners with the curve of iOS's bar above the keyboard (continuous, 26.4 pt, measured; on by default), and fade in over the band above the keys so the bar melts into it (off by default). (user asked for both switches; defaults Claude's call)
   - Pressed keys always show, and keep their labels readable, whatever colours a user picks.
 
 ## 5. Typing behaviour (user approved)
@@ -242,8 +243,8 @@ There are no `UIButton`s and no gesture recognizers on keys, because both add de
 
 ### Settings
 
-- **Settings:** theme and dark-mode theme, haptics, sound, key popup, double-space full stop, long-press delay, currency, a .com key in web addresses, and switching to Apple's keyboard in one-time code fields.
-- **Themes' storage:** the picked ids in the settings; custom themes as JSON under `kittykeys.customThemes` in the same App Group. A bad saved theme is dropped, and an id that names nothing falls back to Automatic.
+- **Settings:** theme, haptics, sound, key popup, double-space full stop, long-press delay, currency, a .com key in web addresses, and switching to Apple's keyboard in one-time code fields.
+- **Themes' storage:** the picked theme's id in the settings; custom themes as JSON under `kittykeys.customThemes` in the same App Group, each with its light look and optional dark look. A bad saved theme is dropped, and an id that names nothing falls back to Automatic.
 - **Storage:** an App Group's shared defaults, written by the app and read by the keyboard.
 - **Risk:** it's unconfirmed whether a free Apple ID can use App Groups with a keyboard extension. Verify on the device in M1. If it doesn't work, settings move into the keyboard itself, as a gear in the suggestion row when it's empty. Until then, the defaults in this document apply.
 

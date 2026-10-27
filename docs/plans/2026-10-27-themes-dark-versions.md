@@ -143,3 +143,7 @@ layer), `Keyboard/KeyboardViewController.swift`, `App/KeyboardPreviewView.swift`
 ## Progress
 
 - 2026-10-27: design agreed in chat with mockups; plan written.
+- 2026-10-27: Tasks 1–4 built on branch `themes-dark` (338 tests). Checked on the iOS 26.4 simulator: screenshots of
+  rounded presets, Rose with the fade (light and dark), Neon's emoji panel, Automatic unchanged; the editor through a
+  UI test (dark version on, Start from Neon, Light tab with the fade, split card in the gallery); the real keyboard
+  switching between the light look (Rose, rounded and faded) and the dark look (Neon) with the phone's appearance.
