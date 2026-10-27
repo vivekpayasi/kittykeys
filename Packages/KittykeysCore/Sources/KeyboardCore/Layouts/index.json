@@ -1,5 +1,6 @@
 {
   "letters": "latin-qwerty",
   "pages": ["latin-qwerty", "symbols-1", "symbols-2"],
-  "globeKey": {"label": "🌐", "action": "globe"}
+  "globeKey": {"label": "🌐", "action": "globe"},
+  "currencies": ["$", "€", "£", "¥", "₹", "₩", "₽", "₺", "₦", "฿", "₱", "₫", "₪", "₴"]
 }

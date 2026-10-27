@@ -11,7 +11,7 @@
     {
       "kind": "keys",
       "keys": [
-        {"label": "@"}, {"label": "#"}, {"label": "₹"}, {"label": "$"}, {"label": "_"},
+        {"label": "@"}, {"label": "#"}, {"label": "{currency1}"}, {"label": "{currency2}"}, {"label": "_"},
         {"label": "&"}, {"label": "-"}, {"label": "+"}, {"label": "("}, {"label": ")"}
       ]
     },

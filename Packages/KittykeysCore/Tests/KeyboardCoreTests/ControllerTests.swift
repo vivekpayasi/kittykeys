@@ -20,6 +20,8 @@ import KeyboardCore
         doc = FakeTextDocument(text, cursor: cursor)
         controller = KeyboardController(document: doc, layouts: try LayoutSet.bundled(), settings: settings, feedback: feedback)
         controller.setWidth(390)
+        // "d" offers the currencies in an Indian region's order, whatever the Mac running the tests is set to.
+        controller.regionCurrency = "₹"
         controller.fieldDidChange(FieldTraits(autoCap: autoCap))
         controller.onChange = { [unowned self] in self.changes += 1 }
     }
@@ -156,7 +158,9 @@ import KeyboardCore
     }
 
     @Test func shiftLeavesLongerOutputsAsWritten() throws {
-        let k = try Harness()
+        var settings = KeyboardSettings()
+        settings.showDotComKey = true
+        let k = try Harness(settings: settings)
         k.controller.fieldDidChange(FieldTraits(kind: .url, autoCap: .none))
         try k.tap("⇧")
         try k.tap("⇧")
@@ -227,7 +231,7 @@ import KeyboardCore
         let p = try k.down("d")
         k.wait(0.4)
         let popup = try #require(k.controller.state.alternates)
-        #expect(popup.keyID == d.id && popup.options == ["₹", "$", "€"] && popup.selected == 0 && popup.originX == 100.5)
+        #expect(popup.keyID == d.id && popup.options == ["₹", "$", "€", "£", "¥"] && popup.selected == 0 && popup.originX == 100.5)
         k.up(at: p)
         #expect(k.doc.text == "₹" && k.controller.state.shift == .off && k.controller.state.alternates == nil)
     }
@@ -265,7 +269,7 @@ import KeyboardCore
         k.wait(0.4)
         #expect(k.controller.state.alternates == nil)
         k.wait(0.1)
-        #expect(k.controller.state.alternates?.options == ["₹", "$", "€"])
+        #expect(k.controller.state.alternates?.options == ["₹", "$", "€", "£", "¥"])
     }
 
     @Test func popupStaysWhileItsFingerChooses() throws {
@@ -342,7 +346,7 @@ import KeyboardCore
         k.controller.fieldDidChange(FieldTraits(kind: .email))
         #expect(labels().contains("@"))
         k.controller.fieldDidChange(FieldTraits(kind: .url))
-        #expect(labels().contains("/") && labels().contains(".com"))
+        #expect(labels().contains("/") && !labels().contains(".com"))
         k.controller.fieldDidChange(FieldTraits(kind: .number))
         #expect(k.controller.state.pageID == "symbols-1")
         k.controller.fieldDidChange(FieldTraits(returnKey: .send))

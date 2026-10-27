@@ -1,3 +1,5 @@
+import Foundation
+
 /// The keyboard's brain, free of UIKit. It runs the host's raw touches through a `TouchProcessor`, applies the events
 /// to a `TextDocument`, and keeps the `state` and `frames` the keyboard view draws.
 ///
@@ -25,7 +27,20 @@
             processor.timing.longPress = settings.longPressDelay
             notifying {
                 if !settings.keyPopup { state.previewKeyID = nil }
+                if settings.showDotComKey != oldValue.showDotComKey, let traits {
+                    adopt(traits)
+                } else if settings.currency != oldValue.currency {
+                    layOutKeys()
+                }
             }
+        }
+    }
+
+    /// The currency of the user's region, such as "₹", which comes first unless `settings.currency` picks one.
+    public var regionCurrency: String? = Locale.current.currencySymbol {
+        didSet {
+            guard regionCurrency != oldValue else { return }
+            notifying { layOutKeys() }
         }
     }
 
@@ -463,7 +478,7 @@
         state.returnKey = traits.returnKey
         let variant: BottomVariant = switch traits.kind {
         case .email: .email
-        case .url: .url
+        case .url: settings.showDotComKey ? .urlWithDotCom : .url
         case .text, .number: .standard
         }
         let page = traits.kind == .number ? Self.numberPageID : layouts.lettersPageID
@@ -489,9 +504,11 @@
     /// Rebuilds `frames` for the current page, bottom row and width, and hands them to the touch processor.
     /// Search's frames leave out the number row. Highlights, the preview and the popup go with the old frames, whose ids
     /// may now mean other keys.
+    /// Lays out the current page, with its currency placeholders filled in (`CurrencyOrder`).
     private func layOutKeys() {
         framesAreForSearch = state.panel == .emojiSearch
-        if let page = layouts.page(state.pageID) {
+        let currencies = CurrencyOrder.ordered(choice: settings.currency, region: regionCurrency, all: layouts.currencies)
+        if let page = layouts.page(state.pageID, currencies: currencies) {
             frames = KeyboardGeometry.frames(
                 page: page, bottom: bottomRow(of: page), width: width, metrics: metrics,
                 includingNumberRows: !framesAreForSearch)

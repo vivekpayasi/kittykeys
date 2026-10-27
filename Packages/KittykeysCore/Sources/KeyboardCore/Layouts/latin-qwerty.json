@@ -28,7 +28,7 @@
       "keys": [
         {"label": "a", "longPress": ["@"]},
         {"label": "s", "longPress": ["#"]},
-        {"label": "d", "longPress": ["₹", "$", "€"]},
+        {"label": "d", "longPress": ["{currencies}"]},
         {"label": "f", "longPress": ["_"]},
         {"label": "g", "longPress": ["&"]},
         {"label": "h", "longPress": ["-"]},
@@ -66,7 +66,7 @@
       {"label": "😊", "action": "emoji", "icon": "face.smiling"},
       {"label": "@"},
       {"label": "space", "output": " ", "action": "space", "width": 0},
-      {"label": ".", "longPress": [".", "?", "!", "…", ":", "/"]},
+      {"label": ".", "longPress": [".com", ".in", ".co.in", ".org", ".net"]},
       {"label": "return", "output": "\n", "action": "return", "width": 2}
     ],
     "url": [
@@ -74,8 +74,16 @@
       {"label": "😊", "action": "emoji", "icon": "face.smiling"},
       {"label": "/"},
       {"label": "space", "output": " ", "action": "space", "width": 0},
+      {"label": ".", "longPress": [".com", ".in", ".co.in", ".org", ".net"]},
+      {"label": "return", "output": "\n", "action": "return", "width": 2}
+    ],
+    "url-com": [
+      {"label": "123", "action": "page:symbols-1", "width": 1.5},
+      {"label": "😊", "action": "emoji", "icon": "face.smiling"},
+      {"label": "/"},
+      {"label": "space", "output": " ", "action": "space", "width": 0},
       {"label": ".com", "width": 1.5},
-      {"label": ".", "longPress": [".", "?", "!", "…", ":", "/"]},
+      {"label": ".", "longPress": [".com", ".in", ".co.in", ".org", ".net"]},
       {"label": "return", "output": "\n", "action": "return", "width": 2}
     ]
   }

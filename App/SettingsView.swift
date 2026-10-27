@@ -6,6 +6,10 @@ import SwiftUI
 struct SettingsView: View {
     let store: SettingsStore?
     @State private var settings = KeyboardSettings()
+    /// The currencies the layouts offer, for the Currency picker. Empty if the layouts can't load.
+    private let currencies = (try? LayoutSet.bundled().currencies) ?? []
+    /// The region's currency, as the keyboard picks it when the setting is Automatic.
+    private let regionCurrency = Locale.current.currencySymbol
 
     var body: some View {
         NavigationStack {
@@ -35,6 +39,18 @@ struct SettingsView: View {
                 }
                 .disabled(store == nil)
                 Section {
+                    Picker("Currency", selection: saving(\.currency)) {
+                        Text("Automatic (\(automaticCurrency))").tag("")
+                        ForEach(currencies, id: \.self) { Text($0).tag($0) }
+                    }
+                    Toggle("Show a .com key in web addresses", isOn: saving(\.showDotComKey))
+                } footer: {
+                    Text(
+                        "Your currency comes first when you hold d, and on the 123 page. In web addresses, hold . for .com and other endings; the .com key makes the space bar narrower."
+                    )
+                }
+                .disabled(store == nil)
+                Section {
                     Toggle("Switch to Apple's keyboard for codes", isOn: saving(\.handOffCodeFields))
                 } footer: {
                     Text(
@@ -51,6 +67,11 @@ struct SettingsView: View {
         .onAppear {
             if let store { settings = store.load() }
         }
+    }
+
+    /// The currency Automatic gives, as `CurrencyOrder` picks it.
+    private var automaticCurrency: String {
+        CurrencyOrder.ordered(choice: "", region: regionCurrency, all: currencies).first ?? "?"
     }
 
     /// The app's version and build, such as "0.2.0 (2)".
