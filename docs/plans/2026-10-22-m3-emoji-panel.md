@@ -440,4 +440,5 @@ public struct EmojiSearch {
   - release.sh puts the version back if it stops before its commit, and pushes the branch and the tag together.
   A re-review approved the fixes. 311 tests pass.
 - 2026-10-26: published as the public repo `vivekpayasi/kittykeys`. Before the first push, the history was rewritten with the author email iamvivek7411@gmail.com, and the commit ids above were updated to match. Release v0.2.0 (build 2) is cut from this branch with `scripts/release.sh`. The SideStore source (`releases/latest/download/source.json`), the IPA (byte-identical to the local build) and the icon all download. The user adds the source in SideStore to get updates.
+- 2026-10-27: the README gained the app icon and three keyboard screenshots from `scripts/sim-screenshots.sh` (cropped to the keyboard). `m3-emoji-panel` was merged into `main` before Task 5's device check: the code is public and released as v0.2.0, and `main` is the repo's front page. Task 5 continues on `main`.
 - Rulings live in the Rulings section above. The ledger, with every deferred minor, is local and gitignored: `.superpowers/sdd/2026-10-22-m3-emoji-panel/progress.md`.

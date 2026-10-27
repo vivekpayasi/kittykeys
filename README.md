@@ -1,7 +1,15 @@
+<img src="App/Assets.xcassets/AppIcon.appiconset/AppIcon.png" alt="" width="96" align="right">
+
 # kittykeys
 
 An open-source iPhone keyboard for English and Hinglish, laid out like SwiftKey. It never autocorrects, so Hinglish
 words stay exactly as you type them. Nothing you type leaves your phone.
+
+<p>
+  <img src="docs/assets/keyboard-symbols.png" alt="The letters with a number row and symbol hints, holding d for ₹ $ €" width="32%">
+  <img src="docs/assets/keyboard-emoji.png" alt="The emoji panel with Recent and the category tabs" width="32%">
+  <img src="docs/assets/keyboard-emoji-search.png" alt="Emoji search for lau, with 🤣 and 😂 first" width="32%">
+</p>
 
 kittykeys is early. It is tested on one iPhone, and it changes often.
 
