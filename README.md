@@ -19,6 +19,8 @@ kittykeys is early. It is tested on one iPhone, and it changes often.
 - Hold the space bar and slide to move the cursor
 - An emoji panel with Recent, categories, skin tones and search
 - Your currency first when you hold d, from your region or picked in Settings
+- Themes, like SwiftKey's: ten ready-made ones, including black with neon green, or your own colours, key style
+  (filled, outlined or no borders), shadow and font; a separate theme for dark mode if you like
 - In web addresses a full-width space bar; hold . for .com, .in and other endings
 - Your Text Replacement shortcuts from iOS Settings, such as "omw" for "On my way!"; ⌫ right after puts the shortcut
   back
