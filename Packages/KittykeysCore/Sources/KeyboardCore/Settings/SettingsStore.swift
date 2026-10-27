@@ -6,6 +6,8 @@ import Foundation
 public struct SettingsStore {
     private static let settingsKey = "catkeys.settings"
     private static let keyboardOpenedAtKey = "catkeys.keyboardOpenedAt"
+    // Keys from before the rename keep "catkeys." so saved data carries over; new keys use "kittykeys.".
+    private static let triedFeaturesKey = "kittykeys.triedFeatures"
 
     private let defaults: UserDefaults
 
@@ -48,5 +50,24 @@ public struct SettingsStore {
     public var lastKeyboardOpen: Date? {
         get { defaults.object(forKey: Self.keyboardOpenedAtKey) as? Date }
         nonmutating set { defaults.set(newValue, forKey: Self.keyboardOpenedAtKey) }
+    }
+
+    /// The things to try that the user has done: the keyboard records them and the app's Try it tab ticks them.
+    /// Entries that aren't a `TryFeature` read as not tried.
+    public var triedFeatures: Set<TryFeature> {
+        let saved = (defaults.array(forKey: Self.triedFeaturesKey) ?? []).compactMap { $0 as? String }
+        return Set(saved.compactMap(TryFeature.init(rawValue:)))
+    }
+
+    /// Records that the user has done `feature`. Writes only when it's new.
+    public func markTried(_ feature: TryFeature) {
+        var tried = triedFeatures
+        guard tried.insert(feature).inserted else { return }
+        defaults.set(tried.map(\.rawValue).sorted(), forKey: Self.triedFeaturesKey)
+    }
+
+    /// Forgets every thing tried, so the Try it list starts over.
+    public func resetTried() {
+        defaults.removeObject(forKey: Self.triedFeaturesKey)
     }
 }

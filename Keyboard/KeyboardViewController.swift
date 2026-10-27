@@ -32,6 +32,8 @@ final class KeyboardViewController: UIInputViewController {
     private var startupInterval: OSSignpostIntervalState?
     /// From `viewDidAppear` to `viewWillDisappear`: the keyboard only switches away while it shows.
     private var isShowing = false
+    /// The things to try already recorded in the shared settings, read as the keyboard appears, so each is written once.
+    private var triedFeatures: Set<TryFeature> = []
 
     /// iOS creates a view controller each time the keyboard appears, and keeps the old input view alive after
     /// its controller goes (seen on the iOS 26.4 simulator). Taking the keys out of it frees them, their layers
@@ -70,6 +72,7 @@ final class KeyboardViewController: UIInputViewController {
             document: document, layouts: layouts, settings: settingsStore?.load() ?? KeyboardSettings(),
             feedback: feedback)
         controller.onGlobe = { [weak self] in self?.advanceToNextInputMode() }
+        controller.onFeatureUsed = { [weak self] feature in self?.recordTried(feature) }
         // Recent and the skin tones live in the extension's own defaults, which need no Full Access.
         let keyboardView = KeyboardView(
             controller: controller, feedback: feedback, emojiPreferences: EmojiPreferences(defaults: .standard))
@@ -135,6 +138,7 @@ final class KeyboardViewController: UIInputViewController {
         if let settingsStore {
             controller.settings = settingsStore.load()
             settingsStore.lastKeyboardOpen = Date()
+            triedFeatures = settingsStore.triedFeatures
         }
         feedback.configure(settings: controller.settings, hasFullAccess: hasFullAccess)
         controller.keyboardWillAppear(document.traits)
@@ -202,6 +206,13 @@ final class KeyboardViewController: UIInputViewController {
                 Self.logger.notice("Text replacements: \(pairs.count, privacy: .public) lexicon entries")
             }
         }
+    }
+
+    /// Records a thing to try, for the app's Try it tab to tick. Each is written once, on the next turn so the keystroke
+    /// that did it isn't held up; without Full Access the shared settings can't be written, and nothing is.
+    private func recordTried(_ feature: TryFeature) {
+        guard let settingsStore, triedFeatures.insert(feature).inserted else { return }
+        DispatchQueue.main.async { settingsStore.markTried(feature) }
     }
 
     /// Dark for a field that asks for a dark keyboard, and in dark mode.

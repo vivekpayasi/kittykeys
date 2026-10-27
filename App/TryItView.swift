@@ -1,6 +1,8 @@
+import KeyboardCore
 import SwiftUI
 
-/// A field to try the keyboard in, as each kind of field an app can ask for: the keys change with it.
+/// A field to try the keyboard in, as each kind of field an app can ask for: the keys change with it. Below it, things
+/// to try, each ticked once the keyboard reports it done.
 struct TryItView: View {
     /// The kinds of field to try.
     enum FieldType: String, CaseIterable, Identifiable {
@@ -18,9 +20,14 @@ struct TryItView: View {
         }
     }
 
+    /// The shared settings, where the keyboard records the things tried. nil without the App Group.
+    let store: SettingsStore?
     @State private var text = ""
     @State private var fieldType = FieldType.text
     @FocusState private var isFocused: Bool
+    @State private var tried: Set<TryFeature> = []
+    /// Whether the list shows after everything is tried, when it folds away.
+    @State private var showsFinishedList = false
 
     var body: some View {
         NavigationStack {
@@ -37,6 +44,7 @@ struct TryItView: View {
                 } footer: {
                     Text("The kittykeys keyboard must be picked with 🌐: touch and hold 🌐, then choose kittykeys.")
                 }
+                thingsToTry
             }
             // The keyboard covers the tab bar; dragging the form down puts it away.
             .scrollDismissesKeyboard(.interactively)
@@ -47,6 +55,13 @@ struct TryItView: View {
         // A `-kittykeysFocus` launch argument focuses the field, for UI tests on the simulator.
         .onAppear {
             if ProcessInfo.processInfo.arguments.contains("-kittykeysFocus") { isFocused = true }
+        }
+        // The keyboard writes from its own process, so the ticks are read again each second while the tab shows.
+        .task {
+            while !Task.isCancelled {
+                tried = store?.triedFeatures ?? []
+                try? await Task.sleep(for: .seconds(1))
+            }
         }
     }
 
@@ -62,5 +77,62 @@ struct TryItView: View {
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
         }
+    }
+
+    /// The things to try, ticked as they're done. Once all are, the list folds into one line that can open it again.
+    @ViewBuilder private var thingsToTry: some View {
+        let allTried = tried.isSuperset(of: TryFeature.allCases)
+        Section {
+            if allTried && !showsFinishedList {
+                Label("You've tried them all", systemImage: "checkmark.circle.fill")
+                    .foregroundStyle(.green)
+                Button("Show the list") { showsFinishedList = true }
+            } else {
+                ForEach(TryFeature.allCases, id: \.self) { feature in
+                    ThingToTry(text: Self.text(for: feature), done: tried.contains(feature))
+                }
+                if !tried.isEmpty {
+                    Button("Start over") {
+                        // The keyboard reloads what's tried when it next appears, so it goes away first.
+                        isFocused = false
+                        store?.resetTried()
+                        tried = []
+                        showsFinishedList = false
+                    }
+                }
+            }
+        } header: {
+            Text("Things to try")
+        } footer: {
+            Text(store == nil
+                ? "\(appGroupUnavailableMessage), so nothing can be ticked."
+                : "Each gets its tick when you do it with kittykeys, which needs Full Access. kittykeys notes only that you did it, never what you typed.")
+        }
+    }
+
+    private static func text(for feature: TryFeature) -> LocalizedStringKey {
+        switch feature {
+        case .cursorMove: "Hold the **space bar**, then slide to move the cursor"
+        case .longPressSymbol: "Hold a key for the symbol in its corner, like **a** for **@**"
+        case .wordDelete: "Slide left from **⌫** to delete a whole word"
+        case .textReplacement: "Type **omw** or another of your text replacements, then space; **⌫** right after undoes it"
+        case .emojiSearch: "Tap **😊**, search for an emoji, and tap it"
+        }
+    }
+}
+
+/// One thing to try, with a green tick once it's done.
+private struct ThingToTry: View {
+    let text: LocalizedStringKey
+    let done: Bool
+
+    var body: some View {
+        Label {
+            Text(text)
+        } icon: {
+            Image(systemName: done ? "checkmark.circle.fill" : "circle")
+                .foregroundStyle(done ? AnyShapeStyle(.green) : AnyShapeStyle(.secondary))
+        }
+        .accessibilityValue(done ? "Done" : "")
     }
 }
