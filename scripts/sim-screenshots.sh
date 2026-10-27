@@ -73,7 +73,8 @@ for appearance in light dark; do
     xcrun simctl terminate "$UDID" "$BUNDLE_ID" >/dev/null 2>&1 || true
     # $arguments is split into separate launch arguments on purpose.
     # shellcheck disable=SC2086
-    xcrun simctl launch "$UDID" "$BUNDLE_ID" $arguments >/dev/null
+    # India's region whatever the simulator's, so "d" offers ₹ first in every screenshot.
+    xcrun simctl launch "$UDID" "$BUNDLE_ID" -AppleLocale en_IN $arguments >/dev/null
     sleep "$SETTLE"
     # simctl chats on stderr even when it works; show what it said only when it fails.
     if ! output=$(xcrun simctl io "$UDID" screenshot "$OUT/$name-$appearance.png" 2>&1); then
