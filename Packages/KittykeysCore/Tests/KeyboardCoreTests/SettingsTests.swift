@@ -175,7 +175,7 @@ final class SettingsTests {
         let added = store.addCustomTheme(copying: Themes.presets[3])
         #expect(added.id.hasPrefix(Themes.customIDPrefix))
         #expect(added.name == "My theme")
-        #expect(added.key == Themes.presets[3].key)
+        #expect(added.light == Themes.presets[3].light)
         #expect(store.customThemes == [first, added])
     }
 
