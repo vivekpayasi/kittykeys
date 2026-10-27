@@ -15,10 +15,9 @@ public struct KeyboardSettings: Codable, Equatable, Sendable {
     public var showDotComKey = false
     /// The currency "d" and the 123 page offer first, such as "₹"; empty for the region's (`CurrencyOrder`).
     public var currency = ""
-    /// The theme the keyboard shows (`Themes`): a ready-made theme's id or a custom theme's.
+    /// The theme the keyboard shows (`Themes`): a ready-made theme's id or a custom theme's. A theme carries its own
+    /// look for dark mode; version 0.5.0's separate `darkThemeID` is ignored.
     public var themeID = Themes.automaticID
-    /// The theme in dark mode; empty for the same as `themeID`.
-    public var darkThemeID = ""
 
     public init() {}
 }
@@ -26,7 +25,7 @@ public struct KeyboardSettings: Codable, Equatable, Sendable {
 extension KeyboardSettings {
     private enum CodingKeys: String, CodingKey {
         case haptics, sound, keyPopup, doubleSpacePeriod, longPressDelay, handOffCodeFields, showDotComKey, currency,
-            themeID, darkThemeID
+            themeID
     }
 
     /// A missing or wrong-typed field takes its default, so settings saved before a field existed still load
@@ -44,7 +43,6 @@ extension KeyboardSettings {
         showDotComKey = (try? container.decodeIfPresent(Bool.self, forKey: .showDotComKey)) ?? showDotComKey
         currency = (try? container.decodeIfPresent(String.self, forKey: .currency)) ?? currency
         themeID = (try? container.decodeIfPresent(String.self, forKey: .themeID)) ?? themeID
-        darkThemeID = (try? container.decodeIfPresent(String.self, forKey: .darkThemeID)) ?? darkThemeID
     }
 
     /// `delay` clamped to `longPressDelayRange`; NaN or infinity gives the default.

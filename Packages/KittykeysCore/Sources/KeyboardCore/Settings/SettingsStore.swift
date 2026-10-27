@@ -96,14 +96,12 @@ public struct SettingsStore {
         return theme
     }
 
-    /// Deletes the custom theme `id`. A slot that picked it goes back to its default: Automatic, or the same as Theme
-    /// in dark mode.
+    /// Deletes the custom theme `id`. If it was the theme picked, Automatic is picked instead.
     public func removeCustomTheme(id: String) {
         saveCustomThemes(customThemes.filter { $0.id != id })
         var settings = load()
-        guard settings.themeID == id || settings.darkThemeID == id else { return }
-        if settings.themeID == id { settings.themeID = Themes.automaticID }
-        if settings.darkThemeID == id { settings.darkThemeID = "" }
+        guard settings.themeID == id else { return }
+        settings.themeID = Themes.automaticID
         save(settings)
     }
 }
