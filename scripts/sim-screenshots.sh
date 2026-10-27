@@ -38,12 +38,6 @@ SCENES=(
   "app-setup|-kittykeysTab setup"
   "app-settings|-kittykeysTab settings"
   "app-tryit|-kittykeysTab tryit"
-  # The typing test before a run, mid-run, its summary over invented sample history, and the summary offering to
-  # relabel a run as kittykeys (all but the first need a debug build).
-  "app-typingtest|-kittykeysTab typingtest"
-  "app-typingtest-run|-kittykeysTab typingtest -kittykeysTypingTestScene run"
-  "app-typingtest-summary|-kittykeysTab typingtest -kittykeysTypingTestScene summary"
-  "app-typingtest-relabel|-kittykeysTab typingtest -kittykeysTypingTestScene relabel"
 )
 
 xcodegen generate

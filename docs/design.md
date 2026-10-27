@@ -213,7 +213,7 @@ Items 2 and 3 stay only if they measurably improve accuracy.
 
 | Target | What it is | UI tech |
 |---|---|---|
-| `Kittykeys` | Container app: setup steps, settings, test fields (text and one-time code), a typing test | SwiftUI (planning) |
+| `Kittykeys` | Container app: setup steps, settings, a field to try the keyboard in | SwiftUI (planning) |
 | `KittykeysKeyboard` | Keyboard extension (`UIInputViewController`) | UIKit with raw touch handling (planning) |
 | `KeyboardCore` | Local Swift package with all logic that doesn't need UIKit | none |
 

@@ -22,7 +22,6 @@ kittykeys is early. It is tested on one iPhone, and it changes often.
   back
 - In a one-time code field it switches to the next keyboard, so Apple's keyboard (list it right after kittykeys) can
   offer the code from Messages; iOS gives SMS codes to no other keyboard
-- A typing test in the app, to compare it with other keyboards
 
 Coming later: next-word and emoji suggestions from the anantara prediction engine (not public yet), and glide typing.
 
