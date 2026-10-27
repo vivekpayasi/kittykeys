@@ -22,13 +22,13 @@ struct ContentView: View {
         } else {
             TabView(selection: $selectedTab) {
                 Tab("Setup", systemImage: "list.number", value: AppTab.setup) {
-                    SetupView(store: settingsStore)
+                    SetupView(store: settingsStore) { selectedTab = .tryIt }
                 }
                 Tab("Settings", systemImage: "gearshape", value: AppTab.settings) {
                     SettingsView(store: settingsStore)
                 }
                 Tab("Try it", systemImage: "keyboard", value: AppTab.tryIt) {
-                    TryItView()
+                    TryItView(store: settingsStore)
                 }
             }
         }

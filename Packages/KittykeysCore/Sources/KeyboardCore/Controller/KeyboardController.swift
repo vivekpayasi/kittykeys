@@ -63,6 +63,9 @@ import Foundation
 
     /// Called when the globe key is typed: the host switches to the next keyboard.
     public var onGlobe: (() -> Void)?
+    /// Called when the user does one of the things the app's Try it tab suggests. It can come again for the same
+    /// thing; the host keeps the first.
+    public var onFeatureUsed: ((TryFeature) -> Void)?
     /// Called once after each call that changed `state` or `frames`, for the view to redraw.
     public var onChange: (() -> Void)?
     public private(set) var state: KeyboardState
@@ -237,6 +240,7 @@ import Foundation
     /// From search too, it goes into the document, and search stays as it is.
     public func insertEmoji(_ emoji: String) {
         notifying { typeText(emoji) }
+        if state.panel == .emojiSearch { onFeatureUsed?(.emojiSearch) }
     }
 
     /// The panel's ⌫: deletes one grapheme, so one whole emoji, flags, skin tones and joined sequences included,
@@ -395,6 +399,7 @@ import Foundation
             appendToQuery(text)
         case .activateAlternate(_, let text):
             typeCharacters(text)
+            onFeatureUsed?(.longPressSymbol)
         case .deleteBackward(let word) where searching:
             deleteFromQuery(word: word)
         case .deleteBackward(let word):
@@ -403,7 +408,9 @@ import Foundation
         case .deleteRestOfWord where searching:
             state.searchQuery.removeLast(TextRules.trailingRunLength(before: state.searchQuery))
         case .deleteRestOfWord:
-            delete(TextRules.trailingRunLength(before: document.textBefore))
+            let count = TextRules.trailingRunLength(before: document.textBefore)
+            delete(count)
+            if count > 0 { onFeatureUsed?(.wordDelete) }
         case .cursorModeBegan:
             state.cursorMode = true
             forgetPreviousKey()
@@ -595,6 +602,7 @@ import Foundation
         // Only when the word end landed: a field may ignore it, as a single-line field ignores a return that sends.
         let typed = replacement.phrase + text
         guard let after = document.textBefore, after.hasSuffix(typed) else { return }
+        onFeatureUsed?(.textReplacement)
         undoableReplacement = (
             shortcut: String(textBefore.suffix(replacement.length)), length: typed.count, textBefore: after)
     }
@@ -648,7 +656,10 @@ import Foundation
     }
 
     private func moveCursor(by offset: Int, ticks: Int) {
-        if offset != 0 { document.moveCursor(by: offset) }
+        if offset != 0 {
+            document.moveCursor(by: offset)
+            onFeatureUsed?(.cursorMove)
+        }
         for _ in 0..<ticks { feedback.cursorTick() }
     }
 

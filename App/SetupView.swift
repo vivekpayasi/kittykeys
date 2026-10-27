@@ -6,6 +6,8 @@ import UIKit
 /// whenever the app comes back, as from Settings.
 struct SetupView: View {
     let store: SettingsStore?
+    /// Goes to the Try it tab, which Setup suggests once both steps are done.
+    let onTryIt: () -> Void
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.openURL) private var openURL
     @State private var isKeyboardAdded = false
@@ -26,6 +28,11 @@ struct SetupView: View {
                     Text("Turn on kittykeys")
                 } footer: {
                     Text(stepsFooter)
+                }
+                if isKeyboardAdded && isFullAccessConfirmed {
+                    Section {
+                        Button("Next: try it out", systemImage: "arrow.right.circle", action: onTryIt)
+                    }
                 }
                 Section("Full Access") {
                     Text("Full Access lets kittykeys use haptics and read the settings you choose here. kittykeys never connects to the internet: nothing you type leaves your phone.")
