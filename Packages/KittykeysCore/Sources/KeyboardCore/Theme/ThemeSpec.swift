@@ -36,6 +36,8 @@ public enum KeyRole: Sendable {
 public struct ThemeSpec: Hashable, Sendable, Identifiable {
     /// Below this contrast a pressed key's fill can't be told from what is under it.
     private static let minimumPressContrast = 1.15
+    /// Below this contrast a pressed key's label can't be read on its fill.
+    private static let minimumPressedLabelContrast = 2.0
     /// Below this contrast the popups can't be told from the background.
     private static let minimumPopupContrast = 1.1
     /// Keys darker than this get popups a shade lighter, so they stand apart from the keys they cover.
@@ -133,14 +135,20 @@ public struct ThemeSpec: Hashable, Sendable, Identifiable {
 
     /// The fill a pressed key shows, as shift does while on. Filled keys swap to the other key colour; outlined and
     /// borderless keys fill with their own. A fill too close to what is under it is moved toward the label instead,
-    /// so a press always shows. A return key in the accent darkens or lightens toward its text.
+    /// so a press always shows, and one the label can't be read on moves halfway to the background. Space keeps its
+    /// faint label, as Apple's does. A return key in the accent moves away from its text colour.
     public func pressedFill(_ role: KeyRole) -> ThemeColor {
-        if accentsReturn(role) { return accent.mixed(with: onAccent, 0.25) }
+        if accentsReturn(role) { return accent.mixed(with: onAccent == .white ? .black : .white, 0.25) }
         let own = ownColour(role)
-        let fill = keyShape == .filled ? otherColour(role) : own
+        var fill = keyShape == .filled ? otherColour(role) : own
         let under = keyShape == .filled ? own : background
-        guard let under, fill.contrast(with: under) < Self.minimumPressContrast else { return fill }
-        return own.mixed(with: labelColor(role), 0.2)
+        if let under, fill.contrast(with: under) < Self.minimumPressContrast {
+            fill = own.mixed(with: labelColor(role), 0.2)
+        }
+        if role != .space, labelColor(role).contrast(with: fill) < Self.minimumPressedLabelContrast {
+            fill = fill.mixed(with: background ?? previewBackdrop, 0.5)
+        }
+        return fill
     }
 
     public func labelColor(_ role: KeyRole) -> ThemeColor {

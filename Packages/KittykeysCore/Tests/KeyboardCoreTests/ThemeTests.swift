@@ -86,6 +86,27 @@ struct ThemeTests {
         #expect(flat.pressedFill(.letter) == flat.key)
     }
 
+    @Test func pressedFillKeepsLabelReadable() {
+        // A user's theme whose function labels are close to their outline colour: shift while on fills with that
+        // colour, so the fill moves halfway to the background instead.
+        var spec = Themes.automaticLight
+        spec.keyShape = .outlined
+        spec.background = ThemeColor(rgb: 0x101820)
+        spec.specialKey = ThemeColor(rgb: 0xE94B3C)
+        spec.functionLabel = ThemeColor(rgb: 0xFF6F61)
+        let fill = spec.pressedFill(.function)
+        #expect(fill == spec.specialKey.mixed(with: ThemeColor(rgb: 0x101820), 0.5))
+        #expect(spec.functionLabel.contrast(with: fill) >= 2)
+
+        // Every ready-made theme already reads, so none of them changes. Space is left out: its label is the dim hint
+        // colour on purpose, and Apple's pressed space is as faint.
+        for preset in Themes.presets + [Themes.automaticDark] {
+            for role in [KeyRole.letter, .punctuation, .function, .returnKey] {
+                #expect(preset.labelColor(role).contrast(with: preset.pressedFill(role)) >= 2, "\(preset.id) \(role)")
+            }
+        }
+    }
+
     @Test func labelsByRole() {
         let neon = preset("neon")
         #expect(neon.labelColor(.function).hex == "#3DF58A")
@@ -99,7 +120,12 @@ struct ThemeTests {
         #expect(midnight.returnKeyAccent)
         #expect(midnight.restingFill(.returnKey) == midnight.accent)
         #expect(midnight.labelColor(.returnKey) == midnight.onAccent)
-        #expect(midnight.pressedFill(.returnKey) == midnight.accent.mixed(with: midnight.onAccent, 0.25))
+        // Pressed, it moves away from its text colour, so the text only gets easier to read.
+        #expect(midnight.onAccent == .white)
+        #expect(midnight.pressedFill(.returnKey) == midnight.accent.mixed(with: .black, 0.25))
+        var light = midnight
+        light.accent = ThemeColor(rgb: 0x3DF58A)
+        #expect(light.pressedFill(.returnKey) == light.accent.mixed(with: .white, 0.25))
         var outlined = midnight
         outlined.keyShape = .outlined
         #expect(outlined.restingFill(.returnKey) == midnight.accent)

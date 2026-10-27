@@ -279,7 +279,7 @@ final class KeyboardPreviewHost: UIView {
 }
 
 /// The preview has no haptics or sound; the keyboard extension has the real ones.
-@MainActor private final class SilentFeedback: FeedbackSink {
+@MainActor final class SilentFeedback: FeedbackSink {
     func keyDown() {}
     func cursorTick() {}
 }

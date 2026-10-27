@@ -54,6 +54,8 @@ SCENES=(
   "app-setup|-kittykeysTab setup"
   "app-settings|-kittykeysTab settings"
   "app-tryit|-kittykeysTab tryit"
+  "app-themes|-kittykeysTab settings -kittykeysSettingsPage themes"
+  "app-dark-themes|-kittykeysTab settings -kittykeysSettingsPage darkthemes"
 )
 
 xcodegen generate
