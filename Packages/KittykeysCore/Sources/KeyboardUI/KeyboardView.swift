@@ -39,9 +39,11 @@ public enum ReturnKeyLabel {
 /// - In `.emojiSearch` (ruling M3-R15) the keys show again without their number row, the field shows the query, and an
 ///   `EmojiSearchResultsView` fills the number row's band. It is made the first time search opens and kept, unless a
 ///   memory warning frees it, with the search keywords, while search is closed.
-/// - With a theme that has no background the view looks clear, so the system's keyboard backdrop shows around and
-///   between the keys (ruling R42). Its fill is then `UIColor.touchableClear`, not `.clear`, so taps between the keys
-///   still reach it (ruling M3-R8). A theme's background fills the view instead.
+/// - The view's own fill is `UIColor.touchableClear`, not `.clear`, so taps between the keys and in the rounded or
+///   faded parts of a background still reach it (ruling M3-R8). With a look that has no background the view looks
+///   clear, so the system's keyboard backdrop shows around and between the keys (ruling R42). A look's colour
+///   background is a layer under the keys that can round its top corners like iOS's bar above the keyboard and fade in
+///   over the band above the keys.
 @MainActor public final class KeyboardView: UIView {
     /// The label shift shows while caps lock is on. The layout file's label shows otherwise.
     private static let capsLockLabel = "⇪"
@@ -49,13 +51,14 @@ public enum ReturnKeyLabel {
     private static let numberFontSize: CGFloat = 19, characterFontSize: CGFloat = 21, wordFontSize: CGFloat = 15
     /// More fingers than a screen reports at once, so tracking touches never grows its set.
     private static let touchCapacity = 20
+    /// The fading background's opacity at even steps from the top of the view to the top of the keys: a smooth ramp.
+    private static let fadeOpacities: [CGFloat] = [0, 0.15, 0.5, 0.85, 1]
 
     /// Set by the host from the settings, the trait collection and the field's `keyboardAppearance`. Changing it
     /// redraws every key.
     public var theme: KeyboardTheme = .light {
         didSet {
             guard theme != oldValue else { return }
-            backgroundColor = Self.fill(for: theme)
             emojiPanel?.theme = theme
             searchField?.theme = theme
             searchResults?.theme = theme
@@ -102,6 +105,8 @@ public enum ReturnKeyLabel {
     private var shownPanel = KeyboardPanel.keys
     /// Whether this view has asked for the emoji font warm-up, which it does once, after its keys are first drawn.
     private var hasScheduledFontWarmup = false
+    /// The look's colour background, under everything else; hidden for the system's backdrop.
+    private let backgroundLayer = CAGradientLayer()
     private let keysLayer = CALayer()
     private let previewLayer = KeyPreviewLayer()
     private let alternatesLayer = AlternatesLayer()
@@ -137,7 +142,13 @@ public enum ReturnKeyLabel {
         super.init(frame: .zero)
         isMultipleTouchEnabled = true
         liveTouchIDs.reserveCapacity(Self.touchCapacity)
-        backgroundColor = Self.fill(for: theme)
+        // Not `.clear`: iOS drops touches on fully transparent parts of a keyboard extension, which would lose taps in
+        // the gaps between keys (ruling R9 sends them to the nearest key) and in the suggestion row (ruling M3-R8).
+        backgroundColor = .touchableClear
+        backgroundLayer.isHidden = true
+        backgroundLayer.cornerCurve = .continuous
+        backgroundLayer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
+        layer.addSublayer(backgroundLayer)
         layer.addSublayer(keysLayer)
         layer.addSublayer(previewLayer)
         layer.addSublayer(alternatesLayer)
@@ -165,6 +176,7 @@ public enum ReturnKeyLabel {
         // such as before this view existed, still need drawing.
         if controller.frames != builtFrames { render() }
         layOutEmojiViews()
+        updateBackground()
     }
 
     public override func didMoveToWindow() {
@@ -216,18 +228,41 @@ public enum ReturnKeyLabel {
         }
     }
 
-    /// The theme's background, else a clear-looking fill. Not `.clear`: iOS drops touches on fully transparent parts
-    /// of a keyboard extension, which would lose taps in the gaps between keys (ruling R9 sends them to the nearest key)
-    /// and in the suggestion row (ruling M3-R8).
-    private static func fill(for theme: KeyboardTheme) -> UIColor {
-        theme.background ?? .touchableClear
-    }
-
     /// Throws away every key layer and icon and draws again, for a new theme or screen scale.
     private func rebuild() {
         iconCache.removeAll()
         builtFrames = nil
         render()
+        updateBackground()
+    }
+
+    /// Fills the background layer with the look's colour, with its top corners rounded at iOS's bar's radius and the
+    /// band above the keys fading in, as the look asks. A plain fill rounds without masking; a fade needs the mask.
+    private func updateBackground() {
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        defer { CATransaction.commit() }
+        guard let colour = theme.background, hasArea(bounds.size) else {
+            backgroundLayer.isHidden = true
+            return
+        }
+        let style = theme.style
+        backgroundLayer.isHidden = false
+        backgroundLayer.frame = bounds
+        let radius = style.roundsTopCorners ? fittedCornerRadius(CGFloat(Themes.topCornerRadius), for: bounds.size) : 0
+        backgroundLayer.cornerRadius = radius
+        let fadeEnd = min(CGFloat(controller.metrics.suggestionRowHeight), bounds.height)
+        if style.fadesTopEdge, fadeEnd > 0 {
+            let steps = Self.fadeOpacities.count - 1
+            backgroundLayer.backgroundColor = nil
+            backgroundLayer.colors = Self.fadeOpacities.map { colour.withAlphaComponent($0).cgColor }
+            backgroundLayer.locations = (0...steps).map { NSNumber(value: Double(fadeEnd / bounds.height) * Double($0) / Double(steps)) }
+            backgroundLayer.masksToBounds = radius > 0
+        } else {
+            backgroundLayer.colors = nil
+            backgroundLayer.backgroundColor = colour.cgColor
+            backgroundLayer.masksToBounds = false
+        }
     }
 
     private func buildKeys() {
@@ -482,6 +517,7 @@ public enum ReturnKeyLabel {
         for view in [searchField, searchResults, emojiPanel] {
             if let view { bringSubviewToFront(view) }
         }
+        layer.insertSublayer(backgroundLayer, at: 0)
         layer.addSublayer(previewLayer)
         layer.addSublayer(alternatesLayer)
     }

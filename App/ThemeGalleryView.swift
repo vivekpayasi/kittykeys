@@ -1,23 +1,16 @@
 import KeyboardCore
 import SwiftUI
 
-/// Which theme a gallery picks: the keyboard's, or the one it shows in dark mode.
-enum ThemeSlot: Hashable {
-    case main, dark
-}
-
-/// The themes as cards: the ready-made ones, then the user's own and a New theme card. Tapping a card picks it for
-/// the slot and saves at once; the keyboard reads it the next time it appears. New, Customise and Duplicate make a
-/// custom theme, pick it and open the editor.
+/// The themes as cards: the ready-made ones, then the user's own and a New theme card. Tapping a card picks it and
+/// saves at once; the keyboard reads it the next time it appears. New, Customise and Duplicate make a custom theme,
+/// pick it and open the editor. A theme with a dark look shows both, light on the left.
 struct ThemeGalleryView: View {
     let store: SettingsStore?
-    let slot: ThemeSlot
     @State private var settings = KeyboardSettings()
     @State private var custom: [ThemeSpec] = []
     /// The custom theme the editor shows.
     @State private var editing: ThemeSpec?
     @State private var deleting: ThemeSpec?
-    @Environment(\.colorScheme) private var colorScheme
 
     private let columns = [GridItem(.adaptive(minimum: 150), spacing: 16)]
 
@@ -29,17 +22,12 @@ struct ThemeGalleryView: View {
                         .foregroundStyle(.secondary)
                 }
                 LazyVGrid(columns: columns, spacing: 16) {
-                    if slot == .dark {
-                        Button { pick("") } label: {
-                            ThemeCard(spec: sameAsThemeSpec, title: "Same as Theme", isPicked: pickedID == "")
-                        }
-                    }
                     ForEach(Themes.presets) { spec in
                         Button { pick(spec.id) } label: {
-                            ThemeCard(spec: shown(spec), title: spec.name, isPicked: pickedID == spec.id)
+                            ThemeCard(spec: spec, title: spec.name, isPicked: settings.themeID == spec.id)
                         }
                         .contextMenu {
-                            Button("Customise", systemImage: "paintbrush") { create(from: shown(spec)) }
+                            Button("Customise", systemImage: "paintbrush") { create(from: spec) }
                         }
                     }
                 }
@@ -49,7 +37,7 @@ struct ThemeGalleryView: View {
                 LazyVGrid(columns: columns, spacing: 16) {
                     ForEach(custom) { spec in
                         Button { pick(spec.id) } label: {
-                            ThemeCard(spec: spec, title: spec.name, isPicked: pickedID == spec.id)
+                            ThemeCard(spec: spec, title: spec.name, isPicked: settings.themeID == spec.id)
                         }
                         .contextMenu {
                             Button("Edit", systemImage: "slider.horizontal.3") { editing = spec }
@@ -67,7 +55,7 @@ struct ThemeGalleryView: View {
             .padding()
         }
         .disabled(store == nil)
-        .navigationTitle(slot == .main ? "Theme" : "In dark mode")
+        .navigationTitle("Theme")
         .navigationDestination(item: $editing) { spec in
             if let store { ThemeEditorView(store: store, theme: spec) }
         }
@@ -82,27 +70,9 @@ struct ThemeGalleryView: View {
         .onAppear(perform: reload)
     }
 
-    /// The id this gallery's slot holds; empty in the dark slot for the same as Theme.
-    private var pickedID: String {
-        slot == .main ? settings.themeID : settings.darkThemeID
-    }
-
-    /// The theme the slot shows now, which a new theme starts from.
+    /// The theme picked now, which a new theme starts from.
     private var currentSpec: ThemeSpec {
-        Themes.active(
-            themeID: settings.themeID, darkThemeID: slot == .dark ? settings.darkThemeID : "", custom: custom,
-            isDark: slot == .dark || colorScheme == .dark)
-    }
-
-    /// Theme's theme as it looks in dark mode, for the Same as Theme card.
-    private var sameAsThemeSpec: ThemeSpec {
-        Themes.active(themeID: settings.themeID, darkThemeID: "", custom: custom, isDark: true)
-    }
-
-    /// Automatic drawn as it looks here: dark in the dark slot and in dark mode.
-    private func shown(_ spec: ThemeSpec) -> ThemeSpec {
-        guard spec.id == Themes.automaticID else { return spec }
-        return slot == .dark || colorScheme == .dark ? Themes.automaticDark : Themes.automaticLight
+        Themes.spec(id: settings.themeID, custom: custom) ?? Themes.automatic
     }
 
     private func reload() {
@@ -111,14 +81,11 @@ struct ThemeGalleryView: View {
         custom = store.customThemes
     }
 
-    /// Saves `id` into the slot, over the latest saved settings so nothing changed elsewhere is lost.
+    /// Picks `id`, over the latest saved settings so nothing changed elsewhere is lost.
     private func pick(_ id: String) {
         guard let store else { return }
         var latest = store.load()
-        switch slot {
-        case .main: latest.themeID = id
-        case .dark: latest.darkThemeID = id
-        }
+        latest.themeID = id
         store.save(latest)
         settings = latest
     }
@@ -145,7 +112,7 @@ struct ThemeCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            ThemeSwatch(spec: spec)
+            ThemeSpecSwatch(spec: spec)
                 .aspectRatio(1.7, contentMode: .fit)
                 .clipShape(.rect(cornerRadius: 12))
                 .overlay {

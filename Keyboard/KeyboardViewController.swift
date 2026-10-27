@@ -36,8 +36,8 @@ final class KeyboardViewController: UIInputViewController {
     private var triedFeatures: Set<TryFeature> = []
     /// The user's own themes, read from the shared settings as the keyboard appears.
     private var customThemes: [ThemeSpec] = []
-    /// The theme the keys show, so a keystroke that changes nothing doesn't build a new one.
-    private var shownTheme: ThemeSpec?
+    /// The look the keys show, so a keystroke that changes nothing doesn't build a new one.
+    private var shownTheme: ThemeStyle?
 
     /// iOS creates a view controller each time the keyboard appears, and keeps the old input view alive after
     /// its controller goes (seen on the iOS 26.4 simulator). Taking the keys out of it frees them, their layers
@@ -220,17 +220,15 @@ final class KeyboardViewController: UIInputViewController {
         DispatchQueue.main.async { settingsStore.markTried(feature) }
     }
 
-    /// The theme the settings pick, with the dark-mode one for a field that asks for a dark keyboard and in dark mode.
-    /// It runs at each text change, so it only compares unless the theme changed.
+    /// The picked theme's look: its dark one for a field that asks for a dark keyboard and in dark mode. It runs at each
+    /// text change, so it only compares unless the look changed.
     private func updateTheme() {
         guard let controller, let keyboardView else { return }
         let isDark = textDocumentProxy.keyboardAppearance == .dark || traitCollection.userInterfaceStyle == .dark
-        let spec = Themes.active(
-            themeID: controller.settings.themeID, darkThemeID: controller.settings.darkThemeID, custom: customThemes,
-            isDark: isDark)
-        guard spec != shownTheme else { return }
-        shownTheme = spec
-        keyboardView.theme = KeyboardTheme(spec: spec)
+        let style = Themes.active(themeID: controller.settings.themeID, custom: customThemes, isDark: isDark)
+        guard style != shownTheme else { return }
+        shownTheme = style
+        keyboardView.theme = KeyboardTheme(style: style)
     }
 
     /// A one-time code field goes to the next keyboard, where Apple's keyboard can offer the code from Messages,

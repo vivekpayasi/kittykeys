@@ -120,10 +120,15 @@ public struct ThemeStyle: Hashable, Sendable {
         Self.readable(hint.contrast(with: key) >= hint.contrast(with: specialKey) ? key : specialKey, under: label)
     }
 
-    /// For a host with nothing behind the keyboard, such as the app's previews: the background, or a grey like iOS's
-    /// backdrop, dark for dark keys.
+    /// The background, or for iOS's backdrop a grey like it, dark for dark keys: what the keys are seen against.
     public var previewBackdrop: ThemeColor {
-        background ?? (key.luminance < 0.3 ? ThemeColor(rgb: 0x171717) : ThemeColor(rgb: 0xE2E4E8))
+        background ?? Self.systemBackdrop(isDark: key.luminance < 0.3)
+    }
+
+    /// A grey like iOS's keyboard backdrop and the bar above the keyboard, for a host that has neither behind its
+    /// keyboard, such as the app's previews.
+    public static func systemBackdrop(isDark: Bool) -> ThemeColor {
+        isDark ? ThemeColor(rgb: 0x171717) : ThemeColor(rgb: 0xE2E4E8)
     }
 
     // MARK: Keys

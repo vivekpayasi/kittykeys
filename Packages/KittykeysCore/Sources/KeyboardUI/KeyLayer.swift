@@ -62,7 +62,7 @@ final class KeyLayer: CALayer {
     /// A key with an icon takes its image from `icons`, which renders it only the first time.
     init(rect: CGRect, style: KeyStyle, hint: String?, theme: KeyboardTheme, scale: CGFloat, icons: KeyIconCache) {
         self.keyStyle = style
-        let spec = theme.spec
+        let spec = theme.style
         let role = style.role
         restingFill = spec.restingFill(role).map { UIColor(themeColor: $0).cgColor }
         pressedFill = UIColor(themeColor: spec.pressedFill(role)).cgColor
