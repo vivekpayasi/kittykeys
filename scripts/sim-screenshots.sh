@@ -22,6 +22,9 @@ SCENES=(
   "symbols-2|-kittykeysPreview -kittykeysPreviewPage symbols-2"
   "hold-d|-kittykeysPreview -kittykeysPreviewHold d"
   "hold-period|-kittykeysPreview -kittykeysPreviewHold ."
+  # A web-address field: the row without the .com key, and holding . for the domains in their wider cells.
+  "web|-kittykeysPreview -kittykeysPreviewField url"
+  "web-hold-period|-kittykeysPreview -kittykeysPreviewField url -kittykeysPreviewHold ."
   "cursor|-kittykeysPreview -kittykeysPreviewCursor"
   "emoji|-kittykeysPreview -kittykeysPreviewEmoji"
   # Skin-tone popups at a middle column (base remembered), and at the left-most and right-most columns (the third skin
@@ -38,12 +41,6 @@ SCENES=(
   "app-setup|-kittykeysTab setup"
   "app-settings|-kittykeysTab settings"
   "app-tryit|-kittykeysTab tryit"
-  # The typing test before a run, mid-run, its summary over invented sample history, and the summary offering to
-  # relabel a run as kittykeys (all but the first need a debug build).
-  "app-typingtest|-kittykeysTab typingtest"
-  "app-typingtest-run|-kittykeysTab typingtest -kittykeysTypingTestScene run"
-  "app-typingtest-summary|-kittykeysTab typingtest -kittykeysTypingTestScene summary"
-  "app-typingtest-relabel|-kittykeysTab typingtest -kittykeysTypingTestScene relabel"
 )
 
 xcodegen generate
@@ -76,7 +73,8 @@ for appearance in light dark; do
     xcrun simctl terminate "$UDID" "$BUNDLE_ID" >/dev/null 2>&1 || true
     # $arguments is split into separate launch arguments on purpose.
     # shellcheck disable=SC2086
-    xcrun simctl launch "$UDID" "$BUNDLE_ID" $arguments >/dev/null
+    # India's region whatever the simulator's, so "d" offers ₹ first in every screenshot.
+    xcrun simctl launch "$UDID" "$BUNDLE_ID" -AppleLocale en_IN $arguments >/dev/null
     sleep "$SETTLE"
     # simctl chats on stderr even when it works; show what it said only when it fails.
     if ! output=$(xcrun simctl io "$UDID" screenshot "$OUT/$name-$appearance.png" 2>&1); then

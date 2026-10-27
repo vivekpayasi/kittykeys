@@ -288,22 +288,25 @@ public final class TouchProcessor {
         return Int(steps)
     }
 
-    /// Whether `timing.alternateWidth` can place cells. A width of 0 or less, or not finite, gives NaN or nonsense positions.
-    private var alternateWidthIsUsable: Bool {
-        timing.alternateWidth > 0 && timing.alternateWidth.isFinite
+    /// Whether `width` can place cells. A width of 0 or less, or not finite, gives NaN or nonsense positions.
+    private static func isUsableCellWidth(_ width: Double) -> Bool {
+        width > 0 && width.isFinite
     }
 
-    /// Lays out `frame`'s long-press options with the default (first) option over the key, selected.
+    /// Lays out `frame`'s long-press options with the default (first) option over the key, selected, in cells
+    /// `timing.alternateWidth` times the key's `longPressWidth` wide.
     /// They run rightward from the key's left edge when they fit on the keyboard, otherwise leftward from its right edge.
     /// With an unusable cell width they run rightward from the left edge.
     private func alternatesPopup(for frame: KeyFrame) -> KeyTouch.Popup {
         let options = frame.key.longPress
-        let width = Double(options.count) * timing.alternateWidth
-        if !alternateWidthIsUsable || frame.rect.minX + width <= keyboardWidth {
-            return KeyTouch.Popup(options: options, originX: frame.rect.minX, defaultIndex: 0)
+        let cellWidth = timing.alternateWidth * frame.key.longPressWidth
+        let width = Double(options.count) * cellWidth
+        if !Self.isUsableCellWidth(cellWidth) || frame.rect.minX + width <= keyboardWidth {
+            return KeyTouch.Popup(options: options, originX: frame.rect.minX, cellWidth: cellWidth, defaultIndex: 0)
         }
         return KeyTouch.Popup(
-            options: options.reversed(), originX: max(frame.rect.maxX - width, 0), defaultIndex: options.count - 1)
+            options: options.reversed(), originX: max(frame.rect.maxX - width, 0), cellWidth: cellWidth,
+            defaultIndex: options.count - 1)
     }
 
     /// The touch whose timer is due first at or before `time`. On a tie, the earlier touch-down wins.
@@ -324,10 +327,10 @@ public final class TouchProcessor {
 
     /// The option under `x`. Past either end of the popup, the end option.
     private func alternateIndex(atX x: Double, in popup: KeyTouch.Popup) -> Int {
-        let cell = (x - popup.originX) / timing.alternateWidth
+        let cell = (x - popup.originX) / popup.cellWidth
         // `Int(_:)` traps on NaN and infinity, and an unusable cell width gives them or nonsense:
         // keep the default option instead. Any finite value is clamped into range before converting.
-        guard alternateWidthIsUsable, cell.isFinite else { return popup.defaultIndex }
+        guard Self.isUsableCellWidth(popup.cellWidth), cell.isFinite else { return popup.defaultIndex }
         return Int(min(max(cell, 0), Double(popup.options.count - 1)))
     }
 }
@@ -348,18 +351,20 @@ private struct KeyTouch {
         case movingCursor(Trackpad)
     }
 
-    /// A long-press popup: one `alternateWidth` cell per option, from `originX`.
+    /// A long-press popup: one `cellWidth` cell per option, from `originX`.
     struct Popup: Equatable {
         /// The options in display order, left to right.
         var options: [String]
         var originX: Double
+        var cellWidth: Double
         /// Where the key's first option, its default, sits in `options`.
         var defaultIndex: Int
         var selected: Int
 
-        init(options: [String], originX: Double, defaultIndex: Int) {
+        init(options: [String], originX: Double, cellWidth: Double, defaultIndex: Int) {
             self.options = options
             self.originX = originX
+            self.cellWidth = cellWidth
             self.defaultIndex = defaultIndex
             selected = defaultIndex
         }

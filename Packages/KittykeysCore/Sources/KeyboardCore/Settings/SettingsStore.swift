@@ -43,8 +43,8 @@ public struct SettingsStore {
         defaults.set(data, forKey: Self.settingsKey)
     }
 
-    /// When the keyboard last appeared. The keyboard writes it and the app shows it, so the user can see
-    /// whether the App Group carries data between them. Setting nil removes it.
+    /// When the keyboard last appeared. Without Full Access the keyboard can't write to the App Group, so the app takes
+    /// it as proof that Full Access is on. Setting nil removes it.
     public var lastKeyboardOpen: Date? {
         get { defaults.object(forKey: Self.keyboardOpenedAtKey) as? Date }
         nonmutating set { defaults.set(newValue, forKey: Self.keyboardOpenedAtKey) }

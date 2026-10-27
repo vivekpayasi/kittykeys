@@ -89,7 +89,7 @@ q:%  w:\  e:|  r:=  t:[  y:]  u:<  i:>  o:{  p:}
 
 Details:
 
-- **The symbol map** is Gboard's, with one change: ₹ replaces $ on **d**. Holding **d** offers `₹ $ €`.
+- **The symbol map** is Gboard's, with one change: **d** holds the user's currency, not $. Holding **d** offers that currency, then `$ € £ ¥ ₹` (the layout's list, `{currencies}` in the data). The currency comes from the region (₹ for the user) unless Settings › Currency picks one; the 123 page's two currency keys follow the same order. (user, 2026-10-27)
 - **Holding `.`** offers `. ? ! … : /`.
 - **No globe key** on Face ID iPhones (user), because iOS draws one. On iPhones with a home button, where `needsInputModeSwitchKey` is true, a globe key goes left of the emoji key.
 
@@ -119,7 +119,7 @@ The bottom row is the same as on the letters page, with `ABC` in place of `123`.
 
 - **Return key:** its label follows the app's `returnKeyType`, for example Send, Search or Go.
 - **Email fields:** the bottom row gains `@`.
-- **Web-address fields:** the bottom row gains `/` and `.com`.
+- **Web-address fields:** `/` takes the comma's place, so the space bar keeps its width. Holding `.` offers `.com .in .co.in .org .net`, `.com` preselected; email fields' `.` does the same. A setting adds a separate `.com` key, which narrows the space bar. (user, 2026-10-27)
 - **Number and decimal pads:** kittykeys opens on symbols page 1, where the number row is. (Claude's call)
 
 ### 4.4 Size and look
@@ -213,7 +213,7 @@ Items 2 and 3 stay only if they measurably improve accuracy.
 
 | Target | What it is | UI tech |
 |---|---|---|
-| `Kittykeys` | Container app: setup steps, settings, test fields (text and one-time code), a typing test | SwiftUI (planning) |
+| `Kittykeys` | Container app: setup steps, settings, a field to try the keyboard in | SwiftUI (planning) |
 | `KittykeysKeyboard` | Keyboard extension (`UIInputViewController`) | UIKit with raw touch handling (planning) |
 | `KeyboardCore` | Local Swift package with all logic that doesn't need UIKit | none |
 
@@ -237,7 +237,7 @@ There are no `UIButton`s and no gesture recognizers on keys, because both add de
 
 ### Settings
 
-- **Settings:** haptics, sound, key popup, double-space full stop, long-press delay, and switching to Apple's keyboard in one-time code fields.
+- **Settings:** haptics, sound, key popup, double-space full stop, long-press delay, currency, a .com key in web addresses, and switching to Apple's keyboard in one-time code fields.
 - **Storage:** an App Group's shared defaults, written by the app and read by the keyboard.
 - **Risk:** it's unconfirmed whether a free Apple ID can use App Groups with a keyboard extension. Verify on the device in M1. If it doesn't work, settings move into the keyboard itself, as a gear in the suggestion row when it's empty. Until then, the defaults in this document apply.
 

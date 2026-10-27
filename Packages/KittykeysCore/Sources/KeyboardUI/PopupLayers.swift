@@ -174,7 +174,7 @@ final class AlternatesLayer: CALayer {
             let cell = CATextLayer()
             cell.contentsScale = scale
             cell.font = font
-            cell.fontSize = font.pointSize
+            cell.fontSize = Self.fittedFontSize(for: option, in: cellWidth)
             cell.alignmentMode = .center
             cell.foregroundColor = theme.label.cgColor
             cell.string = option
@@ -185,6 +185,15 @@ final class AlternatesLayer: CALayer {
             return cell
         }
         isHidden = false
+    }
+
+    /// The font size that fits `option` in a cell `cellWidth` wide, inside the highlight: `fontSize`, or smaller for an
+    /// option too wide for it, so no data can make options overlap.
+    private static func fittedFontSize(for option: String, in cellWidth: CGFloat) -> CGFloat {
+        let room = cellWidth - 2 * (selectionInset + 2)
+        let width = (option as NSString).size(withAttributes: [.font: UIFont.systemFont(ofSize: fontSize)]).width
+        guard width > room, room > 0 else { return fontSize }
+        return max(fontSize * room / width, 1)
     }
 
     /// Highlights the cell at `index`, an index into the options shown. A cell too narrow for the highlight

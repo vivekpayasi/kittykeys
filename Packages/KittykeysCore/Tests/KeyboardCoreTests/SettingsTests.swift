@@ -31,6 +31,7 @@ final class SettingsTests {
         #expect(s.haptics && !s.sound && s.keyPopup && s.doubleSpacePeriod)
         #expect(s.longPressDelay == 0.3)
         #expect(s.handOffCodeFields)
+        #expect(!s.showDotComKey && s.currency == "")
         #expect(store.load() == s)   // nothing saved yet
     }
 
@@ -42,6 +43,8 @@ final class SettingsTests {
         s.doubleSpacePeriod = false
         s.longPressDelay = 0.45
         s.handOffCodeFields = false
+        s.showDotComKey = true
+        s.currency = "€"
         store.save(s)
         #expect(store.load() == s)
         #expect(SettingsStore(defaults: UserDefaults(suiteName: suiteName)!).load() == s)

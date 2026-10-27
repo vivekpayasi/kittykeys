@@ -45,6 +45,9 @@ public struct KeySpec: Equatable, Sendable, Decodable {
     public var output: String
     /// Long-press options, in popup order. Defaults to none.
     public var longPress: [String]
+    /// The width of each long-press option's cell, in `TouchTiming.alternateWidth` units, for options wider than a
+    /// symbol such as ".com". Defaults to 1.
+    public var longPressWidth: Double
     /// Width in key units. Defaults to 1; 0 fills the space left in the row.
     public var width: Double
     public var action: KeyAction
@@ -64,7 +67,7 @@ public struct KeySpec: Equatable, Sendable, Decodable {
 
 extension KeySpec {
     private enum CodingKeys: String, CodingKey {
-        case label, output, longPress, width, action, icon
+        case label, output, longPress, longPressWidth, width, action, icon
     }
 
     public init(from decoder: any Decoder) throws {
@@ -72,6 +75,7 @@ extension KeySpec {
         label = try container.decode(String.self, forKey: .label)
         output = try container.decodeIfPresent(String.self, forKey: .output) ?? label
         longPress = try container.decodeIfPresent([String].self, forKey: .longPress) ?? []
+        longPressWidth = try container.decodeIfPresent(Double.self, forKey: .longPressWidth) ?? 1
         width = try container.decodeIfPresent(Double.self, forKey: .width) ?? 1
         action = try container.decodeIfPresent(KeyAction.self, forKey: .action) ?? .character
         icon = try container.decodeIfPresent(String.self, forKey: .icon)

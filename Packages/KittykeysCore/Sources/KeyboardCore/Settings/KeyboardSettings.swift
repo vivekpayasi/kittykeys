@@ -10,13 +10,18 @@ public struct KeyboardSettings: Codable, Equatable, Sendable {
     /// Whether a one-time code field goes to the next keyboard, so Apple's keyboard can offer the code from Messages
     /// (`CodeFieldHandOff`).
     public var handOffCodeFields = true
+    /// Whether web-address fields get a .com key. Without it the space bar is as wide as elsewhere, and holding "."
+    /// offers .com and other domains.
+    public var showDotComKey = false
+    /// The currency "d" and the 123 page offer first, such as "₹"; empty for the region's (`CurrencyOrder`).
+    public var currency = ""
 
     public init() {}
 }
 
 extension KeyboardSettings {
     private enum CodingKeys: String, CodingKey {
-        case haptics, sound, keyPopup, doubleSpacePeriod, longPressDelay, handOffCodeFields
+        case haptics, sound, keyPopup, doubleSpacePeriod, longPressDelay, handOffCodeFields, showDotComKey, currency
     }
 
     /// A missing or wrong-typed field takes its default, so settings saved before a field existed still load
@@ -31,6 +36,8 @@ extension KeyboardSettings {
         let delay = (try? container.decodeIfPresent(Double.self, forKey: .longPressDelay)) ?? longPressDelay
         longPressDelay = Self.validLongPressDelay(delay)
         handOffCodeFields = (try? container.decodeIfPresent(Bool.self, forKey: .handOffCodeFields)) ?? handOffCodeFields
+        showDotComKey = (try? container.decodeIfPresent(Bool.self, forKey: .showDotComKey)) ?? showDotComKey
+        currency = (try? container.decodeIfPresent(String.self, forKey: .currency)) ?? currency
     }
 
     /// `delay` clamped to `longPressDelayRange`; NaN or infinity gives the default.

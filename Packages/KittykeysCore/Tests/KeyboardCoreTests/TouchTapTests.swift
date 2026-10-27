@@ -21,8 +21,9 @@ struct TouchTapTests {
         touches.keyboardWidth = 390
     }
 
+    /// The page's frames, with "d" offering ₹ $ € as the worked numbers above assume.
     static func pageFrames(_ id: String) throws -> [KeyFrame] {
-        let page = try #require(try LayoutSet.bundled().page(id))
+        let page = try #require(try LayoutSet.bundled().page(id, currencies: ["₹", "$", "€"]))
         return KeyboardGeometry.frames(page: page, bottom: page.bottomRow(.standard), width: 390, metrics: .standard)
     }
 

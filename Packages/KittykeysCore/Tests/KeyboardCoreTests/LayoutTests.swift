@@ -2,9 +2,14 @@ import Foundation
 import Testing
 import KeyboardCore
 
+/// The currencies in the order an Indian region gives them.
+func indianCurrencies(_ set: LayoutSet) -> [String] {
+    CurrencyOrder.ordered(choice: "", region: "₹", all: set.currencies)
+}
+
 @Test func lettersPageMatchesDesign() throws {
     let set = try LayoutSet.bundled()
-    let p = try #require(set.page(set.lettersPageID))
+    let p = try #require(set.page(set.lettersPageID, currencies: indianCurrencies(set)))
     #expect(p.rows.map(\.kind) == [.number, .keys, .keys, .keys])
     #expect(p.rows[0].keys.map(\.label) == ["1","2","3","4","5","6","7","8","9","0"])
     #expect(p.rows[1].keys.map(\.label) == ["q","w","e","r","t","y","u","i","o","p"])
@@ -12,14 +17,15 @@ import KeyboardCore
     #expect(p.rows[2].keys.map(\.cornerHint) == ["@","#","₹","_","&","-","+","(",")"])
     #expect(p.rows[3].keys.map(\.cornerHint) == [nil,"*","\"","'",":",";","!","?",nil])
     #expect(p.rows[3].keys.first?.action == .shift && p.rows[3].keys.last?.action == .backspace)
-    #expect(p.rows[2].keys[2].longPress == ["₹","$","€"])
+    #expect(p.rows[2].keys[2].longPress == ["₹","$","€","£","¥"])
     #expect(p.bottomRow(.standard).map(\.action) == [.switchPage(.named("symbols-1")), .emoji, .character, .space, .character, .returnKey])
     #expect(p.bottomRow(.standard)[4].longPress == [".","?","!","…",":","/"])
 }
 
 @Test func symbolsPagesMatchDesign() throws {
     let set = try LayoutSet.bundled()
-    let s1 = try #require(set.page("symbols-1")), s2 = try #require(set.page("symbols-2"))
+    let s1 = try #require(set.page("symbols-1", currencies: indianCurrencies(set)))
+    let s2 = try #require(set.page("symbols-2", currencies: indianCurrencies(set)))
     #expect(s1.rows[1].keys.map(\.label) == ["@","#","₹","$","_","&","-","+","(",")"])
     #expect(s1.rows[2].keys.map(\.label) == ["*","\"","'",":",";","!","?","/","%","="])
     #expect(s1.rows[3].keys.map(\.label) == ["1/2","<",">","[","]","{","}","|","⌫"])
@@ -34,7 +40,9 @@ import KeyboardCore
 @Test func fieldVariants() throws {
     let p = try #require(try LayoutSet.bundled().page("latin-qwerty"))
     #expect(p.bottomRow(.email).map(\.output).contains("@"))
-    #expect(p.bottomRow(.url).map(\.output).contains("/") && p.bottomRow(.url).map(\.output).contains(".com"))
+    #expect(p.bottomRow(.url).map(\.output).contains("/") && !p.bottomRow(.url).map(\.output).contains(".com"))
+    #expect(p.bottomRow(.urlWithDotCom).map(\.output).contains(".com"))
+    #expect(p.bottomRow(.email).last { $0.label == "." }?.longPress.first == ".com")
 }
 
 @Test func globeKeyComesFromTheIndex() throws {

@@ -191,7 +191,7 @@ import KeyboardCore
     @Test func longPressOptionsGoIntoTheQuery() throws {
         let k = try searching()
         try type("a", into: k)
-        // Holding d offers ₹ $ €, ₹ first.
+        // Holding d offers the currencies, ₹ first.
         let p = try k.down("d")
         k.wait(0.3)
         #expect(k.controller.state.alternates != nil)

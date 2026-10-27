@@ -4,7 +4,7 @@ import Testing
 /// How emoji search relabels its bottom row's page key (ruling M3-R18), for rows the bundled layouts don't have.
 struct SearchBottomRowTests {
     static func key(_ label: String, _ action: KeyAction, icon: String? = nil) -> KeySpec {
-        KeySpec(label: label, output: label, longPress: [], width: 1.5, action: action, icon: icon)
+        KeySpec(label: label, output: label, longPress: [], longPressWidth: 1, width: 1.5, action: action, icon: icon)
     }
 
     static let abc = key("ABC", .switchPage(.letters))
