@@ -125,9 +125,8 @@ struct ThemeGalleryView: View {
 
     private func create(from base: ThemeSpec) {
         guard let store else { return }
-        let spec = Themes.newCustom(from: base, existing: custom)
-        custom.append(spec)
-        store.saveCustomThemes(custom)
+        let spec = store.addCustomTheme(copying: base)
+        custom = store.customThemes
         pick(spec.id)
         editing = spec
     }

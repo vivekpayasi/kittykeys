@@ -107,6 +107,61 @@ struct ThemeTests {
         }
     }
 
+    @Test func pressAlwaysShows() {
+        // Accents at the extremes, with the return key in the accent: the press shows and its text still reads.
+        for rgb: UInt32 in [0xFFFFFF, 0x000000, 0xF2F2F2, 0x3DF58A, 0xFFD60A, 0x0D0D0D] {
+            var spec = preset("midnight")
+            spec.accent = ThemeColor(rgb: rgb)
+            let pressed = spec.pressedFill(.returnKey)
+            #expect(pressed.contrast(with: spec.accent) >= 1.15, "\(spec.accent.hex)")
+            #expect(spec.onAccent.contrast(with: pressed) >= 3, "\(spec.accent.hex)")
+        }
+
+        // Any colours at all: every pressed key differs from how it rests (its fill, else the background, else the
+        // backdrop iOS's glass stands in for).
+        var random = SeededRandom(seed: 7)
+        func colour() -> ThemeColor { ThemeColor(rgb: UInt32(truncatingIfNeeded: random.next()) & 0xFFFFFF) }
+        for _ in 0..<3000 {
+            var spec = Themes.automaticLight
+            spec.background = random.next() % 4 == 0 ? nil : colour()
+            spec.key = colour()
+            spec.specialKey = random.next() % 3 == 0 ? spec.key : colour()
+            spec.label = colour()
+            spec.functionLabel = random.next() % 3 == 0 ? spec.specialKey : colour()
+            spec.hint = colour()
+            spec.accent = colour()
+            spec.keyShape = KeyShape.allCases[Int(random.next() % 3)]
+            spec.returnKeyAccent = random.next() % 2 == 0
+            for role in [KeyRole.letter, .punctuation, .space, .function, .returnKey] {
+                let resting = spec.restingFill(role) ?? spec.background ?? spec.previewBackdrop
+                #expect(spec.pressedFill(role).contrast(with: resting) >= 1.15, "\(spec) \(role)")
+            }
+        }
+    }
+
+    @Test func popupAndSearchFieldKeepLabelsReadable() {
+        // Natural custom looks where the key colour is the letter colour: white outlines with white letters, and
+        // neon letters with neon presses and no borders.
+        var outline = preset("neon")
+        outline.keyShape = .outlined
+        outline.key = .white
+        outline.label = .white
+        var flat = preset("neon")
+        flat.keyShape = .borderless
+        flat.key = ThemeColor(rgb: 0x3DF58A)
+        flat.label = ThemeColor(rgb: 0x3DF58A)
+        for spec in [outline, flat] {
+            #expect(spec.label.contrast(with: spec.popup) >= 3, "\(spec.keyShape) popup")
+            #expect(spec.label.contrast(with: spec.searchField) >= 3, "\(spec.keyShape) search field")
+            #expect(spec.popup.contrast(with: spec.background!) >= 1.1, "\(spec.keyShape) popup on background")
+        }
+        // The ready-made themes already read, so they keep today's colours.
+        for spec in Themes.presets + [Themes.automaticDark] {
+            #expect(spec.label.contrast(with: spec.popup) >= 3, "\(spec.id)")
+            #expect(spec.label.contrast(with: spec.searchField) >= 3, "\(spec.id)")
+        }
+    }
+
     @Test func labelsByRole() {
         let neon = preset("neon")
         #expect(neon.labelColor(.function).hex == "#3DF58A")
@@ -123,9 +178,11 @@ struct ThemeTests {
         // Pressed, it moves away from its text colour, so the text only gets easier to read.
         #expect(midnight.onAccent == .white)
         #expect(midnight.pressedFill(.returnKey) == midnight.accent.mixed(with: .black, 0.25))
+        // A light accent with black text: moving toward white would barely show, so it moves toward its text.
         var light = midnight
         light.accent = ThemeColor(rgb: 0x3DF58A)
-        #expect(light.pressedFill(.returnKey) == light.accent.mixed(with: .white, 0.25))
+        #expect(light.onAccent == .black)
+        #expect(light.pressedFill(.returnKey) == light.accent.mixed(with: .black, 0.25))
         var outlined = midnight
         outlined.keyShape = .outlined
         #expect(outlined.restingFill(.returnKey) == midnight.accent)
@@ -234,5 +291,22 @@ struct ThemeTests {
         #expect(second.id != first.id)
         #expect(Themes.newCustom(from: neon, existing: [first, second]).name == "My theme 3")
         #expect(Themes.newCustom(from: neon, existing: [second]).name == "My theme")
+    }
+}
+
+/// SplitMix64: the same numbers on every run, so a failing case can be found again.
+private struct SeededRandom {
+    private var state: UInt64
+
+    init(seed: UInt64) {
+        state = seed
+    }
+
+    mutating func next() -> UInt64 {
+        state &+= 0x9E37_79B9_7F4A_7C15
+        var z = state
+        z = (z ^ (z >> 30)) &* 0xBF58_476D_1CE4_E5B9
+        z = (z ^ (z >> 27)) &* 0x94D0_49BB_1331_11EB
+        return z ^ (z >> 31)
     }
 }

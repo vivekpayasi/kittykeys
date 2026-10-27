@@ -165,6 +165,20 @@ final class SettingsTests {
         #expect(store.customThemes.isEmpty)
     }
 
+    @Test func addingAThemeKeepsChangesSavedElsewhere() {
+        var first = customTheme("First")
+        store.saveCustomThemes([first])
+        // The editor, through another store on the same defaults, renames it meanwhile.
+        first.name = "Renamed"
+        SettingsStore(defaults: UserDefaults(suiteName: suiteName)!).saveCustomThemes([first])
+
+        let added = store.addCustomTheme(copying: Themes.presets[3])
+        #expect(added.id.hasPrefix(Themes.customIDPrefix))
+        #expect(added.name == "My theme")
+        #expect(added.key == Themes.presets[3].key)
+        #expect(store.customThemes == [first, added])
+    }
+
     @Test func removingAPickedThemeResetsTheSlot() {
         let picked = customTheme("Picked"), other = customTheme("Other")
         store.saveCustomThemes([picked, other])

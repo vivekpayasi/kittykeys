@@ -86,6 +86,16 @@ public struct SettingsStore {
         defaults.set(data, forKey: Self.customThemesKey)
     }
 
+    /// Saves a copy of `base` as a new custom theme (`Themes.newCustom`) at the end of the saved list, read afresh so
+    /// a change saved elsewhere meanwhile is kept, and returns it.
+    public func addCustomTheme(copying base: ThemeSpec) -> ThemeSpec {
+        var themes = customThemes
+        let theme = Themes.newCustom(from: base, existing: themes)
+        themes.append(theme)
+        saveCustomThemes(themes)
+        return theme
+    }
+
     /// Deletes the custom theme `id`. A slot that picked it goes back to its default: Automatic, or the same as Theme
     /// in dark mode.
     public func removeCustomTheme(id: String) {

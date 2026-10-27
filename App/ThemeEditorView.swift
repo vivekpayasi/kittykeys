@@ -4,16 +4,18 @@ import SwiftUI
 import UIKit
 
 /// Edits one of the user's themes. Each change saves at once. A working kittykeys keyboard in the theme sits at the
-/// bottom, typing into nothing, so presses and popups can be tried.
+/// top, typing into nothing, so presses and popups can be tried. At the top it stays in sight while iOS's colour
+/// picker covers the bottom half of the screen, and while the keyboard for the name field is up.
 struct ThemeEditorView: View {
     let store: SettingsStore
     @State private var spec: ThemeSpec
     @State private var confirmsDelete = false
     @Environment(\.dismiss) private var dismiss
 
+    /// Edits `theme` as last saved, falling back to the copy given.
     init(store: SettingsStore, theme: ThemeSpec) {
         self.store = store
-        _spec = State(initialValue: theme)
+        _spec = State(initialValue: store.customThemes.first { $0.id == theme.id } ?? theme)
     }
 
     var body: some View {
@@ -83,11 +85,10 @@ struct ThemeEditorView: View {
         }
         .navigationTitle(spec.name.isEmpty ? "Theme" : spec.name)
         .navigationBarTitleDisplayMode(.inline)
-        // The tab bar floats over the bottom of the screen, where the keyboard sits.
+        // The tab bar floats over the bottom of the form, which is short with the keyboard above it.
         .toolbar(.hidden, for: .tabBar)
-        .safeAreaInset(edge: .bottom, spacing: 0) {
+        .safeAreaInset(edge: .top, spacing: 0) {
             ThemePreviewKeyboard(spec: spec)
-                .background(Color(themeColor: spec.previewBackdrop).ignoresSafeArea(edges: .bottom))
         }
         .onChange(of: spec) { _, spec in save(spec) }
         .confirmationDialog("Delete \(spec.name)?", isPresented: $confirmsDelete, titleVisibility: .visible) {

@@ -38,6 +38,8 @@ public struct ThemeSpec: Hashable, Sendable, Identifiable {
     private static let minimumPressContrast = 1.15
     /// Below this contrast a pressed key's label can't be read on its fill.
     private static let minimumPressedLabelContrast = 2.0
+    /// Below this contrast text can't be read on a popup or the search field.
+    private static let minimumTextContrast = 3.0
     /// Below this contrast the popups can't be told from the background.
     private static let minimumPopupContrast = 1.1
     /// Keys darker than this get popups a shade lighter, so they stand apart from the keys they cover.
@@ -100,18 +102,20 @@ public struct ThemeSpec: Hashable, Sendable, Identifiable {
     }
 
     /// The key preview, long-press and skin-tone popups: the key colour, a shade lighter for dark keys, and moved
-    /// toward the letter colour if it would vanish into the background.
+    /// toward the letter colour if it would vanish into the background. Letters must read on it: with no borders or
+    /// outlines the key colour is free to match the letters.
     public var popup: ThemeColor {
         var popup = key.luminance < Self.darkKeyLuminance ? key.mixed(with: .white, 0.15) : key
         if let background, popup.contrast(with: background) < Self.minimumPopupContrast {
             popup = popup.mixed(with: label, 0.15)
         }
-        return popup
+        return Self.readable(popup, under: label)
     }
 
-    /// The emoji search field: whichever key colour its grey placeholder, in the hint colour, reads better on.
+    /// The emoji search field: whichever key colour its grey placeholder, in the hint colour, reads better on, as long
+    /// as the typed query, in the letter colour, reads on it too.
     public var searchField: ThemeColor {
-        hint.contrast(with: key) >= hint.contrast(with: specialKey) ? key : specialKey
+        Self.readable(hint.contrast(with: key) >= hint.contrast(with: specialKey) ? key : specialKey, under: label)
     }
 
     /// For a host with nothing behind the keyboard, such as the app's previews: the background, or a grey like iOS's
@@ -134,19 +138,27 @@ public struct ThemeSpec: Hashable, Sendable, Identifiable {
     }
 
     /// The fill a pressed key shows, as shift does while on. Filled keys swap to the other key colour; outlined and
-    /// borderless keys fill with their own. A fill too close to what is under it is moved toward the label instead,
-    /// so a press always shows, and one the label can't be read on moves halfway to the background. Space keeps its
-    /// faint label, as Apple's does. A return key in the accent moves away from its text colour.
+    /// borderless keys fill with their own. A fill too close to how the key rests is moved toward the label instead,
+    /// and one the label can't be read on moves halfway to the background; space keeps its faint label, as Apple's
+    /// does. A return key in the accent moves away from its text colour, or toward it where that barely shows, as for
+    /// a near-white accent. Whatever the colours, the press shows: as a last resort the resting colour darkens or
+    /// lightens. iOS's backdrop counts as `previewBackdrop`.
     public func pressedFill(_ role: KeyRole) -> ThemeColor {
-        if accentsReturn(role) { return accent.mixed(with: onAccent == .white ? .black : .white, 0.25) }
-        let own = ownColour(role)
-        var fill = keyShape == .filled ? otherColour(role) : own
-        let under = keyShape == .filled ? own : background
-        if let under, fill.contrast(with: under) < Self.minimumPressContrast {
-            fill = own.mixed(with: labelColor(role), 0.2)
+        let resting = restingFill(role) ?? background ?? previewBackdrop
+        var fill: ThemeColor
+        if accentsReturn(role) {
+            fill = accent.mixed(with: onAccent == .white ? .black : .white, 0.25)
+            if fill.contrast(with: accent) < Self.minimumPressContrast { fill = accent.mixed(with: onAccent, 0.25) }
+        } else {
+            let own = ownColour(role)
+            fill = keyShape == .filled ? otherColour(role) : own
+            if fill.contrast(with: resting) < Self.minimumPressContrast { fill = own.mixed(with: labelColor(role), 0.2) }
+            if role != .space, labelColor(role).contrast(with: fill) < Self.minimumPressedLabelContrast {
+                fill = fill.mixed(with: background ?? previewBackdrop, 0.5)
+            }
         }
-        if role != .space, labelColor(role).contrast(with: fill) < Self.minimumPressedLabelContrast {
-            fill = fill.mixed(with: background ?? previewBackdrop, 0.5)
+        if fill.contrast(with: resting) < Self.minimumPressContrast {
+            fill = resting.mixed(with: resting.luminance > Self.darkKeyLuminance ? .black : .white, 0.3)
         }
         return fill
     }
@@ -162,6 +174,18 @@ public struct ThemeSpec: Hashable, Sendable, Identifiable {
 
     public func hasShadow(_ role: KeyRole) -> Bool {
         keyShadow && keyShape == .filled
+    }
+
+    /// `fill`, or if `text` can't be read on it, `fill` moved in quarter steps toward black or white, whichever `text`
+    /// stands out from more, until it reads.
+    private static func readable(_ fill: ThemeColor, under text: ThemeColor) -> ThemeColor {
+        guard text.contrast(with: fill) < minimumTextContrast else { return fill }
+        let away: ThemeColor = text.contrast(with: .black) >= text.contrast(with: .white) ? .black : .white
+        for amount in [0.25, 0.5, 0.75] {
+            let moved = fill.mixed(with: away, amount)
+            if text.contrast(with: moved) >= minimumTextContrast { return moved }
+        }
+        return away
     }
 
     private func usesSpecialColour(_ role: KeyRole) -> Bool {
