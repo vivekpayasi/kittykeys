@@ -32,7 +32,9 @@ final class SettingsTests {
         #expect(s.longPressDelay == 0.3)
         #expect(s.handOffCodeFields)
         #expect(!s.showDotComKey && s.currency == "")
+        #expect(s.themeID == "automatic" && s.darkThemeID == "")
         #expect(store.load() == s)   // nothing saved yet
+        #expect(store.customThemes.isEmpty)
     }
 
     @Test func saveThenLoadRoundTrips() {
@@ -45,6 +47,8 @@ final class SettingsTests {
         s.handOffCodeFields = false
         s.showDotComKey = true
         s.currency = "€"
+        s.themeID = "neon"
+        s.darkThemeID = "midnight"
         store.save(s)
         #expect(store.load() == s)
         #expect(SettingsStore(defaults: UserDefaults(suiteName: suiteName)!).load() == s)
@@ -131,6 +135,60 @@ final class SettingsTests {
 
         store.lastKeyboardOpen = nil
         #expect(store.lastKeyboardOpen == nil)
+    }
+
+    // MARK: Themes
+
+    private func customTheme(_ name: String) -> ThemeSpec {
+        var spec = Themes.newCustom(from: Themes.presets[3], existing: [])
+        spec.name = name
+        return spec
+    }
+
+    @Test func customThemesRoundTrip() {
+        let themes = [customTheme("B"), customTheme("A")]
+        store.saveCustomThemes(themes)
+        #expect(store.customThemes == themes)
+        #expect(SettingsStore(defaults: UserDefaults(suiteName: suiteName)!).customThemes == themes)
+        #expect(defaults.data(forKey: "kittykeys.customThemes") != nil)
+    }
+
+    @Test func customThemesSkipBadEntries() throws {
+        let good = customTheme("Good")
+        let goodJSON = try #require(String(data: JSONEncoder().encode(good), encoding: .utf8))
+        defaults.set(Data(#"[42, {"name":"No id"}, \#(goodJSON)]"#.utf8), forKey: "kittykeys.customThemes")
+        #expect(store.customThemes == [good])
+
+        defaults.set(Data([0xDE, 0xAD]), forKey: "kittykeys.customThemes")
+        #expect(store.customThemes.isEmpty)
+        defaults.set("not data", forKey: "kittykeys.customThemes")
+        #expect(store.customThemes.isEmpty)
+    }
+
+    @Test func removingAPickedThemeResetsTheSlot() {
+        let picked = customTheme("Picked"), other = customTheme("Other")
+        store.saveCustomThemes([picked, other])
+        var s = KeyboardSettings()
+        s.themeID = picked.id
+        s.darkThemeID = picked.id
+        s.sound = true
+        store.save(s)
+
+        store.removeCustomTheme(id: picked.id)
+        #expect(store.customThemes == [other])
+        var expected = s
+        expected.themeID = "automatic"
+        expected.darkThemeID = ""
+        #expect(store.load() == expected)
+
+        // Removing a theme no slot picked leaves the settings alone.
+        s = expected
+        s.themeID = "neon"
+        s.darkThemeID = "midnight"
+        store.save(s)
+        store.removeCustomTheme(id: other.id)
+        #expect(store.customThemes.isEmpty)
+        #expect(store.load() == s)
     }
 
     @Test func appGroupNeedsAnID() throws {
