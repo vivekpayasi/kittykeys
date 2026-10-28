@@ -4,7 +4,7 @@
   "subtitle": "An open-source keyboard for English and Hinglish",
   "sourceURL": "https://github.com/vivekpayasi/kittykeys/releases/latest/download/source.json",
   "website": "https://github.com/vivekpayasi/kittykeys",
-  "iconURL": "https://raw.githubusercontent.com/vivekpayasi/kittykeys/v0.5.0/App/Assets.xcassets/AppIcon.appiconset/AppIcon.png",
+  "iconURL": "https://raw.githubusercontent.com/vivekpayasi/kittykeys/v0.6.0/App/Assets.xcassets/AppIcon.appiconset/AppIcon.png",
   "apps": [
     {
       "name": "kittykeys",
@@ -12,9 +12,18 @@
       "developerName": "vivekpayasi",
       "subtitle": "An open-source keyboard for English and Hinglish",
       "localizedDescription": "An open-source iPhone keyboard for English and Hinglish: a number row, symbols on long-press with hints on the keys, space-bar cursor control, an emoji panel with search, and no autocorrect, so Hinglish words stay as typed. Nothing you type leaves your phone.",
-      "iconURL": "https://raw.githubusercontent.com/vivekpayasi/kittykeys/v0.5.0/App/Assets.xcassets/AppIcon.appiconset/AppIcon.png",
+      "iconURL": "https://raw.githubusercontent.com/vivekpayasi/kittykeys/v0.6.0/App/Assets.xcassets/AppIcon.appiconset/AppIcon.png",
       "category": "utilities",
       "versions": [
+        {
+          "version": "0.6.0",
+          "buildVersion": "6",
+          "date": "2026-10-28",
+          "localizedDescription": "- Dark version: in a theme's editor, turn on Dark version to give it its own look for dark mode, edited in Light and Dark tabs. Start from copies any ready-made or saved theme into the tab you're editing, so a theme can be Paper by day and Neon at night\n- Themes with a dark look show both halves in the gallery; Automatic is one of them\n- Round top corners (on by default): a colour background rounds its top corners with the same curve as iOS's bar above the keyboard\n- Fade into iOS's bar (off by default): the band above the keys fades into your colour, so iOS's bar melts into it\n- Settings › In dark mode is gone. If you picked a dark-mode theme in 0.5.0, make it again as a dark version: customise your theme, turn on Dark version, and Start from the theme you had for dark mode",
+          "downloadURL": "https://github.com/vivekpayasi/kittykeys/releases/download/v0.6.0/kittykeys.ipa",
+          "size": 938030,
+          "minOSVersion": "26.0"
+        },
         {
           "version": "0.5.0",
           "buildVersion": "5",
@@ -58,11 +67,11 @@
         ],
         "privacy": {}
       },
-      "version": "0.5.0",
-      "versionDate": "2026-10-27",
-      "versionDescription": "- Themes, like SwiftKey's: Settings › Theme has ten ready-made ones, including Neon (black, with neon green on shift, ⌫, 123, 😊 and return), Midnight, Amber, Synthwave, Terminal, Paper and Rose. Automatic, today's look, stays the default\n- Make your own: tap New theme, or touch and hold a theme and choose Customise. Pick the background, the key style (filled, outlined or no borders), key colours and shadow, label colours, an accent (optionally on the return key), and the font and its weight, with a working keyboard at the top to try it\n- Settings › In dark mode picks a separate theme for dark mode. iOS colours the strip with 🌐 and the microphone light or dark to match your phone, so a dark theme suits dark mode",
-      "downloadURL": "https://github.com/vivekpayasi/kittykeys/releases/download/v0.5.0/kittykeys.ipa",
-      "size": 917486
+      "version": "0.6.0",
+      "versionDate": "2026-10-28",
+      "versionDescription": "- Dark version: in a theme's editor, turn on Dark version to give it its own look for dark mode, edited in Light and Dark tabs. Start from copies any ready-made or saved theme into the tab you're editing, so a theme can be Paper by day and Neon at night\n- Themes with a dark look show both halves in the gallery; Automatic is one of them\n- Round top corners (on by default): a colour background rounds its top corners with the same curve as iOS's bar above the keyboard\n- Fade into iOS's bar (off by default): the band above the keys fades into your colour, so iOS's bar melts into it\n- Settings › In dark mode is gone. If you picked a dark-mode theme in 0.5.0, make it again as a dark version: customise your theme, turn on Dark version, and Start from the theme you had for dark mode",
+      "downloadURL": "https://github.com/vivekpayasi/kittykeys/releases/download/v0.6.0/kittykeys.ipa",
+      "size": 938030
     }
   ],
   "news": []
