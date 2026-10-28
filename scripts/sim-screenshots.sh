@@ -51,11 +51,12 @@ SCENES=(
   "theme-terminal|-kittykeysPreview -kittykeysPreviewTheme terminal"
   "theme-paper|-kittykeysPreview -kittykeysPreviewTheme paper"
   "theme-rose|-kittykeysPreview -kittykeysPreviewTheme rose"
+  # Rose with its background fading in at the top instead of meeting iOS's bar at an edge.
+  "theme-rose-fade|-kittykeysPreview -kittykeysPreviewTheme rose -kittykeysPreviewFade"
   "app-setup|-kittykeysTab setup"
   "app-settings|-kittykeysTab settings"
   "app-tryit|-kittykeysTab tryit"
   "app-themes|-kittykeysTab settings -kittykeysSettingsPage themes"
-  "app-dark-themes|-kittykeysTab settings -kittykeysSettingsPage darkthemes"
 )
 
 xcodegen generate

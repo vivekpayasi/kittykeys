@@ -3,7 +3,7 @@ import SwiftUI
 
 /// A page Settings opens. The simulator screenshot script opens one with `-kittykeysSettingsPage <raw value>`.
 enum SettingsPage: String, Hashable {
-    case themes, darkThemes = "darkthemes"
+    case themes
 }
 
 /// The keyboard settings. Each change is saved at once; the keyboard reads them each time it appears.
@@ -11,7 +11,7 @@ enum SettingsPage: String, Hashable {
 struct SettingsView: View {
     let store: SettingsStore?
     @State private var settings = KeyboardSettings()
-    /// The custom themes, for the picked themes' names.
+    /// The custom themes, for the picked theme's name.
     @State private var customThemes: [ThemeSpec] = []
     /// A `-kittykeysSettingsPage <page>` launch argument opens that page.
     @State private var path: [SettingsPage] =
@@ -32,15 +32,8 @@ struct SettingsView: View {
                     NavigationLink(value: SettingsPage.themes) {
                         LabeledContent("Theme", value: themeName(settings.themeID))
                     }
-                    NavigationLink(value: SettingsPage.darkThemes) {
-                        LabeledContent(
-                            "In dark mode",
-                            value: settings.darkThemeID.isEmpty ? "Same as Theme" : themeName(settings.darkThemeID))
-                    }
                 } footer: {
-                    Text(
-                        "iOS draws the strip below the keys, with 🌐 and the microphone, light or dark to match your phone. Pick a dark theme for dark mode to match it."
-                    )
+                    Text("A theme can have its own look for dark mode: customise it, then turn on Dark version.")
                 }
                 Section {
                     Toggle("Haptics", isOn: saving(\.haptics))
@@ -86,8 +79,8 @@ struct SettingsView: View {
                 }
             }
             .navigationTitle("Settings")
-            .navigationDestination(for: SettingsPage.self) { page in
-                ThemeGalleryView(store: store, slot: page == .themes ? .main : .dark)
+            .navigationDestination(for: SettingsPage.self) { _ in
+                ThemeGalleryView(store: store)
             }
         }
         .onAppear(perform: reload)
@@ -101,9 +94,9 @@ struct SettingsView: View {
         customThemes = store.customThemes
     }
 
-    /// A theme's name; an id that names nothing, such as a deleted theme's, shows as the theme the keyboard falls back to.
+    /// A theme's name; an id that names nothing, such as a deleted theme's, shows as Automatic, as the keyboard does.
     private func themeName(_ id: String) -> String {
-        Themes.spec(id: id, custom: customThemes, isDark: false)?.name ?? "Automatic"
+        Themes.spec(id: id, custom: customThemes)?.name ?? Themes.automatic.name
     }
 
     /// The currency Automatic gives, picked from the region's currency code as the keyboard picks it.

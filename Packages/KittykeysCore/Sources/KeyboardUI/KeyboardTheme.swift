@@ -3,22 +3,19 @@
 import KeyboardCore
 import UIKit
 
-/// A `ThemeSpec` as UIKit colours and fonts. The host builds one from the theme the settings pick (`Themes.active`);
+/// A `ThemeStyle` as UIKit colours and fonts. The host builds one from the look the settings pick (`Themes.active`);
 /// `.light` and `.dark` are Automatic's two looks, close to Apple's keyboard, as in the approved mockups.
 ///
-/// A theme without a background leaves the keyboard view clear, so the system's keyboard backdrop (Liquid Glass on
+/// A look without a background leaves the keyboard view clear, so the system's keyboard backdrop (Liquid Glass on
 /// iOS 26) shows around and between the keys and in the suggestion row (ruling R42). The key colours read well on it.
 public struct KeyboardTheme: Equatable, Sendable {
-    public static let light = KeyboardTheme(spec: Themes.automaticLight)
-    public static let dark = KeyboardTheme(spec: Themes.automaticDark)
+    public static let light = KeyboardTheme(style: Themes.automaticLight)
+    public static let dark = KeyboardTheme(style: Themes.automaticDark)
 
-    /// The theme's data; the colours below are drawn from it. Two themes are equal when their specs are.
-    public let spec: ThemeSpec
+    /// The look's data; the colours below are drawn from it. Two themes are equal when their styles are.
+    public let style: ThemeStyle
     /// What the keys sit on; nil for the system's backdrop.
     public let background: UIColor?
-    /// The background, or a grey like the system's backdrop, for a host that has nothing behind the keys, such as the
-    /// app's preview. The keyboard view never draws it.
-    public let backdrop: UIColor
     /// Letter, number and symbol keys, and space.
     public let key: UIColor
     /// Shift, backspace, the page keys, return and the bottom row's other keys.
@@ -36,44 +33,49 @@ public struct KeyboardTheme: Equatable, Sendable {
     /// The emoji search field.
     public let searchField: UIColor
 
-    public init(spec: ThemeSpec) {
-        self.spec = spec
-        background = spec.background.map(UIColor.init(themeColor:))
-        backdrop = UIColor(themeColor: spec.previewBackdrop)
-        key = UIColor(themeColor: spec.key)
-        specialKey = UIColor(themeColor: spec.specialKey)
-        label = UIColor(themeColor: spec.label)
-        functionLabel = UIColor(themeColor: spec.functionLabel)
-        hint = UIColor(themeColor: spec.hint)
-        popup = UIColor(themeColor: spec.popup)
-        selection = UIColor(themeColor: spec.accent)
-        selectedLabel = UIColor(themeColor: spec.onAccent)
-        searchField = UIColor(themeColor: spec.searchField)
+    public init(style: ThemeStyle) {
+        self.style = style
+        background = style.background.map(UIColor.init(themeColor:))
+        key = UIColor(themeColor: style.key)
+        specialKey = UIColor(themeColor: style.specialKey)
+        label = UIColor(themeColor: style.label)
+        functionLabel = UIColor(themeColor: style.functionLabel)
+        hint = UIColor(themeColor: style.hint)
+        popup = UIColor(themeColor: style.popup)
+        selection = UIColor(themeColor: style.accent)
+        selectedLabel = UIColor(themeColor: style.onAccent)
+        searchField = UIColor(themeColor: style.searchField)
     }
 
     public static func == (a: KeyboardTheme, b: KeyboardTheme) -> Bool {
-        a.spec == b.spec
+        a.style == b.style
+    }
+
+    /// A grey like iOS's keyboard backdrop and the bar above the keyboard, for a host that has neither behind its
+    /// keyboard, such as the app's previews: rounded and faded backgrounds show against it as on the phone.
+    public static func systemBackdrop(isDark: Bool) -> UIColor {
+        UIColor(themeColor: ThemeStyle.systemBackdrop(isDark: isDark))
     }
 
     /// The system font in the theme's design and weight.
     public func font(ofSize size: CGFloat) -> UIFont {
-        Self.font(ofSize: size, weight: spec.fontWeight, design: spec.fontDesign)
+        Self.font(ofSize: size, weight: style.fontWeight, design: style.fontDesign)
     }
 
     /// The standard design at the theme's weight, for function keys' symbol labels such as ⇧ and ⌫: the serif and
     /// monospaced designs draw them small or thin.
     public func symbolFont(ofSize size: CGFloat) -> UIFont {
-        Self.font(ofSize: size, weight: spec.fontWeight, design: .standard)
+        Self.font(ofSize: size, weight: style.fontWeight, design: .standard)
     }
 
     /// The theme's design at regular weight, for the small corner hints.
     public func hintFont(ofSize size: CGFloat) -> UIFont {
-        Self.font(ofSize: size, weight: .regular, design: spec.fontDesign)
+        Self.font(ofSize: size, weight: .regular, design: style.fontDesign)
     }
 
     /// Key icons drawn to match the labels' weight.
     public var symbolWeight: UIImage.SymbolWeight {
-        switch spec.fontWeight {
+        switch style.fontWeight {
         case .light: .light
         case .regular: .regular
         case .medium: .medium

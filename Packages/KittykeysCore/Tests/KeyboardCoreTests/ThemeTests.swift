@@ -3,12 +3,24 @@ import Testing
 import KeyboardCore
 
 struct ThemeTests {
-    private func preset(_ id: String) -> ThemeSpec {
-        Themes.presets.first { $0.id == id }!
+    /// A ready-made theme's light look.
+    private func preset(_ id: String) -> ThemeStyle {
+        Themes.presets.first { $0.id == id }!.light
+    }
+
+    /// Every look of every ready-made theme, named for messages.
+    private var presetStyles: [(name: String, style: ThemeStyle)] {
+        Themes.presets.flatMap { spec in
+            [(spec.id, spec.light)] + (spec.dark.map { [(spec.id + " dark", $0)] } ?? [])
+        }
     }
 
     private func decode(_ json: String) throws -> ThemeSpec {
         try JSONDecoder().decode(ThemeSpec.self, from: Data(json.utf8))
+    }
+
+    private func decodeStyle(_ json: String) throws -> ThemeStyle {
+        try JSONDecoder().decode(ThemeStyle.self, from: Data(json.utf8))
     }
 
     // MARK: Colours
@@ -100,9 +112,9 @@ struct ThemeTests {
 
         // Every ready-made theme already reads, so none of them changes. Space is left out: its label is the dim hint
         // colour on purpose, and Apple's pressed space is as faint.
-        for preset in Themes.presets + [Themes.automaticDark] {
+        for (name, preset) in presetStyles {
             for role in [KeyRole.letter, .punctuation, .function, .returnKey] {
-                #expect(preset.labelColor(role).contrast(with: preset.pressedFill(role)) >= 2, "\(preset.id) \(role)")
+                #expect(preset.labelColor(role).contrast(with: preset.pressedFill(role)) >= 2, "\(name) \(role)")
             }
         }
     }
@@ -156,9 +168,9 @@ struct ThemeTests {
             #expect(spec.popup.contrast(with: spec.background!) >= 1.1, "\(spec.keyShape) popup on background")
         }
         // The ready-made themes already read, so they keep today's colours.
-        for spec in Themes.presets + [Themes.automaticDark] {
-            #expect(spec.label.contrast(with: spec.popup) >= 3, "\(spec.id)")
-            #expect(spec.label.contrast(with: spec.searchField) >= 3, "\(spec.id)")
+        for (name, spec) in presetStyles {
+            #expect(spec.label.contrast(with: spec.popup) >= 3, "\(name)")
+            #expect(spec.label.contrast(with: spec.searchField) >= 3, "\(name)")
         }
     }
 
@@ -202,14 +214,14 @@ struct ThemeTests {
     // MARK: Ready-made themes
 
     @Test func presetsAreReadable() {
-        for spec in Themes.presets + [Themes.automaticDark] {
+        for (name, spec) in presetStyles {
             func surface(_ role: KeyRole) -> ThemeColor? { spec.restingFill(role) ?? spec.background }
             if let letters = surface(.letter) {
-                #expect(spec.label.contrast(with: letters) >= 4.5, "\(spec.id) letters")
-                #expect(spec.hint.contrast(with: letters) >= 2.5, "\(spec.id) hints")
+                #expect(spec.label.contrast(with: letters) >= 4.5, "\(name) letters")
+                #expect(spec.hint.contrast(with: letters) >= 2.5, "\(name) hints")
             }
             if let functions = surface(.function) {
-                #expect(spec.functionLabel.contrast(with: functions) >= 3, "\(spec.id) function labels")
+                #expect(spec.functionLabel.contrast(with: functions) >= 3, "\(name) function labels")
             }
         }
     }
@@ -217,7 +229,7 @@ struct ThemeTests {
     @Test func presetIdsAreUniqueAndStable() {
         let ids = Themes.presets.map(\.id)
         #expect(Set(ids).count == ids.count)
-        #expect(Themes.presets.first == Themes.automaticLight)
+        #expect(Themes.presets.first == Themes.automatic)
         #expect(ids.first == Themes.automaticID)
         #expect(!ids.contains { $0.hasPrefix(Themes.customIDPrefix) })
         #expect(ids == ["automatic", "light", "dark", "neon", "midnight", "amber", "synthwave", "terminal", "paper", "rose"])
@@ -226,71 +238,121 @@ struct ThemeTests {
 
     // MARK: Picking
 
-    @Test func darkSlotPicksByAppearance() {
-        let neon = preset("neon"), midnight = preset("midnight")
-        for isDark in [false, true] {
-            #expect(Themes.active(themeID: "neon", darkThemeID: "", custom: [], isDark: isDark) == neon)
-        }
-        #expect(Themes.active(themeID: "neon", darkThemeID: "midnight", custom: [], isDark: true) == midnight)
-        #expect(Themes.active(themeID: "neon", darkThemeID: "midnight", custom: [], isDark: false) == neon)
-        #expect(Themes.active(themeID: "automatic", darkThemeID: "", custom: [], isDark: false) == Themes.automaticLight)
-        #expect(Themes.active(themeID: "automatic", darkThemeID: "", custom: [], isDark: true) == Themes.automaticDark)
+    @Test func automaticHasBothVersions() {
+        #expect(Themes.automatic.id == Themes.automaticID)
+        #expect(Themes.automatic.light == Themes.automaticLight)
+        #expect(Themes.automatic.dark == Themes.automaticDark)
+        #expect(Themes.automatic.style(isDark: true) == Themes.automaticDark)
+        #expect(Themes.automatic.style(isDark: false) == Themes.automaticLight)
+        // The others have one look, shown in light and dark mode alike.
+        #expect(Themes.presets.dropFirst().allSatisfy { $0.dark == nil })
     }
 
-    @Test func unknownIdsFallBack() {
-        let neon = preset("neon")
-        #expect(Themes.active(themeID: "neon", darkThemeID: "custom-gone", custom: [], isDark: true) == neon)
-        #expect(Themes.active(themeID: "custom-gone", darkThemeID: "", custom: [], isDark: false) == Themes.automaticLight)
-        #expect(Themes.active(themeID: "custom-gone", darkThemeID: "nope", custom: [], isDark: true) == Themes.automaticDark)
-        var mine = neon
-        mine.id = "custom-1"
-        mine.name = "Mine"
-        #expect(Themes.active(themeID: "custom-1", darkThemeID: "", custom: [mine], isDark: false) == mine)
-        #expect(Themes.spec(id: "custom-1", custom: [mine], isDark: false) == mine)
-        #expect(Themes.spec(id: "custom-2", custom: [mine], isDark: false) == nil)
+    @Test func activePicksTheVersionForTheAppearance() {
+        let neon = preset("neon"), midnight = preset("midnight")
+        for isDark in [false, true] {
+            #expect(Themes.active(themeID: "neon", custom: [], isDark: isDark) == neon)
+        }
+        #expect(Themes.active(themeID: "automatic", custom: [], isDark: false) == Themes.automaticLight)
+        #expect(Themes.active(themeID: "automatic", custom: [], isDark: true) == Themes.automaticDark)
+
+        let mine = ThemeSpec(id: "custom-1", name: "Mine", light: neon, dark: midnight)
+        #expect(Themes.active(themeID: "custom-1", custom: [mine], isDark: false) == neon)
+        #expect(Themes.active(themeID: "custom-1", custom: [mine], isDark: true) == midnight)
+        let single = ThemeSpec(id: "custom-2", name: "Single", light: neon, dark: nil)
+        #expect(Themes.active(themeID: "custom-2", custom: [single], isDark: true) == neon)
+
+        // A theme that's gone shows Automatic's version for the appearance.
+        #expect(Themes.active(themeID: "custom-gone", custom: [], isDark: false) == Themes.automaticLight)
+        #expect(Themes.active(themeID: "custom-gone", custom: [], isDark: true) == Themes.automaticDark)
+        #expect(Themes.spec(id: "custom-1", custom: [mine]) == mine)
+        #expect(Themes.spec(id: "neon", custom: [mine])?.light == neon)
+        #expect(Themes.spec(id: "custom-3", custom: [mine]) == nil)
     }
 
     // MARK: Saving
 
-    @Test func specDecodingIsForgiving() throws {
+    @Test func styleDecodingIsForgiving() throws {
         let midnight = preset("midnight")
-        let data = try JSONEncoder().encode(midnight)
-        #expect(try JSONDecoder().decode(ThemeSpec.self, from: data) == midnight)
+        #expect(try JSONDecoder().decode(ThemeStyle.self, from: JSONEncoder().encode(midnight)) == midnight)
+        #expect(try decodeStyle("{}") == Themes.automaticLight)
 
-        let sparse = try decode(#"{"id":"custom-1","name":"Sparse"}"#)
-        var expected = Themes.automaticLight
-        expected.id = "custom-1"
-        expected.name = "Sparse"
-        #expect(sparse == expected)
-
-        let bad = try decode(#"{"id":"custom-2","key":"nonsense","keyShape":"wavy","fontWeight":7,"background":null}"#)
+        let bad = try decodeStyle(#"{"key":"nonsense","keyShape":"wavy","fontWeight":7,"background":null}"#)
         #expect(bad.key == Themes.automaticLight.key)
         #expect(bad.keyShape == .filled)
         #expect(bad.fontWeight == .regular)
         #expect(bad.background == nil)
+        #expect(try decodeStyle(##"{"background":"#000000"}"##).background == .black)
+    }
 
-        let solid = try decode(##"{"id":"custom-3","background":"#000000"}"##)
-        #expect(solid.background == .black)
+    @Test func roundingAndFadeDefaults() throws {
+        let old = try decodeStyle(##"{"background":"#000000"}"##)
+        #expect(old.roundsTopCorners && !old.fadesTopEdge)
+        #expect(presetStyles.allSatisfy { $0.style.roundsTopCorners && !$0.style.fadesTopEdge })
+        var faded = preset("rose")
+        faded.roundsTopCorners = false
+        faded.fadesTopEdge = true
+        #expect(try JSONDecoder().decode(ThemeStyle.self, from: JSONEncoder().encode(faded)) == faded)
+        #expect(Themes.topCornerRadius == 26.4)
+    }
 
+    @Test func darkVersionRoundTrips() throws {
+        let both = ThemeSpec(id: "custom-1", name: "Both", light: preset("paper"), dark: preset("neon"))
+        #expect(try JSONDecoder().decode(ThemeSpec.self, from: JSONEncoder().encode(both)) == both)
+        let single = ThemeSpec(id: "custom-2", name: "Single", light: preset("paper"), dark: nil)
+        #expect(try JSONDecoder().decode(ThemeSpec.self, from: JSONEncoder().encode(single)) == single)
+    }
+
+    @Test func decodesThemesSavedBy050() throws {
+        // Version 0.5.0 saved each theme's look flat, beside its id and name.
+        let old = try decode(##"{"id":"custom-1","name":"Old","background":"#101820","key":"#F2AA4C","keyShape":"outlined"}"##)
+        #expect(old.id == "custom-1" && old.name == "Old")
+        #expect(old.dark == nil)
+        #expect(old.light.background == ThemeColor(rgb: 0x101820))
+        #expect(old.light.key == ThemeColor(rgb: 0xF2AA4C))
+        #expect(old.light.keyShape == .outlined)
+        #expect(old.light.roundsTopCorners)
+    }
+
+    @Test func brokenDarkVersionIsDropped() throws {
+        let theme = try decode(##"{"id":"custom-1","name":"Broken","light":{"key":"#FF0000"},"dark":42}"##)
+        #expect(theme.light.key == ThemeColor(rgb: 0xFF0000))
+        #expect(theme.dark == nil)
+        #expect(try decode(#"{"id":"custom-2"}"#).name == "Theme")
         #expect(throws: (any Error).self) { try decode(#"{"name":"No id"}"#) }
         #expect(throws: (any Error).self) { try decode(#"{"id":""}"#) }
     }
 
-    @Test func newCustomNamesAndIds() {
-        let neon = preset("neon")
-        let first = Themes.newCustom(from: neon, existing: [])
+    @Test func startFromCopiesWhatTheGalleryShows() {
+        let rose = Themes.presets.first { $0.id == "rose" }!, neon = Themes.presets.first { $0.id == "neon" }!
+        let single = ThemeSpec(id: "custom-1", name: "Mine", light: rose.light, dark: nil)
+
+        // One look, from a theme with one look: the look is replaced.
+        #expect(single.startingFrom(neon, editingDark: false) == ThemeSpec(id: "custom-1", name: "Mine", light: neon.light, dark: nil))
+        // One look, from a theme with two: both come, as its split card shows.
+        #expect(
+            single.startingFrom(Themes.automatic, editingDark: false)
+                == ThemeSpec(id: "custom-1", name: "Mine", light: Themes.automaticLight, dark: Themes.automaticDark))
+
+        // Two looks: only the tab being edited changes, from the source's look for that tab.
+        let both = ThemeSpec(id: "custom-2", name: "Both", light: rose.light, dark: neon.light)
+        #expect(both.startingFrom(Themes.automatic, editingDark: true).dark == Themes.automaticDark)
+        #expect(both.startingFrom(Themes.automatic, editingDark: true).light == rose.light)
+        #expect(both.startingFrom(neon, editingDark: false).light == neon.light)
+        #expect(both.startingFrom(neon, editingDark: false).dark == neon.light)
+    }
+
+    @Test func newCustomCopiesBothVersions() {
+        let first = Themes.newCustom(from: Themes.automatic, existing: [])
         #expect(first.name == "My theme")
         #expect(first.id.hasPrefix(Themes.customIDPrefix))
-        var expected = neon
-        expected.id = first.id
-        expected.name = first.name
-        #expect(first == expected)
+        #expect(first.light == Themes.automaticLight && first.dark == Themes.automaticDark)
 
-        let second = Themes.newCustom(from: neon, existing: [first])
+        let second = Themes.newCustom(from: first, existing: [first])
         #expect(second.name == "My theme 2")
         #expect(second.id != first.id)
-        #expect(Themes.newCustom(from: neon, existing: [first, second]).name == "My theme 3")
-        #expect(Themes.newCustom(from: neon, existing: [second]).name == "My theme")
+        #expect(Themes.newCustom(from: first, existing: [first, second]).name == "My theme 3")
+        #expect(Themes.newCustom(from: first, existing: [second]).name == "My theme")
     }
 }
 

@@ -32,7 +32,7 @@ final class SettingsTests {
         #expect(s.longPressDelay == 0.3)
         #expect(s.handOffCodeFields)
         #expect(!s.showDotComKey && s.currency == "")
-        #expect(s.themeID == "automatic" && s.darkThemeID == "")
+        #expect(s.themeID == "automatic")
         #expect(store.load() == s)   // nothing saved yet
         #expect(store.customThemes.isEmpty)
     }
@@ -48,7 +48,6 @@ final class SettingsTests {
         s.showDotComKey = true
         s.currency = "€"
         s.themeID = "neon"
-        s.darkThemeID = "midnight"
         store.save(s)
         #expect(store.load() == s)
         #expect(SettingsStore(defaults: UserDefaults(suiteName: suiteName)!).load() == s)
@@ -175,7 +174,7 @@ final class SettingsTests {
         let added = store.addCustomTheme(copying: Themes.presets[3])
         #expect(added.id.hasPrefix(Themes.customIDPrefix))
         #expect(added.name == "My theme")
-        #expect(added.key == Themes.presets[3].key)
+        #expect(added.light == Themes.presets[3].light)
         #expect(store.customThemes == [first, added])
     }
 
@@ -184,7 +183,6 @@ final class SettingsTests {
         store.saveCustomThemes([picked, other])
         var s = KeyboardSettings()
         s.themeID = picked.id
-        s.darkThemeID = picked.id
         s.sound = true
         store.save(s)
 
@@ -192,17 +190,27 @@ final class SettingsTests {
         #expect(store.customThemes == [other])
         var expected = s
         expected.themeID = "automatic"
-        expected.darkThemeID = ""
         #expect(store.load() == expected)
 
-        // Removing a theme no slot picked leaves the settings alone.
+        // Removing a theme that isn't picked leaves the settings alone.
         s = expected
         s.themeID = "neon"
-        s.darkThemeID = "midnight"
         store.save(s)
         store.removeCustomTheme(id: other.id)
         #expect(store.customThemes.isEmpty)
         #expect(store.load() == s)
+    }
+
+    @Test func settingsFrom050StillLoad() throws {
+        // Version 0.5.0 had a separate theme for dark mode; a theme now carries its own dark look.
+        writeSettingsJSON(#"{"themeID":"paper","darkThemeID":"neon","sound":true}"#)
+        var expected = KeyboardSettings()
+        expected.themeID = "paper"
+        expected.sound = true
+        #expect(store.load() == expected)
+        store.save(store.load())
+        let saved = try #require(defaults.data(forKey: "catkeys.settings"))
+        #expect(!String(decoding: saved, as: UTF8.self).contains("darkThemeID"))
     }
 
     @Test func appGroupNeedsAnID() throws {

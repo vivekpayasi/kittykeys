@@ -17,21 +17,23 @@ struct KeyboardPreviewView: UIViewRepresentable {
         }
     }
 
-    /// The theme `-kittykeysPreviewTheme <id>` names, else Automatic, for the app's light or dark.
+    /// The theme `-kittykeysPreviewTheme <id>` names, else Automatic, in its look for the app's light or dark;
+    /// `-kittykeysPreviewFade` turns on its fade.
     func updateUIView(_ view: UIView, context: Context) {
         let arguments = ProcessInfo.processInfo.arguments
         let id = arguments.firstIndex(of: "-kittykeysPreviewTheme").flatMap {
             arguments.indices.contains($0 + 1) ? arguments[$0 + 1] : nil
         }
-        let spec = Themes.active(
-            themeID: id ?? Themes.automaticID, darkThemeID: "", custom: [],
-            isDark: context.environment.colorScheme == .dark)
-        (view as? KeyboardPreviewHost)?.theme = KeyboardTheme(spec: spec)
+        let isDark = context.environment.colorScheme == .dark
+        var style = Themes.active(themeID: id ?? Themes.automaticID, custom: [], isDark: isDark)
+        if arguments.contains("-kittykeysPreviewFade") { style.fadesTopEdge = true }
+        (view as? KeyboardPreviewHost)?.show(KeyboardTheme(style: style), isDark: isDark)
     }
 }
 
 /// What the preview shows, from launch arguments. Each step drives the controller as touches would.
-/// - `-kittykeysPreviewTheme <id>`: a ready-made theme (`Themes.presets`); Automatic otherwise.
+/// - `-kittykeysPreviewTheme <id>`: a ready-made theme (`Themes.presets`); Automatic otherwise. With
+///   `-kittykeysPreviewFade` its background fades in at the top.
 /// - `-kittykeysPreviewField <email|url|number>`: the field asks for that kind of keys; a text field otherwise.
 /// - `-kittykeysPreviewPage <id>`: taps page keys until page `id` shows.
 /// - `-kittykeysPreviewHold <label>`: holds the key with that label until its long-press options show.
@@ -76,7 +78,8 @@ struct PreviewScene {
 }
 
 /// A text view at the top and the keyboard at the bottom, sharing one controller.
-/// The keyboard view is clear, so a grey like the system's keyboard backdrop goes behind it and below it.
+/// The keyboard view is clear where its theme has no background, so a grey like the system's keyboard backdrop goes
+/// behind it and below it; rounded and faded backgrounds show against it as on the phone.
 final class KeyboardPreviewHost: UIView {
     /// Invented text, so the keyboard starts mid-sentence with shift off.
     private static let startingText = "Typing in the kittykeys preview"
@@ -90,11 +93,10 @@ final class KeyboardPreviewHost: UIView {
     /// Invented, most recent first.
     private static let sampleRecent = ["😂", "❤️", "👍🏽", "🙏", "🇮🇳", "👨‍👩‍👧", "🔥", "✅", "😭", "🎉"]
 
-    var theme: KeyboardTheme = .light {
-        didSet {
-            keyboardView.theme = theme
-            backdrop.backgroundColor = theme.backdrop
-        }
+    /// Draws the keyboard in `theme`, on the backdrop grey for the app's light or dark.
+    func show(_ theme: KeyboardTheme, isDark: Bool) {
+        keyboardView.theme = theme
+        backdrop.backgroundColor = KeyboardTheme.systemBackdrop(isDark: isDark)
     }
 
     private let layouts: LayoutSet
@@ -122,7 +124,7 @@ final class KeyboardPreviewHost: UIView {
         keyboardView.blinksSearchCaret = false
         super.init(frame: .zero)
         backgroundColor = .systemBackground
-        backdrop.backgroundColor = theme.backdrop
+        backdrop.backgroundColor = KeyboardTheme.systemBackdrop(isDark: false)
 
         // The backdrop goes in first, so it sits behind the keyboard.
         for view in [backdrop, textView, keyboardView] {
