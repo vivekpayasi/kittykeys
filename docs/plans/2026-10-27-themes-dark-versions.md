@@ -151,7 +151,9 @@ layer), `Keyboard/KeyboardViewController.swift`, `App/KeyboardPreviewView.swift`
   real v0.5.0 themes and settings built from the old code. Fixed: Start from a theme with two looks on a one-look theme
   now brings both (test), and the Settings footer says to customise a ready-made theme first. Deferred minors are in
   the hand-off message. 339 tests.
-- Device check for the user (next release):
+- 2026-10-28: merged to `main` (--no-ff) and released as v0.6.0 (build 6); the IPA on the v0.6.0 release is
+  byte-identical to the local build.
+- Device check for the user (v0.6.0):
   - A custom theme made in v0.5.0 is still there and still picked.
   - Rose with Round top corners, then with Fade too, in light and dark mode; compare with iOS's bar above.
   - The emoji panel and emoji search over a rounded, faded theme; tap the search field and near the rounded corners.
